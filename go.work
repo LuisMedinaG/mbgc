@@ -1,0 +1,10 @@
+// go.work
+go 1.25
+
+use (
+    ./mbgc-shared
+    ./mbgc-gateway
+    ./mbgc-auth-service
+    ./mbgc-game-service
+    ./mbgc-importer-service
+)
