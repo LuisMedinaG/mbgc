@@ -1,0 +1,25 @@
+{{template "base.html" .}}
+
+{{define "title"}}Login — My Board Game Collection{{end}}
+
+{{define "content"}}
+<nav>
+  <strong><a href="/">My Board Game Collection</a></strong>
+  <a href="/register">Register</a>
+</nav>
+
+<h1>Login</h1>
+{{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+
+<form method="POST" action="/api/auth/login" style="max-width: 400px;">
+  <div style="margin-bottom: 1rem;">
+    <label for="email">Email</label><br>
+    <input type="email" id="email" name="email" required style="width: 100%;">
+  </div>
+  <div style="margin-bottom: 1rem;">
+    <label for="password">Password</label><br>
+    <input type="password" id="password" name="password" required style="width: 100%;">
+  </div>
+  <button type="submit">Login</button>
+</form>
+{{end}}

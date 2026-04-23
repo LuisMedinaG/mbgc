@@ -1,0 +1,31 @@
+{{template "base.html" .}}
+
+{{define "title"}}My Board Game Collection{{end}}
+
+{{define "content"}}
+<nav>
+  <strong>My Board Game Collection</strong>
+  {{if .User}}
+    <a href="/htmx/collection">My Collection</a>
+    <span>{{.User.Email}}</span>
+  {{else}}
+    <a href="/login">Login</a>
+    <a href="/register">Register</a>
+  {{end}}
+</nav>
+
+<h1>Games</h1>
+<input
+  type="search"
+  name="q"
+  placeholder="Search games..."
+  hx-get="/htmx/games"
+  hx-target="#game-list"
+  hx-trigger="input changed delay:300ms"
+  style="width: 100%; margin-bottom: 1rem;"
+>
+
+<div id="game-list">
+  {{template "game-list" .Games}}
+</div>
+{{end}}

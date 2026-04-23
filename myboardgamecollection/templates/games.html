@@ -1,0 +1,19 @@
+{{define "game-list"}}
+<div class="game-grid">
+  {{range .}}
+  <div class="game-card">
+    {{if .ImageURL}}
+    <img src="{{.ImageURL}}" alt="{{.Title}}">
+    {{end}}
+    <h3>{{.Title}}</h3>
+    {{if .YearPublished}}<p>{{.YearPublished}}</p>{{end}}
+    {{if .MinPlayers}}
+    <p>Players: {{.MinPlayers}}{{if .MaxPlayers}}–{{.MaxPlayers}}{{end}}</p>
+    {{end}}
+    {{if .Weight}}<p>Weight: {{printf "%.2f" .Weight}}</p>{{end}}
+  </div>
+  {{else}}
+  <p>No games found.</p>
+  {{end}}
+</div>
+{{end}}
