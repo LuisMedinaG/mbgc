@@ -7,4 +7,5 @@ use (
 	./mbgc-gateway
 	./mbgc-importer-service
 	./mbgc-shared
+	./myboardgamecollection
 )
