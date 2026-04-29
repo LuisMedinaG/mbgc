@@ -1,10 +1,11 @@
-// go.work
 go 1.25
 
 use (
-    ./mbgc-shared
-    ./mbgc-gateway
-    ./mbgc-auth-service
-    ./mbgc-game-service
-    ./mbgc-importer-service
+	./mbgc-shared
+	./mbgc-gateway
+	./mbgc-auth-service
+	./mbgc-game-service
+	./mbgc-importer-service
 )
+
+replace github.com/LuisMedinaG/mbgc-shared v0.1.0 => ./mbgc-shared

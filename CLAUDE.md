@@ -15,7 +15,7 @@ being decomposed into focused microservices. Both coexist during migration.
 | `mbgc-web` | TypeScript | React frontend | Cloudflare Pages |
 | `mbgc-shared` | Go | Shared module — response envelope, error codes, HTTP middleware | (library) |
 | `mbgc-infra` | HCL | Terraform IaC — Fly, Cloudflare, Supabase | — |
-
+      
 ## Request Flow
 
 ```
@@ -55,3 +55,5 @@ Direct push to `main`/`staging` is blocked (admin bypass exists for emergencies)
 - **Supabase** — auth provider for microservices
 - **Terraform** — `mbgc-infra` is the single source of truth for all cloud resources
 
+<claude-mem-context>
+</claude-mem-context>

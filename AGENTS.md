@@ -34,8 +34,8 @@ The monolith (`myboardgamecollection`) runs independently and is not behind the 
 
 - **Language:** Go 1.25 (services) · TypeScript / React (web)
 - **Auth:** JWT — access tokens (15 min), refresh tokens (30 day)
-- **Response envelope:** `{ "data": ... }` success · `{ "error": "..." }` failure
-- **Pagination:** top-level `total`, `page`, `per_page` on list responses
+- **Response envelope:** `{ "data": ... }` success · `{ "error": { "code": "...", "message": "..." } }` failure
+- **Pagination:** `{ "data": [...], "meta": { "page": 1, "limit": 20, "total": N } }`
 - **Errors:** sentinel errors in `mbgc-shared` — never leak raw DB errors to clients
 - **DB:** SQLite (`modernc.org/sqlite`) in monolith; services may use Postgres via Supabase
 
