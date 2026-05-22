@@ -1,0 +1,18 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    uses: LuisMedinaG/mbgc-infra/.github/workflows/deploy-cloud-run.yml@main
+    with:
+      service_name: mbgc-importer-service
+      dockerfile: deploy/Dockerfile
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT:            ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_PROJECT_ID:                 ${{ secrets.GCP_PROJECT_ID }}
+      GCP_RUNTIME_SERVICE_ACCOUNT:    ${{ secrets.GCP_RUNTIME_SERVICE_ACCOUNT }}
