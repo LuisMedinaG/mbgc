@@ -52,6 +52,12 @@ make test          # Test all Go packages
 make tidy          # go mod tidy all modules
 ```
 
+## CI/CD
+
+- **CI** — `.github/workflows/ci.yml`: Build, test, vet all Go services + web lint/build + infra lint
+- **Deploy** — `.github/workflows/deploy.yml`: Deploys only changed services on push to `main`
+- **Secrets** — Run `sh set-deploy-secrets.sh` to sync GCP/Cloudflare secrets to GitHub
+
 ## Branching Strategy
 
 ```
