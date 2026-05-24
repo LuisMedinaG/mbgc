@@ -1,76 +1,72 @@
-# mbgc — Monorepo
+# AGENTS.md — mbgc monorepo
 
-Personal board game collection app. Go microservices + React frontend.
-Single git repo — one commit spans all services.
-
-## Directory Structure
-
-```
-mbgc/
-── pkg/shared/          Go shared library (envelope, apierr, httpx)
-── services/
-│   ├── gateway/         API gateway — JWT validation, reverse proxy
-│   ├── auth/            Profile service — BGG username, admin roles
-│   ├── game/            Core domain — games, collections, player aids
-│   ├── importer/        BGG sync + CSV import
-│   ── monolith/        [DEPRECATED] Original Go monolith — being replaced
-── web/                 React frontend (Vite + TypeScript + Tailwind)
-└── infra/               Terraform IaC — GCP Cloud Run, Cloudflare, Supabase
-```
-
-## Request Flow
-
-```
-Browser / web
-      │
-      ▼
-services/gateway  (validates JWT, routes by path prefix)
-      ├──▶ services/auth      /api/v1/auth/*  /api/v1/profile/*
-      ├──▶ services/game      /api/v1/games/* /api/v1/collections/*
-      └──▶ services/importer  /api/v1/import/*
-```
-
-The monolith (`services/monolith`) runs independently on Fly.io and is not behind the gateway.
-It is being decommissioned as microservices reach feature parity.
-
-## Shared Conventions
-
-- **Language:** Go 1.25 (services) · TypeScript / React (web)
-- **Auth:** JWT — access tokens (15 min), refresh tokens (30 day)
-- **Response envelope:** `{ "data": ... }` success · `{ "error": { "code": "...", "message": "..." } }` failure
-- **Pagination:** `{ "data": [...], "meta": { "page": 1, "limit": 20, "total": N } }`
-- **Errors:** sentinel errors in `pkg/shared/apierr` — never leak raw DB errors to clients
-- **DB:** SQLite in monolith; Postgres via Supabase in microservices
-
-## Development
+## Build & Test
 
 ```sh
-make dev-all       # Start all services in tmux
-make dev SERVICE=gateway   # Start one service
-make build         # Build all services
-make test          # Test all Go packages
-make tidy          # go mod tidy all modules
+# All services share the same per-service Makefile interface:
+make dev       # go run ./cmd/server  (auto-loads .env)
+make build     # CGO_ENABLED=0 go build -ldflags="-s -w" -o server ./cmd/server
+make test      # go test ./...
+make test-v    # go test -v -race ./...  ← use before every PR
+make lint      # go vet ./...
+make tidy      # go mod tidy
+
+# Services with Postgres migrations (auth, game, importer):
+make migrate-up
+make migrate-down
+
+# Web (from web/):
+bun run dev
+bun run build        # tsc -b && vite build
+bun run lint
+bun run test:e2e     # Playwright — requires full stack running
 ```
 
-## CI/CD
+## go.work Workspace
 
-- **CI** — `.github/workflows/ci.yml`: Build, test, vet all Go services + web lint/build + infra lint
-- **Deploy** — `.github/workflows/deploy.yml`: Deploys only changed services on push to `main`
-- **Secrets** — Run `sh set-deploy-secrets.sh` to sync GCP/Cloudflare secrets to GitHub
+`go.work` + `replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared` means all services resolve `pkg/shared` locally — no version bump needed during development. Changes to `pkg/shared` are immediately visible to all services.
 
-## Branching Strategy
+When touching `pkg/shared`: run `make tidy` and `make test-v` in each consuming service before opening a PR.
+
+## Code Style (non-obvious rules)
+
+**Go:**
+- `slog` for structured logging — never `log.Printf` or `fmt.Println`
+- Wrap errors with `fmt.Errorf("%w", err)`; check with `errors.Is` / `errors.As`
+- Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
+- Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
+- Extract user identity via `httpx.UserIDFromContext` — the gateway injects `X-User-ID`, `X-Is-Admin` headers
+
+**TypeScript:**
+- Strict mode, no `any`
+- All API calls through `web/src/lib/api.ts` — never raw `fetch()` in components or hooks
+
+## Git Workflow
 
 ```
 feature/*  →  dev  →  staging  →  main
 ```
+- Branch from `dev`, not `main`
+- Commit subject: imperative present tense, 50-char max (`fix: ...`, `add: ...`, `remove: ...`)
+- All promotions (`dev → staging`, `staging → main`) require a PR + passing CI
 
-Promotion: `dev → staging` and `staging → main` require PRs.
-Direct push to `main`/`staging` is blocked (admin bypass exists for emergencies).
+## Boundaries
 
-## Infrastructure
+**Always:**
+- Include `user_id` in every query on user-owned data — multi-tenancy enforced at SQL layer
+- Use `pkg/shared/apierr` sentinels for all error paths
+- Trust gateway-forwarded headers (`X-User-ID`, `X-Is-Admin`) in downstream services — never re-validate the JWT there
+- Run `make test-v` before opening a PR
 
-- **GCP Cloud Run** — all Go microservices (deployed via each service's CI/CD)
-- **Fly.io** — monolith only (being decommissioned)
-- **Cloudflare Pages** — `web/` frontend
-- **Supabase** — auth provider + Postgres for microservices
-- **Terraform** — `infra/` is the single source of truth for all cloud resources
+**Ask first:**
+- Schema changes affecting multiple services
+- Any change to `pkg/shared` exported types (all 5 services depend on it)
+- Auth flow modifications (JWT expiry, Supabase config, refresh logic)
+- New external service integrations or third-party dependencies
+
+**Never:**
+- Push directly to `main` or `staging`
+- Query user-owned data without a `user_id` WHERE clause
+- Expose raw `err.Error()` from DB or internal code to HTTP responses
+- Commit secrets, `.env` files, or service account credentials
+- Use `--no-verify` on commits

@@ -53,3 +53,5 @@ set-deploy-secrets.sh
 
 # Wrangler config
 .wrangler/
+
+.vite/

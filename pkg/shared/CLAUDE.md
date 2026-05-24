@@ -52,9 +52,11 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 
 ## Updating this module
 
-1. Bump the version tag (`vX.Y.Z`) after any breaking change.
-2. Update `go.mod` in every consuming service (`go get github.com/LuisMedinaG/mbgc/pkg/shared@vX.Y.Z`).
-3. Keep backwards-compatible additions in minor versions.
+The monorepo uses `go.work` with a `replace` directive pointing all services to `./pkg/shared` — no version bump needed for local changes. After modifying this package:
+
+1. Run `make tidy` in each consuming service to sync `go.sum`.
+2. Run `make test-v` in each consuming service to catch breakage early.
+3. If publishing externally (outside this monorepo): bump `vX.Y.Z`, then update `go get` in each consumer.
 
 <claude-mem-context>
 </claude-mem-context>

@@ -19,11 +19,11 @@ Deployed to Cloudflare Pages; talks exclusively to mbgc-gateway.
 ## Commands
 
 ```sh
-npm install
-npm run dev      # local dev server
-npm run build    # production build → dist/
-npm run lint
-npm run test
+bun install
+bun run dev          # Vite dev server
+bun run build        # tsc -b && vite build → dist/
+bun run lint         # eslint
+bun run test:e2e     # Playwright e2e (requires full backend stack)
 ```
 
 ## Environment variables
@@ -40,8 +40,10 @@ Preview deploys on every PR (Cloudflare integration).
 ## Key conventions
 
 - No JS framework beyond React — keep it lean
-- All API calls go through a central `api/` module that attaches the JWT header
+- All API calls go through `src/lib/api.ts` — never raw `fetch()` in components or hooks
+- Access token stored in memory; refresh token in `httpOnly` cookie — never localStorage
 - TypeScript strict mode — no `any`
+- No unit test framework — only Playwright e2e in `e2e/`
 
 
 <claude-mem-context>

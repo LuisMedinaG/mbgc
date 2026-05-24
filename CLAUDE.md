@@ -1,3 +1,5 @@
+@AGENTS.md
+
 # mbgc — Monorepo
 
 Personal board game collection app. Go microservices + React frontend.
@@ -15,7 +17,7 @@ mbgc/
 │   ├── importer/        BGG sync + CSV import
 │   └── monolith/        [DEPRECATED] Original Go monolith — being replaced
 ├── web/                 React frontend (Vite + TypeScript + Tailwind)
-── infra/               Terraform IaC — GCP Cloud Run, Cloudflare, Supabase
+├── infra/               Terraform IaC — GCP Cloud Run, Cloudflare, Supabase
 ```
 
 ## Request Flow
@@ -45,18 +47,26 @@ It is being decommissioned as microservices reach feature parity.
 ## Development
 
 ```sh
-make dev-all       # Start all services in tmux
-make dev SERVICE=gateway   # Start one service
-make build         # Build all services
-make test          # Test all Go packages
-make tidy          # go mod tidy all modules
+make dev-all                    # Start all services + web in tmux (detach: ctrl+b d)
+
+# Per-service (run from service directory)
+cd services/gateway && make dev        # go run ./cmd/server, loads .env
+cd services/gateway && make test-v    # go test -v -race ./...
+cd services/gateway && make build     # produces ./server binary
+cd services/gateway && make tidy      # go mod tidy
+
+# Web (from web/)
+bun run dev      # Vite dev server
+bun run build    # tsc -b && vite build
+bun run lint
+bun run test:e2e # Playwright e2e (requires full stack)
 ```
 
 ## CI/CD
 
 - **CI** — `.github/workflows/ci.yml`: Build, test, vet all Go services + web lint/build + infra lint
 - **Deploy** — `.github/workflows/deploy.yml`: Deploys only changed services on push to `main`
-- **Secrets** — Run `sh set-deploy-secrets.sh` to sync GCP/Cloudflare secrets to GitHub
+- **Secrets** — Managed via `infra/scripts/bootstrap.sh`; syncs GCP/Cloudflare credentials to GitHub Actions secrets
 
 ## Branching Strategy
 

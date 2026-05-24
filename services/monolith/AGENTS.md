@@ -19,7 +19,7 @@ target the microservices.
 
 ```
 React (Vite/Bun)  ←→  Go stdlib HTTP server  ←→  SQLite
-  react-app/             main.go + services/         shared/db/
+  web/             main.go + services/         shared/db/
 ```
 
 Single binary Go server. No HTMX, no SSR templates. All frontend is React SPA calling `/api/v1/…` endpoints.
@@ -158,7 +158,7 @@ New column → add to `addCols` (errors discarded intentionally):
 
 After schema change: update column list constants, scan functions, model structs, and API response maps in the affected store.
 
-### React API client (react-app/src/lib/api.ts)
+### React API client (web/src/lib/api.ts)
 
 ```ts
 // Never fetch() in components — always add a typed method here.
@@ -180,7 +180,7 @@ Never expose raw `err.Error()` from DB or internal code to the HTTP response.
 
 ## CSS (React)
 
-Source: `react-app/src/index.css` (Tailwind v4, CSS-first config, no tailwind.config.js)
+Source: `web/src/index.css` (Tailwind v4, CSS-first config, no tailwind.config.js)
 
 Parchment/warm theme tokens: `bg-parchment` · `bg-surface` · `text-ink` · `text-muted` · `bg-accent` (green #2d5a27)
 
