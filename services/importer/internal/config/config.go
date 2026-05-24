@@ -1,0 +1,57 @@
+package config
+
+import (
+	"log/slog"
+	"os"
+	"strconv"
+)
+
+type Config struct {
+	Port           string
+	DatabaseURL    string
+	GameServiceURL string
+	BGGToken       string
+	BGGCookie      string
+	SyncLimitUser  int // max BGG syncs per day for regular users
+	SyncLimitAdmin int // max BGG syncs per day for admins
+}
+
+func Load() Config {
+	return Config{
+		Port:           getenv("PORT", "8003"),
+		DatabaseURL:    mustenv("DATABASE_URL"),
+		GameServiceURL: getenv("GAME_SERVICE_URL", "http://localhost:8002"),
+		BGGToken:       os.Getenv("BGG_TOKEN"),
+		BGGCookie:      os.Getenv("BGG_COOKIE"),
+		SyncLimitUser:  getenvInt("SYNC_LIMIT_USER", 3),
+		SyncLimitAdmin: getenvInt("SYNC_LIMIT_ADMIN", 20),
+	}
+}
+
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+func mustenv(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
+	}
+	return v
+}
+
+func getenvInt(key string, fallback int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return fallback
+	}
+	return n
+}

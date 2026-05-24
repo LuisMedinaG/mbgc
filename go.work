@@ -1,11 +1,12 @@
-go 1.25
+go 1.25.0
 
 use (
-	./mbgc-shared
-	./mbgc-gateway
-	./mbgc-auth-service
-	./mbgc-game-service
-	./mbgc-importer-service
+	./pkg/shared
+	./services/auth
+	./services/game
+	./services/gateway
+	./services/importer
+	./services/monolith
 )
 
-replace github.com/LuisMedinaG/mbgc-shared v0.1.0 => ./mbgc-shared
+replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared

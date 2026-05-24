@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, staging, main]
+  push:
+    branches: [dev, staging, main]
+
+permissions:
+  contents: read
+
+jobs:
+  go-build:
+    name: Go Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+
+      - name: Build all services
+        run: |
+          go build ./pkg/shared/...
+          go build ./services/gateway/...
+          go build ./services/auth/...
+          go build ./services/game/...
+          go build ./services/monolith/...
+
+      - name: Test all packages
+        run: |
+          go test ./pkg/shared/... -cover
+          go test ./services/gateway/... -cover
+          go test ./services/auth/... -cover
+          go test ./services/game/... -cover
+          go test ./services/monolith/... -cover
+
+      - name: Vet all packages
+        run: |
+          go vet ./pkg/shared/...
+          go vet ./services/gateway/...
+          go vet ./services/auth/...
+          go vet ./services/game/...
+          go vet ./services/monolith/...
+
+  web-build:
+    name: Web Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: web
+
+      - name: Lint
+        run: bun run lint
+        working-directory: web
+        continue-on-error: true
+
+      - name: Build
+        run: bun run build
+        working-directory: web
+        env:
+          VITE_API_BASE_URL: ""
+
+  infra-lint:
+    name: Infra Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.52.0
+
+      - name: TFLint
+        run: tflint --recursive --format=compact --only=terraform_deprecated_interpolation --only=terraform_unused_declarations
+        working-directory: infra
+        continue-on-error: true

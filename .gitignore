@@ -1,0 +1,55 @@
+# Binaries and build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+/out/
+
+# Go
+/vendor/
+/go.work.sum
+
+# Node
+node_modules/
+.pnp
+.pnp.js
+
+# Test artifacts
+*.test
+*.out
+coverage.html
+coverage.txt
+coverage.out
+test-results/
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Secrets and local config
+.env
+.env.local
+*.tfvars
+!*.tfvars.example
+backend.hcl
+!backend.hcl.example
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+
+# Deploy secrets script (contains service account mappings)
+set-deploy-secrets.sh
+
+# Wrangler config
+.wrangler/

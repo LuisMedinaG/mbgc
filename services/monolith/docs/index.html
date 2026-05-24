@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ludoteca — Kit de Referencia</title>
+<style>
+/* ── Reset & base ── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f7f7f8;--surface:#fff;--border:#e0e0e0;--border-open:#aaa;
+  --text:#1a1a1a;--muted:#666;--accent:#3d6b4f;--accent-light:#eaf2ec;
+  --warn-bg:#fff8e1;--warn-border:#f0b429;
+  --tip-bg:#e8f5e9;--tip-border:#43a047;
+  --nav-bg:#1e2d24;--nav-text:#f0f4f1;--nav-h:56px;
+  --pill-bg:#e8ede9;--pill-text:#2d4a35;--pill-active:#3d6b4f;--pill-active-text:#fff;
+  --radius:8px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#141818;--surface:#1e2420;--border:#2e3830;--border-open:#4a5e50;
+  --text:#e8ede9;--muted:#8a9e8f;--accent:#5d9b72;--accent-light:#1e2d24;
+  --warn-bg:#2a2200;--warn-border:#a07800;
+  --tip-bg:#0d2010;--tip-border:#2d7040;
+  --nav-bg:#0e1410;--nav-text:#e8ede9;
+  --pill-bg:#1e2d24;--pill-text:#9dbfa6;--pill-active:#5d9b72;--pill-active-text:#0e1410;
+}}
+html{scroll-padding-top:calc(var(--nav-h) + 52px)}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;font-size:16px}
+
+/* ── Nav ── */
+nav{position:sticky;top:0;z-index:100;background:var(--nav-bg);height:var(--nav-h);display:flex;align-items:center;gap:16px;padding:0 20px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.nav-logo{color:var(--nav-text);font-weight:700;font-size:1.1em;white-space:nowrap;letter-spacing:-.01em}
+.nav-logo span{opacity:.6;font-weight:400}
+.search-wrap{flex:1;max-width:400px;margin-left:auto}
+#search{width:100%;padding:8px 14px;border-radius:20px;border:none;background:rgba(255,255,255,.12);color:var(--nav-text);font-size:.95em;outline:none;transition:background .15s}
+#search::placeholder{color:rgba(255,255,255,.45)}
+#search:focus{background:rgba(255,255,255,.2)}
+
+/* ── Pills bar ── */
+.pills-bar{position:sticky;top:var(--nav-h);z-index:99;background:var(--bg);border-bottom:1px solid var(--border);padding:8px 20px;overflow-x:auto;display:flex;gap:6px;scrollbar-width:none;white-space:nowrap}
+.pills-bar::-webkit-scrollbar{display:none}
+.pill{display:inline-block;padding:4px 12px;border-radius:20px;font-size:.82em;font-weight:500;color:var(--pill-text);background:var(--pill-bg);text-decoration:none;border:none;cursor:pointer;transition:background .12s,color .12s;flex-shrink:0}
+.pill:hover,.pill.active{background:var(--pill-active);color:var(--pill-active-text)}
+
+/* ── Main content ── */
+main{max-width:860px;margin:0 auto;padding:24px 20px 60px}
+
+/* ── Section (category) ── */
+.category{margin-bottom:32px}
+.category-header{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+h2{font-size:1.15em;font-weight:700;color:var(--text)}
+.cat-count{font-size:.8em;color:var(--muted);font-weight:400}
+.category-intro{font-size:.9em;color:var(--muted);margin-bottom:10px}
+
+/* ── Details / game cards ── */
+details{margin:5px 0;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+details[open]{border-color:var(--border-open)}
+summary{cursor:pointer;padding:11px 14px;font-weight:600;font-size:.95em;user-select:none;list-style:none;display:flex;align-items:center;gap:8px;transition:background .1s}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▶";font-size:.65em;color:var(--muted);transition:transform .15s;flex-shrink:0}
+details[open]>summary::before{transform:rotate(90deg)}
+summary:hover{background:var(--accent-light)}
+.game-meta{font-size:.8em;color:var(--muted);font-weight:400;margin-left:2px}
+.c{padding:4px 16px 14px}
+
+/* ── Inner sub-details ── */
+details details{margin:8px 0 4px;border-color:var(--border);box-shadow:none}
+details details summary{font-size:.9em;padding:8px 12px;font-style:italic;font-weight:500;color:var(--muted)}
+details details summary::before{font-size:.6em}
+
+/* ── Tables ── */
+table{border-collapse:collapse;width:100%;margin:10px 0;font-size:.9em}
+th{background:var(--accent-light);font-weight:600;text-align:left;padding:7px 10px;border:1px solid var(--border);color:var(--text)}
+td{padding:6px 10px;border:1px solid var(--border);vertical-align:top}
+tr:nth-child(even) td{background:var(--bg)}
+
+/* ── Callouts ── */
+.w{background:var(--warn-bg);border-left:3px solid var(--warn-border);padding:8px 12px;margin:8px 0;border-radius:0 4px 4px 0;font-size:.9em}
+.t{background:var(--tip-bg);border-left:3px solid var(--tip-border);padding:8px 12px;margin:8px 0;border-radius:0 4px 4px 0;font-size:.9em}
+
+/* ── Misc ── */
+ul,ol{margin:6px 0;padding-left:22px}
+li{margin:3px 0}
+p{margin:7px 0}
+a{color:var(--accent)}
+b{font-weight:600}
+hr.cat-sep{border:none;border-top:1px solid var(--border);margin:32px 0}
+.no-results{text-align:center;padding:60px 20px;color:var(--muted);font-size:1.05em;display:none}
+.no-results.visible{display:block}
+
+/* ── Index card ── */
+.index-details{margin-bottom:16px}
+
+/* ── Mobile ── */
+@media(max-width:600px){
+  main{padding:16px 14px 60px}
+  .search-wrap{max-width:none}
+  nav{gap:10px;padding:0 14px}
+  .c{padding:4px 12px 12px}
+}
+
+/* ── Mark (search highlight) ── */
+mark{background:#ffe082;color:inherit;border-radius:2px;padding:0 1px}
+@media(prefers-color-scheme:dark){mark{background:#6b5000;color:#ffe082}}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">🎲 Ludoteca <span>/ Kit de Referencia</span></div>
+  <div class="search-wrap">
+    <input type="search" id="search" placeholder="Buscar juego&hellip;" autocomplete="off" spellcheck="false">
+  </div>
+</nav>
+
+<!-- CATEGORY PILLS -->
+<div class="pills-bar" id="pills">
+  <a class="pill" href="#mind">The Mind</a>
+  <a class="pill" href="#poker">Poker Deck</a>
+  <a class="pill" href="#bluff">Bluff</a>
+  <a class="pill" href="#deduccion">Deducción</a>
+  <a class="pill" href="#push">Push Your Luck</a>
+  <a class="pill" href="#coop">Cooperativo</a>
+  <a class="pill" href="#trick">Trick-Taking</a>
+  <a class="pill" href="#hand">Hand Building</a>
+  <a class="pill" href="#climbing">Climbing</a>
+  <a class="pill" href="#dados">Dados</a>
+  <a class="pill" href="#letras">Letras</a>
+  <a class="pill" href="#everdeck">Everdeck</a>
+  <a class="pill" href="#qwixx">Qwixx</a>
+  <a class="pill" href="#virus">Virus</a>
+  <a class="pill" href="#harmonies">Harmonies</a>
+</div>
+
+<main>
+
+<!-- INDEX -->
+<details class="index-details">
+<summary>📋 Índice completo</summary>
+<div class="c">
+<table>
+<tr><th>Categoría</th><th>Juego</th><th>Jugadores</th></tr>
+<tr><td>The Mind deck</td><td>No Thanks</td><td>3-7</td></tr>
+<tr><td></td><td>6 Nimmt</td><td>2-10</td></tr>
+<tr><td></td><td>Coloretto</td><td>3-5</td></tr>
+<tr><td></td><td>Arboretum</td><td>2-4</td></tr>
+<tr><td></td><td>Kobayakawa</td><td>3-6</td></tr>
+<tr><td></td><td>For Sale</td><td>3-6</td></tr>
+<tr><td>Party / Speed</td><td>Egyptian Ratscrew</td><td>2-6</td></tr>
+<tr><td></td><td>SPIT</td><td>2</td></tr>
+<tr><td>2 jugadores</td><td>Schotten Totten</td><td>2</td></tr>
+<tr><td></td><td>Lost Cities</td><td>2</td></tr>
+<tr><td>Bluff</td><td>Mentiroso</td><td>3-8</td></tr>
+<tr><td></td><td>Skull</td><td>3-6</td></tr>
+<tr><td></td><td>Cockroach Poker</td><td>4-6</td></tr>
+<tr><td></td><td>Coup</td><td>3-6</td></tr>
+<tr><td></td><td>Love Letter</td><td>2-6</td></tr>
+<tr><td></td><td>Avalon</td><td>5-10</td></tr>
+<tr><td>Deducción</td><td>Trio (Nana)</td><td>3-6</td></tr>
+<tr><td></td><td>Eleusis</td><td>4-8</td></tr>
+<tr><td>Push Your Luck</td><td>Scat (31)</td><td>3-6</td></tr>
+<tr><td>Cooperativo</td><td>Kem's</td><td>4-6</td></tr>
+<tr><td>Trick-Taking</td><td>Hearts</td><td>4</td></tr>
+<tr><td></td><td>Euchre</td><td>4</td></tr>
+<tr><td></td><td>Briscola Chiamata</td><td>5</td></tr>
+<tr><td></td><td>Oh Hell</td><td>3-7</td></tr>
+<tr><td></td><td>Fives</td><td>3-4</td></tr>
+<tr><td>Hand Building</td><td>Cribbage</td><td>2</td></tr>
+<tr><td></td><td>Gin Rummy</td><td>2</td></tr>
+<tr><td></td><td>Conquian</td><td>2-4</td></tr>
+<tr><td>Climbing</td><td>Tichu</td><td>4</td></tr>
+<tr><td></td><td>President</td><td>4-8</td></tr>
+<tr><td>Dados</td><td>Liar's Dice</td><td>2-6</td></tr>
+<tr><td></td><td>Shut the Box</td><td>1-4</td></tr>
+<tr><td></td><td>Tenzi</td><td>2+</td></tr>
+<tr><td></td><td>Farkle</td><td>2+</td></tr>
+<tr><td></td><td>Nokosu Dice</td><td>3-5</td></tr>
+<tr><td>Letras</td><td>Bananagrams</td><td>2-8</td></tr>
+<tr><td></td><td>Anagrams</td><td>2-6</td></tr>
+<tr><td></td><td>Pistas Únicas</td><td>4-8</td></tr>
+<tr><td></td><td>Buyword</td><td>2-4</td></tr>
+<tr><td></td><td>Word on the Street</td><td>2+</td></tr>
+<tr><td>Roll &amp; Write</td><td>Qwixx</td><td>2-5</td></tr>
+<tr><td></td><td>Qwinto</td><td>2-6</td></tr>
+<tr><td>Custom cards</td><td>Virus (custom rules)</td><td>2-6</td></tr>
+<tr><td>Tiles</td><td>Harmonies</td><td>1-4</td></tr>
+</table>
+</div>
+</details>
+
+<div class="no-results" id="no-results">No se encontraron juegos. Intenta otro término.</div>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: THE MIND -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="mind">
+<div class="category-header">
+  <h2>🃏 The Mind (Cartas 1-100)</h2>
+</div>
+<p class="category-intro">The Mind y Ito usan el mismo mazo. Las siguientes adaptaciones también funcionan con él.</p>
+
+<details data-name="no thanks">
+<summary>🚫 No Thanks! <span class="game-meta">Push Your Luck &middot; 👥 3-7 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Evita tomar cartas; cada ficha rechazada vale &minus;1 a tu puntaje.</p>
+<p><b>Setup:</b></p>
+<ul>
+<li>Cartas 3-35, quitar 9 al azar (sin verlas)</li>
+<li>Fichas por jugador: 3-5J&rarr;11 | 6J&rarr;9 | 7J&rarr;7</li>
+</ul>
+<p><b>Puntuación:</b></p>
+<ul>
+<li>Suma el valor de tus cartas (Escaleras: solo cuenta la carta menor)</li>
+<li>Resta tus fichas restantes</li>
+</ul>
+<p><b>Gana:</b> Menor puntaje</p>
+</div>
+</details>
+
+<details data-name="6 nimmt">
+<summary>🐮 6 Nimmt! <span class="game-meta">Simultáneo &middot; 👥 2-10 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> No seas quien pone la 6ª carta en una fila.</p>
+<p><b>Setup:</b></p>
+<ul>
+<li>Usar cartas 1-100 (the mind deck)</li>
+<li>10 cartas/jugador</li>
+<li>4 cartas forman 4 filas en mesa</li>
+</ul>
+<p><b>Turno:</b></p>
+<ol>
+<li>Todos eligen 1 carta oculta</li>
+<li>Revelan simultáneamente</li>
+<li>Colocan de menor a mayor</li>
+</ol>
+<p><b>Colocación:</b> Tu carta va a la fila cuyo último número sea el más cercano menor a tu carta.</p>
+<p><b>Penalizaciones:</b></p>
+<ul>
+<li>Si tu carta es la 6ª de una fila &rarr; te comes las 5 anteriores (puntos negativos)</li>
+<li>Si tu carta es menor que todas las filas &rarr; eliges qué fila comerte</li>
+</ul>
+<p><b>Gana:</b> Menos puntos negativos tras varias rondas</p>
+</div>
+</details>
+
+<details data-name="coloretto">
+<summary>🦎 Coloretto <span class="game-meta">Set Collection &middot; 👥 3-5 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Colecciona colores. Tus 3 mejores suman, el resto resta.</p>
+<table>
+<tr><th>Color</th><th>Cartas</th></tr>
+<tr><td>Rojo</td><td>1-10</td></tr>
+<tr><td>Naranja</td><td>11-20</td></tr>
+<tr><td>Amarillo</td><td>21-30</td></tr>
+<tr><td>Verde</td><td>31-40</td></tr>
+<tr><td>Azul</td><td>41-50</td></tr>
+<tr><td>Morado</td><td>51-60</td></tr>
+<tr><td>Café</td><td>61-70</td></tr>
+</table>
+<p><b>Setup:</b> Tantas filas como jugadores. Baraja las cartas restantes.</p>
+<p><b>Turno (elige una):</b></p>
+<ul>
+<li><b>Robar:</b> Toma carta del mazo y ponla en cualquier fila (máx 3 cartas/fila)</li>
+<li><b>Tomar:</b> Agarra una fila completa y sales de la ronda</li>
+</ul>
+<p><b>Puntuación:</b></p>
+<table>
+<tr><th>Cartas</th><th>Puntos</th></tr>
+<tr><td>1</td><td>1</td></tr>
+<tr><td>2</td><td>3</td></tr>
+<tr><td>3</td><td>6</td></tr>
+<tr><td>4</td><td>10</td></tr>
+<tr><td>5</td><td>15</td></tr>
+<tr><td>6+</td><td>21</td></tr>
+</table>
+<ul>
+<li>Tus 3 colores con más cartas = puntos positivos</li>
+<li>El resto = puntos negativos</li>
+</ul>
+</div>
+</details>
+
+<details data-name="arboretum">
+<summary>🌳 Arboretum <span class="game-meta">Colocación &middot; 👥 2-4 &middot; ⏱️ 25 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Crea caminos ascendentes; solo puntúas si conservas en mano la mayor suma de esa especie.</p>
+<p><b>Setup:</b></p>
+<ul>
+<li>Especie: Cada decena (ej: 1-8, 11-18, 21-28&hellip;)</li>
+<li>Mazos: 2J: 6 esp. | 3J: 8 esp. | 4J: 10 esp.</li>
+<li>Mano: 7 cartas</li>
+</ul>
+<p><b>Turno:</b></p>
+<ol>
+<li>Robar 2: Del mazo o cualquier pila de descarte</li>
+<li>Jugar 1: En tu zona, adyacente a otra</li>
+<li>Descartar 1: A tu pila personal</li>
+</ol>
+<p><b>Puntuación:</b></p>
+<ul>
+<li><b>Derecho:</b> Solo puntúa quien sume más valor de la especie en su mano</li>
+<li><b>Conflicto:</b> El "1" reduce el "8" de un rival a 0</li>
+<li><b>Caminos:</b> 1 pt por carta. Deben ser ascendentes y empezar/terminar en la especie puntuada</li>
+<li><b>Bonos:</b> Secuencial: +1 pt si empieza en 1; +2 pts si termina en 8. Pureza: 2 pts/carta si el camino es de &ge;4 cartas de la misma especie</li>
+</ul>
+<p><b>Gana:</b> Mayor puntaje total</p>
+</div>
+</details>
+
+<details data-name="kobayakawa">
+<summary>👺 Kobayakawa <span class="game-meta">Faroleo &middot; 👥 3-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Apuesta a que tienes la carta más alta, pero la carta central ayuda al más débil.</p>
+<p><b>Setup:</b> Cartas 1-15. 4 fichas/jugador. 1 carta en mano, 1 carta visible al centro ("Kobayakawa").</p>
+<p><b>Ronda:</b></p>
+<ol>
+<li>Turno de cada jugador (elige): roba carta &rarr; descarta 1 visible; o roba carta &rarr; reemplaza el Kobayakawa</li>
+<li><b>Apuesta:</b> Todos deciden simultáneamente: apostar 1 ficha o pasar</li>
+<li><b>Revelan:</b> La carta más BAJA suma el valor del Kobayakawa. Gana el valor más alto.</li>
+</ol>
+<p><b>Gana:</b> Último con fichas, o quien tenga más tras 7 rondas</p>
+<details>
+<summary>Variante: Texas Kobayakawa</summary>
+<div class="c">
+<p><b>Ciegas:</b> Los 2 jugadores a la izquierda del botón apuestan 1 ficha cada uno (obligatorio).</p>
+<p><b>Apuestas</b> en orden desde izquierda de ciega grande:</p>
+<ul>
+<li><b>Fold:</b> Retirarse</li>
+<li><b>Call:</b> Igualar apuesta mayor</li>
+<li><b>Raise:</b> Igualar + 1 ficha adicional</li>
+</ul>
+<p>La ronda cierra cuando todos igualan o se retiran. El botón rota a la izquierda cada ronda.</p>
+</div>
+</details>
+</div>
+</details>
+
+<details data-name="for sale">
+<summary>🏘️ For Sale <span class="game-meta">Subastas &middot; 👥 3-6 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Mapeo:</b> Casas: Cartas 60-100 (jugadores &times; 5). Cheques: Cartas 1-40 (jugadores &times; 5).</p>
+<table>
+<tr><th>Jugadores</th><th>Fichas/dinero</th></tr>
+<tr><td>3</td><td>28</td></tr>
+<tr><td>4</td><td>21</td></tr>
+<tr><td>5</td><td>16</td></tr>
+<tr><td>6</td><td>14</td></tr>
+</table>
+<div class="w">⚠️ 3 jugadores: Retirar 10 casas y 10 cheques al azar antes de empezar.</div>
+<p><b>Fase 1 &ndash; Subasta de casas:</b></p>
+<ol>
+<li>Revela tantas casas como jugadores (de menor a mayor)</li>
+<li><b>Pujar:</b> Subir apuesta con fichas</li>
+<li><b>Pasar:</b> Toma la casa más baja + recupera mitad de tu apuesta (redondear arriba)</li>
+<li><b>Último en quedar:</b> Toma la casa más alta + paga toda su apuesta</li>
+</ol>
+<p><b>Fase 2 &ndash; Venta:</b></p>
+<ol>
+<li>Revela tantos cheques como jugadores (de menor a mayor)</li>
+<li>Todos eligen 1 casa oculta</li>
+<li>Revelan simultáneamente</li>
+<li>Casa mayor &rarr; Cheque mayor (y así sucesivamente)</li>
+</ol>
+<p><b>Victoria:</b> Mayor suma de cheques + fichas restantes</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: POKER DECK -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="poker">
+<div class="category-header"><h2>🃏 Juegos con Poker Deck</h2></div>
+
+<details data-name="egyptian ratscrew ers">
+<summary>💥 Egyptian Ratscrew (ERS) <span class="game-meta">Reflejos &middot; 👥 2-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Baraja dividida equitativamente, boca abajo, sin ver.</p>
+<p><b>Golpea la pila si ves:</b></p>
+<table>
+<tr><th>Patrón</th><th>Ejemplo</th></tr>
+<tr><td>Dobles</td><td>7-7</td></tr>
+<tr><td>Sándwich</td><td>5-K-5</td></tr>
+<tr><td>Suma 10</td><td>4-6, A-9</td></tr>
+<tr><td>Secuencia</td><td>2-3, J-Q</td></tr>
+<tr><td>Matrimonio</td><td>Q-K (cualquier orden)</td></tr>
+<tr><td>Joker</td><td>Cualquier Joker jugado</td></tr>
+<tr><td>4 seguidos</td><td>5-6-7-8 o Q-K-A-2</td></tr>
+</table>
+<p><b>Cartas altas (J/Q/K/A):</b> El siguiente debe responder con otra carta alta.</p>
+<table>
+<tr><th>Carta</th><th>Intentos</th></tr>
+<tr><td>J</td><td>1</td></tr>
+<tr><td>Q</td><td>2</td></tr>
+<tr><td>K</td><td>3</td></tr>
+<tr><td>A</td><td>4</td></tr>
+</table>
+<ul>
+<li>Falla todos sus intentos &rarr; quien jugó la carta alta gana la pila</li>
+<li>Responde con carta alta &rarr; el siguiente entra al duelo</li>
+<li>Un patrón de golpe cancela el duelo en cualquier momento</li>
+</ul>
+<div class="w">⚠️ Golpe incorrecto: pierdes 2 cartas al fondo de la pila central. 3 golpes incorrectos &rarr; eliminado permanentemente.</div>
+<p><b>Victoria:</b> Quedarse con todas las cartas.</p>
+</div>
+</details>
+
+<details data-name="spit speed">
+<summary>⚡ SPIT (Speed) <span class="game-meta">Velocidad &middot; 👥 2 &middot; ⏱️ 5 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Deshazte de todas tus cartas antes que tu oponente.</p>
+<p><b>Setup por jugador:</b></p>
+<ul>
+<li>5 pilas en fila: 1, 2, 3, 4, 5 cartas respectivamente (solo la de arriba visible) = 15 cartas</li>
+<li>Resto como mazo personal en mano (11 cartas)</li>
+<li>Dejar espacio para 2 pilas centrales</li>
+</ul>
+<p><b>Inicio:</b> Ambos dicen "¡SPIT!" y voltean 1 carta de su mazo al centro.</p>
+<p><b>Juego (simultáneo, sin turnos):</b></p>
+<ol>
+<li>Juega cartas de tus 5 pilas sobre cualquier pila central</li>
+<li>Regla: &plusmn;1 del valor (sobre 7 va 6 u 8; sobre K va Q o A; sobre A va 2 o K)</li>
+<li>Palo no importa</li>
+<li>Voltea cartas ocultas cuando queden expuestas</li>
+<li><b>Atascados:</b> Ambos dicen "¡SPIT!" y voltean otra del mazo</li>
+</ol>
+<p><b>Fin de ronda:</b> Primero en vaciar sus 5 pilas &rarr; toma la pila central más pequeña.</p>
+<p><b>Victoria:</b> Quedarse completamente sin cartas.</p>
+</div>
+</details>
+
+<details data-name="schotten totten">
+<summary>🪖 Schotten Totten <span class="game-meta">Duelo Táctico &middot; 👥 2 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p>Gana <b>3 piedras adyacentes</b> O <b>5 piedras cualquiera</b>.</p>
+<p><b>Setup:</b> 9 marcadores en fila (la frontera). Solo A-9, 4 palos (36 cartas) + 2 jokers. 7 cartas/jugador.</p>
+<p><b>Turno:</b></p>
+<ol>
+<li>Jugar 1 carta en tu lado de cualquier piedra (máx 3)</li>
+<li>Robar 1 carta (si hay mazo)</li>
+</ol>
+<p><b>Formaciones:</b></p>
+<table>
+<tr><th>Rango</th><th>Nombre</th><th>Ejemplo</th></tr>
+<tr><td>🥇</td><td>Trío</td><td>4♦ 4♠ 4♣</td></tr>
+<tr><td>🥈</td><td>Escalera color</td><td>5♠ 6♠ 7♠</td></tr>
+<tr><td>🥉</td><td>Color</td><td>2♥ 5♥ 9♥</td></tr>
+<tr><td>4️⃣</td><td>Escalera</td><td>3♦ 4♠ 5♥</td></tr>
+<tr><td>5️⃣</td><td>Suma</td><td>cualquier otra</td></tr>
+</table>
+<p>El orden en que juegas las cartas NO importa. <b>Joker:</b> Comodín (elige palo y valor). Máx 1 por jugador en la frontera.</p>
+<p><b>Desempates:</b> Mayor suma. Si persiste, quien completó primero.</p>
+<p><b>Reclamar piedra:</b> Ambos tienen 3 cartas, O antes demostrando con cartas visibles que el rival no puede ganar.</p>
+<details>
+<summary>Variante: Mercado</summary>
+<div class="c">
+<p><b>Setup adicional:</b> Revela 5 cartas boca arriba junto al mazo (el mercado).</p>
+<p><b>Al robar:</b> Toma 1 carta del mercado (no del mazo). El mercado se repone solo cuando se vacía completamente.</p>
+<table>
+<tr><th></th><th>Original</th><th>Adaptación</th></tr>
+<tr><td>Cartas</td><td>54 (6 colores × 1-9)</td><td>36 (4 palos × A-9)</td></tr>
+<tr><td>Resultado</td><td>&mdash;</td><td>Menor variedad, partidas más cortas</td></tr>
+</table>
+</div>
+</details>
+<details>
+<summary>Cartas tácticas</summary>
+<div class="c">
+<p><b>🃏 Tropas de Élite</b> (jugar como carta de clan)</p>
+<table>
+<tr><th>Carta</th><th>Efecto</th></tr>
+<tr><td>🃏 Joker</td><td>Comodín &mdash; elige palo Y valor (1-9). Máx 1 por jugador en frontera</td></tr>
+<tr><td>10♠ Espía</td><td>Valor fijo 7, elige palo</td></tr>
+<tr><td>10♥ Escudero</td><td>Valor 1, 2 ó 3, elige palo</td></tr>
+</table>
+<p><b>⚔️ Modos de Combate</b> (jugar sobre la piedra)</p>
+<table>
+<tr><th>Carta</th><th>Efecto</th></tr>
+<tr><td>10♦ Gallina ciega</td><td>Solo suma, ignora formaciones</td></tr>
+<tr><td>10♣ Lucha en el barro</td><td>4 cartas por lado</td></tr>
+</table>
+<p><b>🎭 Tretas</b> (resolver y descartar)</p>
+<table>
+<tr><th>Carta</th><th>Efecto</th></tr>
+<tr><td>J♠ Reclutador</td><td>Roba 3, devuelve 2 al fondo</td></tr>
+<tr><td>J♥ Estratega</td><td>Mueve 1 carta tuya a otra piedra o descártala</td></tr>
+<tr><td>J♦ Banshee</td><td>Descarta 1 carta del rival</td></tr>
+<tr><td>J♣ Traidor</td><td>Roba 1 carta de clan del rival y colócala en tu lado</td></tr>
+</table>
+</div>
+</details>
+</div>
+</details>
+
+<details data-name="lost cities ciudades perdidas">
+<summary>🗺️ Lost Cities <span class="game-meta">Estrategia &middot; 👥 2 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Remover Ases. 4 palos: 2-10, J, Q, K. 8 cartas/jugador.</p>
+<p><b>Mapeo:</b></p>
+<ul>
+<li>J, Q, K = Apuestas (acumulativas: 1=&times;2, 2=&times;3, 3=&times;4) &mdash; jugar <b>antes</b> de números</li>
+<li>2-10 = Puntos</li>
+</ul>
+<p><b>Turno (orden estricto):</b></p>
+<ol>
+<li><b>Jugar:</b> A tu mesa (ascendente por palo) O a descarte (boca arriba, pila de su palo)</li>
+<li><b>Robar:</b> Del mazo (ciego) O descarte (tope) &mdash; excepto donde tiraste este turno</li>
+</ol>
+<div class="w">⚠️ Las apuestas deben jugarse ANTES que cartas numéricas del mismo palo. Una vez jugada carta numérica, no puedes jugar apuestas de ese palo.</div>
+<p><b>Puntuación:</b> (Suma puntos &minus; 20) &times; Apuestas | +20 bonus si &ge;8 cartas del palo</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: BLUFF -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="bluff">
+<div class="category-header"><h2>🤥 Bluffing</h2></div>
+
+<details data-name="mentiroso bullshit cheat">
+<summary>🤥 Mentiroso <span class="game-meta">Faroleo &middot; 👥 3-8 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Deshazte de todas tus cartas. Puedes mentir, pero si te cachan, tomas la pila.</p>
+<p><b>Turno:</b> Avanza por rango en orden fijo: A &rarr; 2 &rarr; 3 &rarr; &hellip; &rarr; K &rarr; A &rarr; &hellip;</p>
+<p>Cada jugador pone 1-4 cartas boca abajo y declara cuántas del rango actual está jugando.</p>
+<p><b>Desafío:</b> Cualquier jugador puede gritar "¡Mentiroso!" después de una jugada.</p>
+<ul>
+<li>Si era mentira &rarr; el jugador que jugó toma toda la pila</li>
+<li>Si era verdad &rarr; quien desafió toma toda la pila</li>
+</ul>
+<div class="w">⚠️ Puedes jugar cartas de cualquier rango, pero debes declarar el rango del turno. Puedes mezclar cartas reales y falsas.</div>
+<p><b>Victoria:</b> Primero en quedarse sin cartas. Si alguien juega su última carta y nadie desafía, gana inmediatamente.</p>
+</div>
+</details>
+
+<details data-name="skull calavera">
+<summary>💀 Skull <span class="game-meta">Faroleo puro &middot; 👥 3-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> 3 flores (rojas/corazones) + 1 calavera (negra/pica) por jugador.</p>
+<p><b>Fase 1 &ndash; Colocación:</b> Por turnos, pon 1 carta boca abajo. Continúa hasta que alguien decida apostar.</p>
+<p><b>Fase 2 &ndash; Apuesta:</b> Declara "Volteo X cartas sin encontrar calavera". Los demás pueden subir o pasar. Último en subir = Retador.</p>
+<p><b>Fase 3 &ndash; Revelación:</b></p>
+<ol>
+<li>El Retador voltea primero TODAS sus propias cartas</li>
+<li>Luego voltea de otros jugadores (1 por 1) hasta cumplir su apuesta</li>
+</ol>
+<p><b>Resultado:</b></p>
+<ul>
+<li><b>Éxito</b> (puras flores): Gana 1 punto</li>
+<li><b>Fallo</b> (encuentra calavera): Pierde 1 carta al azar. Sin cartas = eliminado</li>
+</ul>
+<p><b>Gana:</b> 2 puntos (voltear sin calavera dos veces)</p>
+</div>
+</details>
+
+<details data-name="cockroach poker cucaracha">
+<summary>🪳 Cockroach Poker <span class="game-meta">Faroleo &middot; 👥 4-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Requiere:</b> 2 barajas mezcladas. 8 copias de cada valor: A, 2, 3, 4, 5, 6, 7, 8 (64 cartas).</p>
+<p><b>Turno:</b></p>
+<ol>
+<li>Pasa 1 carta boca abajo a otro jugador</li>
+<li>Declara un número: "Es un 5" (puede ser verdad o mentira)</li>
+</ol>
+<p><b>El receptor elige:</b></p>
+<ul>
+<li><b>Desafiar:</b> Dice "Verdad" o "Mentira". Acierta &rarr; el pasador pone la carta frente a sí. Falla &rarr; el receptor la pone frente a sí.</li>
+<li><b>Pasar:</b> Mira la carta en secreto &rarr; declara número &rarr; pásala a otro (no de vuelta al original)</li>
+</ul>
+<p><b>Pierde:</b> Quien acumule 4 cartas iguales frente a sí, O se quede sin cartas en mano.</p>
+<p><b>Victoria:</b> Último jugador con cartas.</p>
+</div>
+</details>
+
+<details data-name="coup">
+<summary>🎭 Coup <span class="game-meta">Faroleo/Deducción &middot; 👥 3-6 &middot; ⏱️ 10 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Usa poderes de rol (real o farol) para eliminar a los demás.</p>
+<table>
+<tr><th>Carta</th><th>Rol</th><th>Poder</th></tr>
+<tr><td>K</td><td>Duke</td><td>Toma 3 monedas (no bloqueable)</td></tr>
+<tr><td>Q</td><td>Assassin</td><td>Paga 3 monedas &rarr; elimina 1 carta de otro</td></tr>
+<tr><td>J</td><td>Captain</td><td>Roba 2 monedas de otro jugador</td></tr>
+<tr><td>10</td><td>Ambassador</td><td>Roba 2 del mazo, devuelve 2</td></tr>
+<tr><td>A</td><td>Contessa</td><td>Bloquea asesinato</td></tr>
+</table>
+<p><b>Setup:</b> 3 copias de cada rol (15 cartas). 2 cartas/jugador (ocultas). 2 monedas/jugador.</p>
+<p><b>Turno:</b></p>
+<table>
+<tr><th>Acción</th><th>Efecto</th><th>Bloqueable por</th></tr>
+<tr><td>Ingreso</td><td>+1 moneda</td><td>&mdash;</td></tr>
+<tr><td>Ayuda extranjera</td><td>+2 monedas</td><td>Duke</td></tr>
+<tr><td>Golpe (7 monedas)</td><td>Víctima pierde 1 carta</td><td>&mdash;</td></tr>
+<tr><td>Duke</td><td>+3 monedas</td><td>&mdash;</td></tr>
+<tr><td>Assassin (3 monedas)</td><td>Víctima pierde 1 carta</td><td>Contessa</td></tr>
+<tr><td>Captain</td><td>Roba 2 monedas de otro</td><td>Captain, Ambassador</td></tr>
+<tr><td>Ambassador</td><td>Intercambia cartas con mazo</td><td>&mdash;</td></tr>
+</table>
+<p><b>Desafío:</b> Mentía &rarr; el desafiado pierde 1 carta. Decía verdad &rarr; el desafiador pierde 1 carta; el desafiado devuelve su carta y roba nueva.</p>
+<div class="w">⚠️ Regla de 10 monedas: Si tienes 10+, debes hacer Golpe.</div>
+<p><b>Victoria:</b> Último jugador con cartas.</p>
+</div>
+</details>
+
+<details data-name="love letter carta de amor">
+<summary>💌 Love Letter <span class="game-meta">Deducción &middot; 👥 2-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Quédate con la carta más alta o elimina a todos.</p>
+<table>
+<tr><th>Carta</th><th>Cantidad</th><th>Valor</th></tr>
+<tr><td>A (Guardia)</td><td>5</td><td>1</td></tr>
+<tr><td>2 (Sacerdote)</td><td>2</td><td>2</td></tr>
+<tr><td>3 (Barón)</td><td>2</td><td>3</td></tr>
+<tr><td>4 (Doncella)</td><td>2</td><td>4</td></tr>
+<tr><td>5 (Príncipe)</td><td>2</td><td>5</td></tr>
+<tr><td>6 (Rey)</td><td>1</td><td>6</td></tr>
+<tr><td>7 (Condesa)</td><td>1</td><td>7</td></tr>
+<tr><td>8 (Princesa)</td><td>1</td><td>8</td></tr>
+</table>
+<p>Quita 1 carta del juego (sin ver). Reparte 1 carta/jugador.</p>
+<p><b>Turno:</b> Roba 1 (tienes 2) &rarr; Juega 1 &rarr; Aplica efecto</p>
+<p><b>Efectos:</b></p>
+<ul>
+<li><b>A (Guardia):</b> Nombra jugador y adivina su carta (no puedes decir A). Acierto = eliminado</li>
+<li><b>2 (Sacerdote):</b> Mira la mano de otro jugador</li>
+<li><b>3 (Barón):</b> Compara manos en secreto. El menor valor = eliminado</li>
+<li><b>4 (Doncella):</b> Eres inmune hasta tu siguiente turno</li>
+<li><b>5 (Príncipe):</b> Elige jugador (o tú mismo) &rarr; descarta su mano y roba nueva</li>
+<li><b>6 (Rey):</b> Intercambia tu mano con otro jugador</li>
+<li><b>7 (Condesa):</b> DEBES jugarla si tienes Rey o Príncipe en mano</li>
+<li><b>8 (Princesa):</b> Si la descartas por cualquier razón, pierdes</li>
+</ul>
+<p><b>Gana la ronda:</b> Último en pie O carta más alta cuando se acaba el mazo</p>
+</div>
+</details>
+
+<details data-name="avalon resistencia">
+<summary>🏴‍☠️ Avalon <span class="game-meta">Deducción social &middot; 👥 5-10 &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Cartas rojas = Resistencia (buenos). Cartas negras = Espías (malos, 1/3 del grupo). Reparte roles en secreto.</p>
+<p><b>Ronda:</b></p>
+<ol>
+<li>Líder propone equipo para la misión</li>
+<li>Todos votan aprobar/rechazar (simultáneo)</li>
+<li>Si aprueban: los elegidos juegan carta oculta (roja=éxito, negra=sabotaje)</li>
+</ol>
+<p><b>Victoria:</b> Resistencia: 3 misiones exitosas. Espías: 3 misiones saboteadas.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: DEDUCCIÓN -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="deduccion">
+<div class="category-header"><h2>🧠 Deducción</h2></div>
+
+<details data-name="trio nana">
+<summary>3️⃣ Trio (Nana) <span class="game-meta">Memoria &middot; 👥 3-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Encuentra tríos preguntando por los extremos de las manos ajenas.</p>
+<p><b>Mapeo:</b> Usar A-Q (sin K) de 3 palos = 36 cartas. Valores: A=1, 2-10=valor, J=11, Q=12.</p>
+<table>
+<tr><th>Jugadores</th><th>Cartas por jugador</th><th>Cartas en el centro</th></tr>
+<tr><td>3</td><td>9</td><td>9</td></tr>
+<tr><td>4</td><td>7</td><td>8</td></tr>
+<tr><td>5</td><td>6</td><td>6</td></tr>
+<tr><td>6</td><td>5</td><td>6</td></tr>
+</table>
+<p><b>Turno:</b> Intenta revelar 3 cartas del mismo valor.</p>
+<ul>
+<li><b>De mesa:</b> Voltea cualquier carta</li>
+<li><b>De mano ajena:</b> Pide su carta "más BAJA" o "más ALTA"</li>
+<li>Puedes combinar fuentes en tu turno</li>
+</ul>
+<p><b>Resultado:</b></p>
+<ul>
+<li><b>Diferentes:</b> Turno termina. Cartas de mesa se ocultan; cartas de mano regresan a su dueño.</li>
+<li><b>3 iguales:</b> ¡Ganas el trío!</li>
+</ul>
+<p><b>Victoria:</b> Conseguir 3 tríos cualesquiera, o conseguir el trío de 7s (victoria instantánea).</p>
+</div>
+</details>
+
+<details data-name="eleusis">
+<summary>🧠 Eleusis <span class="game-meta">Deducción &middot; 👥 4-8 &middot; ⏱️ 45 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Un jugador inventa una regla secreta. Los demás la deducen jugando cartas.</p>
+<p><b>Setup:</b></p>
+<ul>
+<li>El Dios crea en secreto una regla (ej: "después de roja va negra", "después de par va impar")</li>
+<li>Repartir 14 cartas a cada jugador</li>
+<li>El Dios voltea 1 carta inicial en la mesa</li>
+</ul>
+<p><b>Turno:</b></p>
+<ul>
+<li>✓ Correcto &rarr; va a la línea principal (sirve de evidencia)</li>
+<li>✗ Incorrecto &rarr; va a la línea lateral de errores</li>
+<li>Puedes pasar sin jugar &rarr; robas 2 cartas</li>
+</ul>
+<p><b>Profeta:</b> Cualquier jugador puede declararse Profeta. El Profeta juzga jugadas en lugar del Dios. Error del Profeta &rarr; pierde 5 pts. El Dios puede destituirlo.</p>
+<p><b>Puntuación:</b></p>
+<ul>
+<li>Jugadores: +1 línea principal, &minus;1 línea de errores, &minus;2 por carta en mano al final</li>
+<li>Profeta exitoso: + cartas juzgadas correctamente</li>
+<li>El Dios: suma el puntaje de todos &rarr; si es alto pierde pts (regla demasiado fácil); si es negativo también pierde (regla injugable)</li>
+</ul>
+<p><b>Victoria:</b> Mayor puntaje al final.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: PUSH YOUR LUCK -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="push">
+<div class="category-header"><h2>🍸 Push Your Luck</h2></div>
+
+<details data-name="scat 31 treinta y uno">
+<summary>🍸 Scat (31) <span class="game-meta">Push your luck &middot; 👥 3-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Acércate a 31 puntos en un solo palo.</p>
+<p><b>Valores:</b> A=11, J/Q/K=10, números=valor.</p>
+<p><b>Setup:</b> 3 cartas/jugador. 3 vidas cada uno. 3 cartas boca arriba al centro (descarte inicial).</p>
+<p><b>Turno:</b></p>
+<ol>
+<li>Roba 1 carta (del mazo O del descarte)</li>
+<li>Descarta 1 carta (al descarte, boca arriba)</li>
+</ol>
+<p><b>Puntuación de mano:</b> Solo suman las cartas del mismo palo. Excepción: Tres cartas iguales = 30.5 puntos.</p>
+<p><b>Cerrar ("Knock"):</b> Si crees tener buena mano, toca la mesa. Todos los demás tienen 1 último turno. El menor puntaje pierde 1 vida.</p>
+<p><b>Eliminación:</b> Sin vidas = fuera del juego.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: COOPERATIVO -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="coop">
+<div class="category-header"><h2>🎪 Cooperativo</h2></div>
+
+<details data-name="kems james bond">
+<summary>🎪 Kem's <span class="game-meta">Velocidad + Señas &middot; 👥 4-6 (pares) &middot; ⏱️ 5 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Equipos de 2. 4 cartas/jugador. 4 al centro boca arriba.</p>
+<p><b>Juego:</b> Intercambia cartas con el centro (1 a 1) buscando 4 iguales.</p>
+<p><b>Señas:</b> Acuerda seña secreta con tu compañero. Cuando tengas 4 iguales, hazla. Tu compañero grita "¡KEM'S!" (o James Bond).</p>
+<div class="w">⚠️ Si otro equipo ve tu seña, grita "¡CONTRA-KEM'S!" y ganan ellos.</div>
+<p><b>Victoria:</b> 3 puntos.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: TRICK-TAKING -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="trick">
+<div class="category-header"><h2>♥️ Trick-Taking</h2></div>
+
+<details data-name="hearts corazones">
+<summary>♥️ Hearts <span class="game-meta">Evasión &middot; 👥 4 &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Evita ganar corazones y la Q♠. Menor puntaje gana.</p>
+<p><b>Valores:</b> Cada corazón = 1 pt. Q♠ = 13 pts. Resto = 0 pts.</p>
+<p><b>Pase de cartas:</b></p>
+<table>
+<tr><th>Ronda</th><th>Dirección</th></tr>
+<tr><td>1</td><td>Izquierda</td></tr>
+<tr><td>2</td><td>Derecha</td></tr>
+<tr><td>3</td><td>Al frente</td></tr>
+<tr><td>4</td><td>Sin pasar</td></tr>
+</table>
+<div class="w">⚠️ Primera baza: no puedes jugar corazones ni Q♠. Corazones rotos: no puedes liderarlos hasta que alguien haya descartado uno.</div>
+<p>🌕 <b>Shoot the Moon:</b> Si ganas TODOS los corazones + Q♠, elige: los demás reciben 26 pts, o tú restas 26 a tu marcador.</p>
+<p><b>Victoria:</b> Cuando alguien llega a 100 pts, gana quien tenga el menor puntaje.</p>
+</div>
+</details>
+
+<details data-name="euchre">
+<summary>🃏 Euchre <span class="game-meta">Trick-taking &middot; 👥 4 (2 equipos) &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Gana al menos 3 de 5 bazas. El equipo que nombra el triunfo debe cumplirlo.</p>
+<p><b>Setup:</b> Solo 9-10-J-Q-K-A de los 4 palos = 24 cartas. 5 cartas/jugador. Las 4 restantes forman el kitty; voltear la de arriba.</p>
+<p><b>Los Bowers:</b></p>
+<table>
+<tr><th>Carta</th><th>Nombre</th><th>Rango</th></tr>
+<tr><td>J del palo de triunfo</td><td>Right Bower</td><td>Más alta del juego</td></tr>
+<tr><td>J del mismo COLOR que el triunfo</td><td>Left Bower</td><td>Segunda más alta</td></tr>
+</table>
+<p>El Left Bower se trata como carta de triunfo. Ejemplo con ♥ de triunfo: J♥ = Right Bower, J♦ = Left Bower.</p>
+<p><b>Orden de triunfo:</b> Right Bower &gt; Left Bower &gt; A &gt; K &gt; Q &gt; 10 &gt; 9</p>
+<p><b>Fase 1 &ndash; Subasta sobre la carta volteada:</b> Ordenar (ese palo es triunfo) o Pasar. Si todos pasan, la carta se voltea boca abajo.</p>
+<p><b>Fase 2 &ndash; Subasta abierta:</b> Nombrar cualquier otro palo o pasar.</p>
+<div class="w">⚠️ Si todos pasan, el repartidor está obligado a nombrar uno ("stuck the dealer").</div>
+<p>Quien nombra triunfo = <b>Maker</b>. Puede declarar <b>Going Alone</b>: su compañero no juega esa ronda.</p>
+<table>
+<tr><th>Resultado</th><th>Puntos</th></tr>
+<tr><td>Maker gana 3-4 bazas</td><td>1 pt al equipo Maker</td></tr>
+<tr><td>Maker gana las 5 (March)</td><td>2 pts al equipo Maker</td></tr>
+<tr><td>Going Alone, 3-4 bazas</td><td>1 pt</td></tr>
+<tr><td>Going Alone, las 5</td><td>4 pts</td></tr>
+<tr><td>Maker gana 0-2 bazas (Euchred)</td><td>2 pts al equipo rival</td></tr>
+</table>
+<p><b>Victoria:</b> Primer equipo en llegar a 10 puntos.</p>
+</div>
+</details>
+
+<details data-name="briscola chiamata">
+<summary>🇮🇹 Briscola Chiamata <span class="game-meta">Trick-taking &middot; 👥 5 &middot; ⏱️ 45 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Subasta para declarar triunfo y llamar un socio secreto. Alianzas ocultas.</p>
+<p><b>Adaptación:</b> Remueve 8s, 9s y 10s &rarr; 40 cartas. 8 cartas/jugador. Total: 120 pts.</p>
+<table>
+<tr><th>Carta</th><th>Puntos</th></tr>
+<tr><td>As</td><td>11</td></tr>
+<tr><td>3</td><td>10</td></tr>
+<tr><td>Rey</td><td>4</td></tr>
+<tr><td>Reina</td><td>3</td></tr>
+<tr><td>J</td><td>2</td></tr>
+<tr><td>7, 6, 5, 4, 2</td><td>0</td></tr>
+</table>
+<p><b>Fase 1 &ndash; Subasta:</b> Cada jugador declara cuántos puntos hará su equipo (mínimo 61). El ganador = Llamador.</p>
+<p><b>Fase 2 &ndash; Llamada:</b> El Llamador declara palo de triunfo y llama una carta específica. Quien la tenga es su Socio secreto. Si la carta está en su propia mano &rarr; juega solo contra los 4.</p>
+<p><b>Fase 3 &ndash; Bazas:</b> El mano abre. Debes seguir palo si puedes. El Socio se revela cuando juega la carta llamada.</p>
+<table>
+<tr><th>Resultado</th><th>Llamador</th><th>Socio</th><th>Cada oponente</th></tr>
+<tr><td>Cumple con socio</td><td>+2</td><td>+1</td><td>&minus;1</td></tr>
+<tr><td>No cumple con socio</td><td>&minus;2</td><td>&minus;1</td><td>+1</td></tr>
+<tr><td>Cumple solo</td><td>+4</td><td>&mdash;</td><td>&minus;1</td></tr>
+<tr><td>No cumple solo</td><td>&minus;4</td><td>&mdash;</td><td>+1</td></tr>
+</table>
+<p><b>Victoria:</b> Mayor puntaje acumulado al final de las rondas acordadas.</p>
+</div>
+</details>
+
+<details data-name="oh hell nomination whist">
+<summary>🎯 Oh Hell <span class="game-meta">Bid exacto &middot; 👥 3-7 &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Licita exactamente las bazas que ganarás. Ni una más, ni una menos.</p>
+<p><b>Setup por ronda:</b></p>
+<ul>
+<li>Las rondas aumentan una carta por turno: ronda 1 = 1 carta, ronda 2 = 2 cartas, etc.</li>
+<li>Máximo = 52 &divide; jugadores (ej: 4 jugadores &rarr; 13). Al llegar al máximo, se baja de vuelta hasta 1.</li>
+<li>Voltear 1 carta del mazo = triunfo. Sin cartas sobrantes &rarr; ronda sin triunfo.</li>
+</ul>
+<div class="w">⚠️ La suma total de licitaciones NO puede igualar el número de bazas de esa ronda. El último en licitar tiene esa restricción.</div>
+<p><b>Puntuación:</b> Cumples exacto &rarr; 10 + bazas licitadas. No cumples &rarr; 0 puntos.</p>
+<p><b>Victoria:</b> Mayor puntaje al final de todas las rondas.</p>
+</div>
+</details>
+
+<details data-name="fives">
+<summary>🖐️ Fives <span class="game-meta">Bazas &middot; 👥 3-4 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Mazo completo + Joker (Joker = 0 de ♥). ♠ = Triunfo. 13 cartas/jugador. Valores: A=1, J=11, Q=12, K=13.</p>
+<p><b>Jugada del 5:</b> En tu turno de liderar o seguir, puedes jugar cualquier carta boca abajo; cuenta como 5 de ♥.</p>
+<div class="w">⚠️ El ganador de cada baza solo conserva la carta que él mismo jugó. Las demás se descartan.</div>
+<p><b>Puntuación:</b></p>
+<ul>
+<li>Exactamente 25 &rarr; ganas la ronda + token extra</li>
+<li>Más cercano a 25 sin pasarse &rarr; ganas la ronda</li>
+<li>Más de 25 &rarr; "truenas" (pierdes 1 token)</li>
+</ul>
+<p><b>Victoria:</b> Último jugador con tokens.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: HAND BUILDING -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="hand">
+<div class="category-header"><h2>🪵 Hand Building</h2></div>
+
+<details data-name="cribbage">
+<summary>🪵 Cribbage <span class="game-meta">Pegboard &middot; 👥 2 &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p>Necesitas tablero de cribbage (o papel). Primero en llegar a 121 gana, incluso a mitad de ronda.</p>
+<p><b>Valores para pegging:</b> A=1, números=valor, J/Q/K=10.</p>
+<p><b>Setup:</b> 6 cartas cada uno &rarr; descartar 2 al Crib &rarr; voltear 1 carta del mazo = Starter. Si el Starter es J &rarr; repartidor anota 2 pts ("Nibs").</p>
+<p><b>Fase 1 &ndash; Pegging</b> (suma acumulada no puede pasar 31):</p>
+<table>
+<tr><th>Situación</th><th>Puntos</th></tr>
+<tr><td>Suma exacta 15</td><td>2</td></tr>
+<tr><td>Suma exacta 31</td><td>2</td></tr>
+<tr><td>Par con carta anterior</td><td>2</td></tr>
+<tr><td>Tres iguales seguidos</td><td>6</td></tr>
+<tr><td>Cuatro iguales seguidos</td><td>12</td></tr>
+<tr><td>Secuencia 3+ (cualquier orden)</td><td>1 por carta</td></tr>
+<tr><td>Último en jugar sin llegar a 31</td><td>1 ("Go")</td></tr>
+</table>
+<p><b>Fase 2 &ndash; Conteo de mano</b> (no-repartidor &rarr; repartidor &rarr; Crib). Cada mano se cuenta con el Starter (5 cartas totales):</p>
+<table>
+<tr><th>Combinación</th><th>Puntos</th></tr>
+<tr><td>Par</td><td>2</td></tr>
+<tr><td>Tres iguales</td><td>6</td></tr>
+<tr><td>Cuatro iguales</td><td>12</td></tr>
+<tr><td>Secuencia 3/4/5 cartas</td><td>3/4/5</td></tr>
+<tr><td>Cualquier combinación que sume 15</td><td>2</td></tr>
+<tr><td>Flush 4 cartas (solo en mano, no Crib)</td><td>4</td></tr>
+<tr><td>Flush 5 cartas (incluye Starter)</td><td>5</td></tr>
+<tr><td>J del mismo palo que el Starter</td><td>1 ("Nobs")</td></tr>
+</table>
+<div class="w">⚠️ Todas las combinaciones posibles cuentan por separado. Ej: A-2-3-4 tiene cuatro secuencias de 3 = 12 pts.</div>
+<div class="t">⚡ Muggins (opcional): Si tu oponente no anota puntos que tiene, puedes reclamarlos tú.</div>
+</div>
+</details>
+
+<details data-name="gin rummy">
+<summary>🍸 Gin Rummy <span class="game-meta">Melds &middot; 👥 2 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Valores:</b> A=1, números=valor, J/Q/K=10. Setup: 10 cartas cada uno.</p>
+<p><b>Combinaciones válidas:</b></p>
+<ul>
+<li><b>Set:</b> 3+ cartas del mismo valor (7♠ 7♥ 7♦)</li>
+<li><b>Escalera:</b> 3+ cartas consecutivas del mismo palo (4♠ 5♠ 6♠)</li>
+</ul>
+<p><b>Deadwood:</b> Puntos de tus cartas que no forman combinaciones.</p>
+<p><b>Terminar la ronda:</b></p>
+<ul>
+<li><b>Knock:</b> Toca la mesa si tu deadwood &le; 10. El oponente puede "layoff" sus cartas a tus combinaciones.
+<ul>
+<li>Tu deadwood &lt; oponente &rarr; ganas la diferencia</li>
+<li><b>Undercut:</b> Si el oponente queda igual o menor &rarr; él gana 25 pts + diferencia</li>
+</ul>
+</li>
+<li><b>Gin:</b> Knock con deadwood = 0 &rarr; 25 pts + diferencia (sin layoff)</li>
+</ul>
+<p><b>Victoria:</b> Primero en llegar a 100 puntos.</p>
+</div>
+</details>
+
+<details data-name="conquian">
+<summary>🀄 Conquian <span class="game-meta">Melds &middot; 👥 2-4 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Forma combinaciones hasta llegar a 11 cartas y ganar.</p>
+<p><b>Baraja:</b> 40 cartas (quita 8s, 9s, 10s). A=1, J=11, Q=12, K=13.</p>
+<p><b>Combinaciones válidas:</b> Trío (3+ del mismo valor) | Escalera (3+ consecutivas del mismo palo)</p>
+<p><b>Turno:</b></p>
+<ol>
+<li>El mazo voltea 1 carta visible</li>
+<li>Tómala si te sirve para una combinación (obligatorio ponerla en juego)</li>
+<li>Si no la tomas, tu oponente puede tomarla bajo la misma regla</li>
+<li>Si nadie la toma, se descarta y robas del mazo</li>
+</ol>
+<div class="w">⚠️ No puedes guardar cartas en la mano sin usarlas en combinación.</div>
+<p><b>Victoria:</b> Primero en tener 11 cartas en combinaciones válidas sobre la mesa.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: CLIMBING -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="climbing">
+<div class="category-header"><h2>🐉 Climbing</h2></div>
+
+<details data-name="tichu">
+<summary>🐉 Tichu <span class="game-meta">Climbing &middot; 👥 4 (2 equipos) &middot; ⏱️ 60 min</span></summary>
+<div class="c">
+<div class="w">⚠️ Requiere 52 cartas estándar + 4 cartas especiales marcadas (usa comodines o cartas de otro mazo).</div>
+<table>
+<tr><th>Carta especial</th><th>Efecto</th></tr>
+<tr><td>Mahjong (valor 1)</td><td>La más baja. Abre el juego. Al jugarla puedes pedir un valor; quien pueda jugarlo debe hacerlo.</td></tr>
+<tr><td>Perro</td><td>Se juega sola. Pasa el liderazgo directamente a tu compañero.</td></tr>
+<tr><td>Fénix</td><td>Comodín. Como individual vale 0.5 más que la carta anterior. En escaleras sustituye cualquier valor. Vale &minus;25 pts si lo ganas en baza.</td></tr>
+<tr><td>Dragón</td><td>El individual más alto. Quien gana esa baza debe regalarla completa a un rival. Vale +25 pts.</td></tr>
+</table>
+<p><b>Puntuación de cartas:</b> 5=5pts, 10 y K=10pts. Total: 100 pts.</p>
+<p><b>Setup:</b> Reparte 8 cartas/jugador. Pausa. Reparte 6 más.</p>
+<p><b>Apuestas:</b></p>
+<ul>
+<li><b>Grand Tichu</b> &mdash; antes de ver las últimas 6 cartas: +200 si eres primero en vaciar tu mano / &minus;200 si no</li>
+<li><b>Tichu</b> &mdash; después de ver las 14 cartas (solo si tu equipo no apostó): +100 / &minus;100</li>
+</ul>
+<p><b>Pase:</b> Cada jugador da 1 carta a cada uno de los otros 3 (das 3, recibes 3).</p>
+<table>
+<tr><th>Tipo</th><th>Descripción</th></tr>
+<tr><td>Individual</td><td>1 carta</td></tr>
+<tr><td>Par</td><td>2 del mismo valor</td></tr>
+<tr><td>Trío</td><td>3 del mismo valor</td></tr>
+<tr><td>Full house</td><td>Trío + par (el valor del trío manda)</td></tr>
+<tr><td>Escalera</td><td>5+ cartas consecutivas</td></tr>
+<tr><td>Escalera de pares</td><td>2+ pares de valores consecutivos</td></tr>
+<tr><td>Bomba</td><td>4 iguales, o escalera del mismo palo (5+)</td></tr>
+</table>
+<div class="t">⚡ Bomba: Se puede jugar en cualquier momento, incluso fuera de turno. Solo la supera otra Bomba de mayor valor.</div>
+<p><b>Fin de ronda:</b> Cuando 3 jugadores vaciaron su mano. El último: da sus cartas de mano al equipo rival; da sus bazas al equipo que salió primero.</p>
+<p><b>Victoria de ronda:</b> Si los 2 jugadores del mismo equipo salen 1° y 2° &rarr; ese equipo gana 200 pts automáticos. Si no &rarr; cada equipo suma los puntos en sus bazas.</p>
+<p><b>Victoria:</b> Primer equipo en alcanzar 1,000 puntos.</p>
+</div>
+</details>
+
+<details data-name="president asshole">
+<summary>🪜 President (Asshole) <span class="game-meta">Escalada social &middot; 👥 4-8 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Deshazte de tus cartas jugando combinaciones cada vez más altas.</p>
+<p><b>Jerarquía:</b> 2 (más alta) &rarr; A &rarr; K &rarr; Q &rarr; J &rarr; 10 &rarr; 9 &rarr; &hellip; &rarr; 3 (más baja)</p>
+<p><b>Juego:</b></p>
+<ol>
+<li>Jugador con 3♣ (o el Presidente en rondas siguientes) abre</li>
+<li>Juega cualquier combinación: carta sola, pareja, trío, escalera, etc.</li>
+<li>Siguiente debe jugar misma combinación pero mayor valor o pasar</li>
+<li>Si todos pasan, se limpia la mesa; último en jugar abre nueva ronda</li>
+</ol>
+<table>
+<tr><th>Posición</th><th>Título</th><th>Intercambio</th></tr>
+<tr><td>1º</td><td>Presidente</td><td>Recibe las 2 mejores cartas del Escoria</td></tr>
+<tr><td>2º</td><td>Vice-Presidente</td><td>Recibe 1 mejor carta del Vice-Escoria</td></tr>
+<tr><td>Penúltimo</td><td>Vice-Escoria</td><td>Da su mejor carta al Vice</td></tr>
+<tr><td>Último</td><td>Escoria</td><td>Da sus 2 mejores cartas al Presidente</td></tr>
+</table>
+<p><b>Victoria:</b> Ser Presidente más veces en partidas acordadas.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: DADOS -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="dados">
+<div class="category-header"><h2>🎲 Dados</h2></div>
+
+<details data-name="liars dice dados mentirosos perudo">
+<summary>🎲 Liar's Dice <span class="game-meta">Faroleo &middot; 👥 2-6 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Apuesta sobre los dados ocultos de todos. Miente o descubre mentiras.</p>
+<p><b>Setup:</b> 5 dados/jugador. 1 vaso opaco/jugador. Los 1s son comodines (excepto en apuesta de 1s).</p>
+<p><b>Turno (elige una):</b></p>
+<ul>
+<li><b>Subir:</b> Mayor cantidad O misma cantidad con mayor valor</li>
+<li><b>Desafiar:</b> "¡Mentira!"</li>
+<li><b>Clavo:</b> "¡Exacto!" (arriesgado)</li>
+</ul>
+<table>
+<tr><th>Acción</th><th>Resultado correcto</th><th>Resultado incorrecto</th></tr>
+<tr><td>Desafío</td><td>Apostador pierde 1 dado</td><td>Desafiador pierde 1 dado</td></tr>
+<tr><td>Clavo</td><td>TODOS los demás pierden 1 dado</td><td>Clavador pierde 2 dados</td></tr>
+</table>
+<p><b>Palifico:</b> Con 1 solo dado, los 1s NO son comodines esa ronda.</p>
+<p><b>Victoria:</b> Último jugador con dados.</p>
+</div>
+</details>
+
+<details data-name="shut the box">
+<summary>🎲 Shut the Box <span class="game-meta">Push Your Luck &middot; 👥 1-4 &middot; ⏱️ 10 min</span></summary>
+<div class="c">
+<p><b>Core:</b> Cierra números del 1-9 tirando dados. Menor suma gana.</p>
+<p><b>Turno:</b> Tira ambos dados. "Cierra" números que sumen el resultado (ej: tiras 8 &rarr; cierra 8, ó 5+3, ó 6+2, etc.). Repite hasta que no puedas cerrar nada.</p>
+<p><b>Regla especial:</b> Si solo quedan números &le;6, puedes tirar 1 solo dado.</p>
+<p>Cierras todos = 0 pts (perfecto). <b>Variante 12:</b> Usa números 1-12. Puedes sumar O multiplicar los dados.</p>
+</div>
+</details>
+
+<details data-name="tenzi">
+<summary>⚡ Tenzi <span class="game-meta">Velocidad &middot; 👥 2+ &middot; ⏱️ 5 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> 10 dados/jugador. Tira todos. Separa los que quieras guardar. Vuelve a tirar el resto.</p>
+<p><b>Victoria:</b> Primero en tener 10 dados con el mismo número.</p>
+</div>
+</details>
+
+<details data-name="farkle">
+<summary>🎲 Farkle <span class="game-meta">Push Your Luck &middot; 👥 2+ &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> 6 dados. Meta: 10,000 puntos.</p>
+<table>
+<tr><th>Combinación</th><th>Puntos</th></tr>
+<tr><td>1 solo</td><td>100</td></tr>
+<tr><td>5 solo</td><td>50</td></tr>
+<tr><td>Trío de 1s</td><td>1,000</td></tr>
+<tr><td>Trío de 2s</td><td>200</td></tr>
+<tr><td>Trío de 3s</td><td>300</td></tr>
+<tr><td>Trío de 4s</td><td>400</td></tr>
+<tr><td>Trío de 5s</td><td>500</td></tr>
+<tr><td>Trío de 6s</td><td>600</td></tr>
+<tr><td>Escalera 1-6</td><td>1,500</td></tr>
+</table>
+<p><b>Turno:</b> Tira los 6 dados. Separa al menos 1 dado que dé puntos. Decide: <b>Plantar</b> O <b>Seguir</b>.</p>
+<div class="w">⚠️ FARKLE: Si tiras y NO sacas nada que puntúe = pierdes TODO lo acumulado ese turno.</div>
+<p><b>Bonus:</b> Si separas los 6 dados con puntos, puedes volver a tirar los 6. <b>Regla de entrada:</b> Mínimo 500 pts en un turno para "entrar al juego".</p>
+</div>
+</details>
+
+<details data-name="nokosu dice">
+<summary>👺 Nokosu Dice <span class="game-meta">Trick-taking &middot; 👥 3-5 &middot; ⏱️ 20 min</span></summary>
+<div class="c">
+<p><b>Core:</b> El juego de bazas donde tu último dado predice tu futuro.</p>
+<p><b>Triunfo:</b> Lanza 1 dado al centro &rarr; ese número/color es triunfo. <b>Juego:</b> Bazas estándar. Puedes usar un dado como carta (se descarta).</p>
+<p><b>Meta:</b> Tu último dado al terminar = bazas que debías ganar exactamente. Exacto = +20. Diferencia = &minus;10 por baza.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: LETRAS -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="letras">
+<div class="category-header"><h2>🔠 Letras</h2></div>
+
+<details data-name="bananagrams">
+<summary>🍌 Bananagrams <span class="game-meta">Velocidad &middot; 👥 2-8 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Pool central con todas las letras boca abajo. Cada jugador toma 21.</p>
+<ol>
+<li>Voltea tus letras y forma tu propio crucigrama</li>
+<li>Cuando termines todas &rarr; grita "¡PELA!" &rarr; TODOS roban 1 letra del centro</li>
+<li>Puedes reorganizar tu crucigrama cuando quieras</li>
+</ol>
+<p><b>Gana:</b> Grita "¡BANANAS!" al usar todas tus letras cuando no queden más en el centro. Penalización: Si alguien detecta palabra inválida, el "ganador" queda descalificado.</p>
+</div>
+</details>
+
+<details data-name="anagrams">
+<summary>🔠 Anagrams <span class="game-meta">Robo de palabras &middot; 👥 2-6 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Juego:</b> Por turnos rápidos, voltea 1 letra al centro. Cuando veas una palabra válida (mín. 3 letras) &rarr; grítala y tómala.</p>
+<p><b>El Robo:</b> Puedes robar una palabra de otro si: usas todas sus letras originales + agregas al menos 1 del centro + cambias el significado (no vale solo pluralizar). Ej: Alguien tiene "CASA", sale "R" &rarr; gritas "CASAR" y te la llevas.</p>
+<div class="w">⚠️ Penalización: Gritar palabra inválida = no puedes jugar por 3 letras.</div>
+</div>
+</details>
+
+<details data-name="pistas unicas just one">
+<summary>🔤 Pistas Únicas <span class="game-meta">Deducción &middot; 👥 4-8 &middot; ⏱️ 15 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> 1 jugador = Adivinador (sale del cuarto). Resto elige palabra secreta.</p>
+<ol>
+<li>Cada jugador escribe una pista de 1 palabra</li>
+<li>Las pistas no pueden compartir letras entre sí</li>
+<li>Si dos pistas tienen alguna letra repetida &rarr; se descartan ambas</li>
+<li>Adivinador regresa y ve solo las pistas válidas</li>
+</ol>
+<p><b>Puntuación:</b> Acierta &rarr; +1 todos, +2 adivinador. Falla &rarr; &minus;1 todos.</p>
+</div>
+</details>
+
+<details data-name="buyword">
+<summary>💰 Buyword <span class="game-meta">Economía de letras &middot; 👥 2-4 &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<p><b>Setup:</b> Cada letra tiene valor (puntos de Scrabble: A=1, B=3, etc.). 20 monedas/jugador. Pool de 8 letras visibles en mesa.</p>
+<ul>
+<li><b>Comprar:</b> Paga el costo de letras que quieras (suma de valores)</li>
+<li><b>Vender:</b> Forma palabra con tus letras. Cobras: (suma de valores)&sup2;</li>
+<li><b>Renovar:</b> Descarta el pool y revela 8 nuevas</li>
+</ul>
+<p><b>Fin:</b> 3 rondas consecutivas sin compras. <b>Gana:</b> Más dinero.</p>
+</div>
+</details>
+
+<details data-name="word on the street">
+<summary>🏎️ Word on the Street <span class="game-meta">👥 2+</span></summary>
+<div class="c">
+<p><b>Setup:</b> Imagina una línea con letras: B, C, D, F, G, H, L, M, N, P, R, S, T.</p>
+<p><b>Juego:</b> En 30 segundos, di una palabra de un tema (ej: "Frutas"). Mueve las fichas de las letras que contiene tu palabra hacia tu lado. Si una letra sale del tablero, la ganas.</p>
+<p><b>Gana:</b> Quien capture 8 letras.</p>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: EVERDECK -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="everdeck">
+<div class="category-header"><h2>🃏 The Everdeck</h2></div>
+<p class="category-intro">Juegos compatibles con el Everdeck según BGG:</p>
+<ol style="padding-left:22px;margin:8px 0">
+<li><a href="https://boardgamegeek.com/geeklist/230703/games-playable-with-the-everdeck">Games playable with the Everdeck</a></li>
+<li><a href="https://boardgamegeek.com/geeklist/303652/more-games-playable-with-the-everdeck">More games playable with the Everdeck</a></li>
+<li><a href="https://boardgamegeek.com/geeklist/361060/everdeck-playable-games-i-likeam-interested-by">Everdeck playable games I like/am interested by</a></li>
+</ol>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: QWIXX -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="qwixx">
+<div class="category-header"><h2>✏️ Qwixx / Qwinto</h2></div>
+
+<details data-name="qwixx">
+<summary><b>Qwixx</b> <span class="game-meta">Roll &amp; Write &middot; El de las cruces</span></summary>
+<div class="c">
+<ul>
+<li><b>La Regla:</b> Solo marcas de izquierda a derecha. Si te saltas un número, lo pierdes para siempre.</li>
+<li><b>Tu turno:</b> Sumas los blancos (todos pueden marcar). Luego sumas un color + un blanco (solo tú marcas).</li>
+<li><b>Cerrar fila:</b> Necesitas 5 cruces antes de marcar el último número (2 o 12).</li>
+<li><b>Puntos:</b> Más cruces = más puntos. Cada fallo son &minus;5.</li>
+</ul>
+<p><b>Fin de juego:</b> 2 filas bloqueadas, o algún jugador marca su cuarta casilla de penalización.</p>
+</div>
+</details>
+
+<details data-name="qwinto">
+<summary><b>Qwinto</b> <span class="game-meta">Roll &amp; Write &middot; El de los números</span></summary>
+<div class="c">
+<ul>
+<li><b>La Regla:</b> Los números en la fila deben ser ascendentes (puedes dejar huecos) y no repetirse en columnas.</li>
+<li><b>Tu turno:</b> Eliges 1, 2 o 3 dados. Todos anotan la suma, pero solo en los colores que lanzaste.</li>
+<li><b>Puntos:</b> Fila llena: vale lo que diga el último número. Fila incompleta: 1 punto/número. Pentágono: puntos extra si la columna está llena.</li>
+<li><b>Fallos:</b> Cada uno son &minus;5.</li>
+</ul>
+<p><b>Fin de juego:</b> 2 filas llenas, o algún jugador marca su cuarto tiro fallido.</p>
+</div>
+</details>
+<p style="margin-top:10px;font-size:.9em;color:var(--muted)"><b>Diferencia rápida:</b> En Qwixx el orden de marcado es estricto; en Qwinto puedes saltar casillas y rellenarlas después, siempre que el orden final sea de menor a mayor.</p>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: VIRUS -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="virus">
+<div class="category-header"><h2>🧬 Virus &mdash; Custom Rule Cards</h2></div>
+
+<details data-name="virus cartas individuales">
+<summary>Cartas individuales</summary>
+<div class="c">
+<table>
+<tr><th>Carta</th><th>Efecto</th></tr>
+<tr><td>🔒 Quarantine</td><td>An organ can't be treated or attacked for one round.</td></tr>
+<tr><td>🦠 Double Infection</td><td>Play two viruses in a single turn.</td></tr>
+<tr><td>💊 Double Medicine</td><td>Play two medicines in a single turn.</td></tr>
+<tr><td>🫀 Organ Donor</td><td>Sacrifice one of your organs to remove two viruses from any player.</td></tr>
+<tr><td>🔬 Lab</td><td>Look at any player's hand.</td></tr>
+<tr><td>🚫 Noup</td><td>Deny any action from another player.</td></tr>
+<tr><td>🪦 Autopsy</td><td>Look at the discard pile and take one card.</td></tr>
+<tr><td>🩺 Second Opinion</td><td>Force a player to discard their hand and redraw.</td></tr>
+</table>
+</div>
+</details>
+
+<details data-name="virus combos agresivos">
+<summary>⚔️ Combos Agresivos</summary>
+<div class="c">
+<table>
+<tr><th>Combo</th><th>Descripción</th></tr>
+<tr><td>🦠 Double Infection + 🚫 Noup</td><td>Attack hard, counter anyone who tries to stop you. Creates a high-pressure, offensive game where timing your Noup is everything.</td></tr>
+<tr><td>🦠 Double Infection + 🪦 Autopsy</td><td>Burn through the deck fast, then recycle key cards from the discard. Rewards players who track what's been played.</td></tr>
+</table>
+</div>
+</details>
+
+<details data-name="virus combos defensivos">
+<summary>🛡️ Combos Defensivos</summary>
+<div class="c">
+<table>
+<tr><th>Combo</th><th>Descripción</th></tr>
+<tr><td>💊 Double Medicine + 🔒 Quarantine</td><td>Heal fast and lock down your most vulnerable organ. Slow, tactical game where survival outlasts aggression.</td></tr>
+<tr><td>💊 Double Medicine + 🫀 Organ Donor</td><td>Full defensive suite &mdash; heal yourself or sacrifice strategically to manage the table.</td></tr>
+</table>
+</div>
+</details>
+
+<details data-name="virus combos estrategicos">
+<summary>🧠 Combos Estratégicos</summary>
+<div class="c">
+<table>
+<tr><th>Combo</th><th>Descripción</th></tr>
+<tr><td>🔬 Lab + 🚫 Noup</td><td>See what's coming, then deny the worst of it. Most skill-expressive combo.</td></tr>
+<tr><td>🔬 Lab + 🪦 Autopsy</td><td>Total information control. Slower but deeply satisfying for analytical players.</td></tr>
+<tr><td>🔬 Lab + 🩺 Second Opinion</td><td>See a dangerous hand, then force the discard. Brutal in the right moment.</td></tr>
+</table>
+</div>
+</details>
+
+<details data-name="virus combos caoticos balanceados">
+<summary>🌀 Combos Caóticos &amp; ⚖️ Balanceados</summary>
+<div class="c">
+<table>
+<tr><th>Combo</th><th>Descripción</th></tr>
+<tr><td>🩺 Second Opinion + 🦠 Double Infection</td><td>Wipe someone's hand, then pile on while they're rebuilding. Swingy and punishing.</td></tr>
+<tr><td>🔒 Quarantine + 🩺 Second Opinion</td><td>Lock an organ, force a redraw &mdash; layers of disruption with no clear counter.</td></tr>
+</table>
+<p style="margin-top:10px"><b>Más balanceados:</b></p>
+<ul>
+<li>🔬 Lab + 🚫 Noup &mdash; strategic ceiling without luck swings</li>
+<li>🦠 Double Infection + 🔒 Quarantine &mdash; aggression with a tactical brake</li>
+</ul>
+</div>
+</details>
+</section>
+
+<!-- ════════════════════════════════ -->
+<!-- SECTION: HARMONIES -->
+<!-- ════════════════════════════════ -->
+<section class="category" id="harmonies">
+<div class="category-header"><h2>🎵 Harmonies</h2></div>
+
+<details data-name="harmonies">
+<summary>Reglas <span class="game-meta">Tiles &middot; 👥 1-4 &middot; ⏱️ 30 min</span></summary>
+<div class="c">
+<ol>
+<li>To win, you score points for environments and for the animals in your tableau.</li>
+<li>The environments score points according to this card [show card]. Usually you create shapes of different sizes. Some score more points than others.</li>
+<li>The animals on your cards score points according to how many you manage to place. An animal cube can be placed as soon as you have created the shape on the card.</li>
+<li>On your turn, you pick one of the sets of tiles and place them anywhere on your tableau. You may also pick one of the cards available. And you may place any animal cubes that match the environments on the animal cards.</li>
+</ol>
+<p>If you put a cube on each animal card space when one isn't taken, then when it's full, discard it and replace it.</p>
+<p><b>River push rule:</b> If the token market contains 4 or more tokens of the same color, the active player may choose to wipe those tokens and refill them before drafting.</p>
+</div>
+</details>
+</section>
+
+</main>
+
+<script>
+const search = document.getElementById("search");
+const noResults = document.getElementById("no-results");
+const allDetails = document.querySelectorAll("main > section details[data-name]");
+const allSections = document.querySelectorAll("main > section.category");
+
+// Pill active state on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.id;
+      document.querySelectorAll(".pill").forEach(p => {
+        p.classList.toggle("active", p.getAttribute("href") === "#" + id);
+      });
+    }
+  });
+}, { rootMargin: "-20% 0px -70% 0px" });
+
+allSections.forEach(s => observer.observe(s));
+
+// Search
+search.addEventListener("input", () => {
+  const q = search.value.trim().toLowerCase();
+  let anyVisible = false;
+
+  allSections.forEach(section => {
+    const games = section.querySelectorAll("details[data-name]");
+    let sectionVisible = false;
+
+    games.forEach(d => {
+      const name = d.dataset.name || "";
+      const summary = d.querySelector("summary")?.textContent?.toLowerCase() || "";
+      const match = !q || name.includes(q) || summary.includes(q);
+      d.style.display = match ? "" : "none";
+      if (match) sectionVisible = true;
+    });
+
+    // Also check non-details content (intros, links)
+    const hasStatic = section.querySelectorAll("details[data-name]").length === 0;
+    section.style.display = (sectionVisible || hasStatic) ? "" : "none";
+    if (sectionVisible || hasStatic) anyVisible = true;
+  });
+
+  noResults.classList.toggle("visible", !anyVisible && q.length > 0);
+
+  // Close all open details when searching
+  if (q) {
+    allDetails.forEach(d => {
+      if (d.style.display !== "none") d.open = true;
+    });
+  }
+});
+
+// Click pill -> smooth scroll + close search
+document.querySelectorAll(".pill").forEach(pill => {
+  pill.addEventListener("click", () => {
+    search.value = "";
+    allDetails.forEach(d => { d.style.display = ""; d.open = false; });
+    allSections.forEach(s => s.style.display = "");
+    noResults.classList.remove("visible");
+  });
+});
+</script>
+
+</body>
+</html>

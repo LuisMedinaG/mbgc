@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search — My Board Game Collection</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a href="index.html" class="back-btn">&#8592; Back</a>
+  <div style="margin-bottom: 1rem;">
+    <input type="text" id="search-input" placeholder="Search by name..." class="search-input">
+  </div>
+  <div class="game-list" id="game-list"></div>
+  <div id="no-results" style="text-align:center;color:var(--text-secondary);padding:2rem 0;display:none;">
+    No games found
+  </div>
+  <script src="js/data.js"></script>
+  <script>
+    async function initTextSearch() {
+      const games = await loadGames();
+      const input = document.getElementById("search-input");
+      const list = document.getElementById("game-list");
+      const noResults = document.getElementById("no-results");
+
+      function renderResults(query) {
+        const filtered = games.filter(g =>
+          g.name.toLowerCase().includes(query.toLowerCase())
+        ).sort((a, b) => a.name.localeCompare(b.name));
+
+        list.innerHTML = "";
+
+        if (filtered.length === 0) {
+          noResults.style.display = query.length > 0 ? "block" : "none";
+          return;
+        }
+
+        noResults.style.display = "none";
+        filtered.forEach(g => {
+          const a = document.createElement("a");
+          a.className = "game-list-item";
+          a.href = "game.html?id=" + g.id;
+          a.innerHTML = `
+            <div>
+              <div class="game-list-name">${g.name}</div>
+              <div class="game-list-meta">${g.players.min}-${g.players.max} players &middot; ${g.playtime} min</div>
+            </div>`;
+          list.appendChild(a);
+        });
+      }
+
+      input.addEventListener("input", e => renderResults(e.target.value));
+      input.focus();
+      renderResults("");
+    }
+    initTextSearch();
+  </script>
+</body>
+</html>

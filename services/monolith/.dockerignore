@@ -1,0 +1,10 @@
+.git
+.gitignore
+*.md
+Dockerfile
+.dockerignore
+fly.toml
+CLAUDE.md
+agent_docs/
+server
+boardgames
