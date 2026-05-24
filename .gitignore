@@ -50,3 +50,6 @@ crash.*.log
 
 # Deploy secrets script (contains service account mappings)
 set-deploy-secrets.sh
+
+# Wrangler config
+.wrangler/
