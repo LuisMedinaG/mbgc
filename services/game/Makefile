@@ -4,7 +4,7 @@ APP ?= server
 PORT ?= 8002
 
 dev:
-	go run ./cmd/server
+	bash -c 'set -a; source .env 2>/dev/null; set +a; go run ./cmd/server'
 
 build:
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(APP) ./cmd/server

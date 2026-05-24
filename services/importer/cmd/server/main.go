@@ -29,13 +29,10 @@ func main() {
 	}
 	defer pool.Close()
 
-	// BGG client is optional — sync is disabled if no token/cookie is configured
 	bggClient := bgg.NewClient(cfg.BGGToken, cfg.BGGCookie)
-
 	st := store.New(pool)
-	gameClient := game.NewClient(cfg.GameServiceURL)
-	svc := service.New(st, bggClient, gameClient)
-	h := handler.New(svc)
+	svc := service.New(st, bggClient, nil) // game client not implemented yet
+	h := handler.New(svc, cfg)
 
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
@@ -53,7 +50,7 @@ func main() {
 			httpx.TrustGatewayHeaders,
 		),
 		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 120 * time.Second, // BGG sync can take a while
+		WriteTimeout: 120 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 

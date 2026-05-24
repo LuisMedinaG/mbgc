@@ -4,7 +4,7 @@ APP ?= server
 PORT ?= 8001
 
 dev:
-	go run ./cmd/server
+	bash -c 'set -a; source .env 2>/dev/null; set +a; go run ./cmd/server'
 
 build:
 	CGO_ENABLED=0 go build -ldflags="-s -w" -o $(APP) ./cmd/server
@@ -21,7 +21,6 @@ lint:
 tidy:
 	go mod tidy
 
-# Run migrations via psql (requires DATABASE_URL env var)
 migrate-up:
 	psql "$$DATABASE_URL" -f migrations/001_init.up.sql
 
