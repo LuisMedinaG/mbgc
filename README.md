@@ -156,10 +156,12 @@ You need **two values** from Supabase: `SUPABASE_JWT_SECRET` and `DATABASE_URL`.
 
 #### `SUPABASE_JWT_SECRET`
 
-1. Open: https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh/settings/jwt
-2. Scroll to **JWT Secret**
+1. Open: https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh/settings/api
+2. Find **JWT Settings** → **JWT Secret**
 3. Click **Reveal** and copy the value
-4. Looks like: `super-secret-jwt-token-with-at-least-32-characters-long`
+4. Paste into `services/gateway/.env` as `SUPABASE_JWT_SECRET`
+
+The gateway supports both **HS256** (original) and **ES256** (ECC P-256) — it auto-detects the algorithm. For ES256, public keys are fetched from Supabase's JWKS endpoint.
 
 #### `DATABASE_URL`
 
@@ -217,6 +219,7 @@ Then edit each:
 ```env
 PORT=8000
 SUPABASE_JWT_SECRET=<paste from step 3>
+SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co
 AUTH_SERVICE_URL=http://localhost:8001
 GAME_SERVICE_URL=http://localhost:8002
 IMPORTER_SERVICE_URL=http://localhost:8003
