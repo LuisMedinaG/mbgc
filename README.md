@@ -103,6 +103,10 @@ cp services/gateway/.env.example services/gateway/.env
 cp services/auth/.env.example     services/auth/.env
 cp services/game/.env.example     services/game/.env
 cp services/importer/.env.example services/importer/.env
+cp web/.env.example               web/.env
+
+# Open all .env files to fill in secrets
+$EDITOR services/gateway/.env services/auth/.env services/game/.env services/importer/.env web/.env
 
 # Install web deps
 cd web && bun install && cd ..
@@ -152,8 +156,8 @@ You need **two values** from Supabase: `SUPABASE_JWT_SECRET` and `DATABASE_URL`.
 
 #### `SUPABASE_JWT_SECRET`
 
-1. Open: https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh/settings/api
-2. Scroll to **JWT Settings** → **JWT Secret**
+1. Open: https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh/settings/jwt
+2. Scroll to **JWT Secret**
 3. Click **Reveal** and copy the value
 4. Looks like: `super-secret-jwt-token-with-at-least-32-characters-long`
 
@@ -202,6 +206,9 @@ cp services/auth/.env.example     services/auth/.env
 cp services/game/.env.example     services/game/.env
 cp services/importer/.env.example services/importer/.env
 cp web/.env.example               web/.env
+
+# Open all .env files to fill in secrets
+$EDITOR services/gateway/.env services/auth/.env services/game/.env services/importer/.env web/.env
 ```
 
 Then edit each:
