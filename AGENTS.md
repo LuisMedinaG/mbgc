@@ -16,10 +16,10 @@ make migrate-up
 make migrate-down
 
 # Web (from web/):
-bun run dev
-bun run build        # tsc -b && vite build
-bun run lint
-bun run test:e2e     # Playwright — requires full stack running
+make dev       # Vite dev server
+make build     # tsc -b && vite build
+make lint
+make test-e2e  # Playwright — requires full stack running
 ```
 
 ## go.work Workspace

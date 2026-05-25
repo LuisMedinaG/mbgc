@@ -56,10 +56,10 @@ cd services/gateway && make build     # produces ./server binary
 cd services/gateway && make tidy      # go mod tidy
 
 # Web (from web/)
-bun run dev      # Vite dev server
-bun run build    # tsc -b && vite build
-bun run lint
-bun run test:e2e # Playwright e2e (requires full stack)
+make dev       # Vite dev server
+make build     # tsc -b && vite build
+make lint
+make test-e2e  # Playwright e2e (requires full stack)
 ```
 
 ## CI/CD

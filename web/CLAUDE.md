@@ -19,11 +19,11 @@ Deployed to Cloudflare Pages; talks exclusively to mbgc-gateway.
 ## Commands
 
 ```sh
-bun install
-bun run dev          # Vite dev server
-bun run build        # tsc -b && vite build → dist/
-bun run lint         # eslint
-bun run test:e2e     # Playwright e2e (requires full backend stack)
+make install  # bun install
+make dev      # Vite dev server
+make build    # tsc -b && vite build → dist/
+make lint     # eslint
+make test-e2e # Playwright e2e (requires full backend stack)
 ```
 
 ## Environment variables
