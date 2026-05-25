@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Port               string
 	JWTSecret          string
+	SupabaseURL        string
 	AuthServiceURL     string
 	GameServiceURL     string
 	ImporterServiceURL string
@@ -19,6 +20,7 @@ func Load() Config {
 	return Config{
 		Port:               getenv("PORT", "8000"),
 		JWTSecret:          mustenv("SUPABASE_JWT_SECRET"),
+		SupabaseURL:        getenv("SUPABASE_URL", "https://mlltpfszhtxhphoaeydh.supabase.co"),
 		AuthServiceURL:     getenv("AUTH_SERVICE_URL", "http://localhost:8001"),
 		GameServiceURL:     getenv("GAME_SERVICE_URL", "http://localhost:8002"),
 		ImporterServiceURL: getenv("IMPORTER_SERVICE_URL", "http://localhost:8003"),
