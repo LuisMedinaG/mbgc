@@ -1,8 +1,6 @@
 # pkg/shared
 
-Shared Go module imported by all mbgc microservices. Contains the contract
-that keeps services consistent — do not break exported types without updating
-all consumers.
+Shared Go module imported by `services/api` (and any future Go services in this monorepo). Contains the contract that keeps services consistent — do not break exported types without updating all consumers.
 
 ## Module path
 
@@ -48,14 +46,14 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 
 - Never expose raw errors (DB, OS, network) to API consumers — wrap with a sentinel.
 - Use `errors.Is` / `apierr.Is*` helpers for sentinel checks; wrap with `fmt.Errorf("%w", ...)` to add context.
-- Middleware chain order: `SecurityHeaders → RequestID → Logger → Recover → TrustGatewayHeaders → router`.
+- Middleware chain order for `services/api`: `Logger → RequestID → Recover → SecurityHeaders → CORS → router` (auth middleware wraps individual routes, not the global chain).
 
 ## Updating this module
 
 The monorepo uses `go.work` with a `replace` directive pointing all services to `./pkg/shared` — no version bump needed for local changes. After modifying this package:
 
-1. Run `make tidy` in each consuming service to sync `go.sum`.
-2. Run `make test-v` in each consuming service to catch breakage early.
+1. Run `make tidy` in `services/api` to sync `go.sum`.
+2. Run `make test-v` in `services/api` to catch breakage early.
 3. If publishing externally (outside this monorepo): bump `vX.Y.Z`, then update `go get` in each consumer.
 
 <claude-mem-context>

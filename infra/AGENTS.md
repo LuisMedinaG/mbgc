@@ -31,8 +31,8 @@ scripts/
 
 | Provider | Resources |
 |---|---|
-| GCP Cloud Run | `myboardgamecollection` (monolith, decommissioning), `mbgc-gateway`, `mbgc-game-service`, `mbgc-importer-service`, `mbgc-auth-service` |
-| Cloudflare | Pages project, DNS records for `lumedina.dev` (apex, www, api) |
+| GCP Cloud Run | `mbgc-api` — single public API service |
+| Cloudflare | Pages project (`mbgc-web`), DNS records for `lumedina.dev` (apex, www, api) |
 | Supabase | Auth settings (`supabase_settings`) — JWT expiry, site URL, redirect URIs, session policy |
 
 **Not managed here:** Cloud Run image/env/resources (owned by service CI/CD). Cloudflare Pages build settings (CF dashboard, `lifecycle { ignore_changes = all }`).
@@ -103,7 +103,7 @@ Terraform changes are **applied manually** — there is no automated `terraform 
 
 | Managed in this repo | Managed elsewhere |
 |---|---|
-| Cloud Run service shells (name, ingress, runtime SA, IAM) | Cloud Run image/env/resources — monorepo CI/CD (`deploy.yml`) |
+| Cloud Run service shell (name, ingress, runtime SA, IAM) | Cloud Run image/env/resources — monorepo CI/CD (`deploy.yml`) |
 | Cloud Run custom domain mapping (`api.lumedina.dev`) | Cloud Run traffic splitting |
 | Artifact Registry repo | Image contents |
 | Workload Identity Federation pool + provider | GitHub Actions workflow YAML (`LuisMedinaG/mbgc`) |
@@ -116,8 +116,8 @@ Terraform changes are **applied manually** — there is no automated `terraform 
 
 - **WIF condition** allows only `LuisMedinaG/mbgc`. Never broaden to `repository_owner` — that trusts every repo in the org.
 - **WIF binding** targets the monorepo (`attribute.repository/LuisMedinaG/mbgc`). Never bind with `attribute.repository_owner`.
-- **Cloud Run runtime SAs** are per-service. Never point multiple services at the same runtime SA unless they share a trust boundary.
-- **Internal services** (`public = false`) must list the gateway runtime SA in `invokers`. Network-only isolation (INTERNAL ingress) isn't sufficient — Cloud Run still requires IAM `roles/run.invoker`.
+- **Cloud Run runtime SA** is scoped to `mbgc-api` only. Never reuse it for other services if new services are added — each gets its own SA.
+- **`mbgc-api` is public** (`public = true`). JWT validation happens inside the service itself — `services/api/internal/jwt/`.
 
 ## Credentials
 

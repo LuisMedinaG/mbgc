@@ -13,118 +13,37 @@ env:
   GCP_REGION: us-central1
 
 jobs:
-  # Determine which services changed
   changes:
     runs-on: ubuntu-latest
     outputs:
-      gateway: ${{ steps.filter.outputs.gateway }}
-      auth: ${{ steps.filter.outputs.auth }}
-      game: ${{ steps.filter.outputs.game }}
-      importer: ${{ steps.filter.outputs.importer }}
-      monolith: ${{ steps.filter.outputs.monolith }}
+      api: ${{ steps.filter.outputs.api }}
       web: ${{ steps.filter.outputs.web }}
-      infra: ${{ steps.filter.outputs.infra }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            gateway:
-              - 'services/gateway/**'
+            api:
+              - 'services/api/**'
               - 'pkg/shared/**'
-            auth:
-              - 'services/auth/**'
-              - 'pkg/shared/**'
-            game:
-              - 'services/game/**'
-              - 'pkg/shared/**'
-            importer:
-              - 'services/importer/**'
-              - 'pkg/shared/**'
-            monolith:
-              - 'services/monolith/**'
             web:
               - 'web/**'
-            infra:
-              - 'infra/**'
 
-  # Deploy gateway
-  deploy-gateway:
+  deploy-api:
     needs: changes
-    if: needs.changes.outputs.gateway == 'true' || github.event_name == 'workflow_dispatch'
+    if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
-      service_name: mbgc-gateway
-      dockerfile: services/gateway/deploy/Dockerfile
-      context: services/gateway
+      service_name: mbgc-api
+      dockerfile: services/api/deploy/Dockerfile
+      context: .
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_GATEWAY }}
+      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_API }}
 
-  # Deploy auth service
-  deploy-auth:
-    needs: changes
-    if: needs.changes.outputs.auth == 'true' || github.event_name == 'workflow_dispatch'
-    uses: ./.github/workflows/deploy-cloud-run.yml
-    with:
-      service_name: mbgc-auth-service
-      dockerfile: services/auth/deploy/Dockerfile
-      context: services/auth
-    secrets:
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_AUTH }}
-
-  # Deploy game service
-  deploy-game:
-    needs: changes
-    if: needs.changes.outputs.game == 'true' || github.event_name == 'workflow_dispatch'
-    uses: ./.github/workflows/deploy-cloud-run.yml
-    with:
-      service_name: mbgc-game-service
-      dockerfile: services/game/deploy/Dockerfile
-      context: services/game
-    secrets:
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_GAME }}
-
-  # Deploy importer service
-  deploy-importer:
-    needs: changes
-    if: needs.changes.outputs.importer == 'true' || github.event_name == 'workflow_dispatch'
-    uses: ./.github/workflows/deploy-cloud-run.yml
-    with:
-      service_name: mbgc-importer-service
-      dockerfile: services/importer/deploy/Dockerfile
-      context: services/importer
-    secrets:
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_IMPORTER }}
-
-  # Deploy monolith
-  deploy-monolith:
-    needs: changes
-    if: needs.changes.outputs.monolith == 'true' || github.event_name == 'workflow_dispatch'
-    uses: ./.github/workflows/deploy-cloud-run.yml
-    with:
-      service_name: myboardgamecollection
-      dockerfile: services/monolith/Dockerfile
-      context: services/monolith
-    secrets:
-      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_MONOLITH }}
-
-  # Deploy web to Cloudflare Pages
   deploy-web:
     needs: changes
     if: needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch'

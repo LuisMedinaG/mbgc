@@ -4,21 +4,28 @@ export default defineConfig({
   testDir: './e2e/tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: 0,
-  reporter: 'list',
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? [['github'], ['list']] : 'list',
+  timeout: 30_000,
+
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
   },
+
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
   ],
+
   webServer: {
     command: 'bun dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000,
   },
 })

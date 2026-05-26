@@ -11,11 +11,7 @@ locals {
   trusted_repos = ["mbgc"]
 
   runtime_services = toset([
-    "mbgc-gateway",
-    "mbgc-game-service",
-    "mbgc-importer-service",
-    "mbgc-auth-service",
-    "myboardgamecollection",
+    "mbgc-api",
   ])
 }
 
@@ -57,66 +53,15 @@ resource "google_service_account" "runtime" {
 # Cloud Run — services
 ###############################################################################
 
-# TODO: Monolith (HTMX + REST API) — to be decommissioned in Phase 5 once microservices
-# cover full feature set. Public: serves the web UI directly.
-module "cloud_run_monolith" {
+# Single public API — validates JWT, handles all business logic.
+module "cloud_run_api" {
   source = "../../modules/cloud-run"
 
-  name            = "myboardgamecollection"
+  name            = "mbgc-api"
   project         = var.gcp_project_id
   region          = var.gcp_region
   public          = true
-  service_account = google_service_account.runtime["myboardgamecollection"].email
-  labels          = local.common_labels
-}
-
-# API gateway — public entry point; validates JWT and routes to internal services.
-module "cloud_run_gateway" {
-  source = "../../modules/cloud-run"
-
-  name            = "mbgc-gateway"
-  project         = var.gcp_project_id
-  region          = var.gcp_region
-  public          = true
-  service_account = google_service_account.runtime["mbgc-gateway"].email
-  labels          = local.common_labels
-}
-
-# Internal services — ingress INTERNAL_ONLY + IAM invoker restricted to the
-# gateway runtime SA. Defense in depth: network + IAM must both pass.
-module "cloud_run_game_service" {
-  source = "../../modules/cloud-run"
-
-  name            = "mbgc-game-service"
-  project         = var.gcp_project_id
-  region          = var.gcp_region
-  public          = false
-  service_account = google_service_account.runtime["mbgc-game-service"].email
-  invokers        = [google_service_account.runtime["mbgc-gateway"].email]
-  labels          = local.common_labels
-}
-
-module "cloud_run_importer_service" {
-  source = "../../modules/cloud-run"
-
-  name            = "mbgc-importer-service"
-  project         = var.gcp_project_id
-  region          = var.gcp_region
-  public          = false
-  service_account = google_service_account.runtime["mbgc-importer-service"].email
-  invokers        = [google_service_account.runtime["mbgc-gateway"].email]
-  labels          = local.common_labels
-}
-
-module "cloud_run_auth_service" {
-  source = "../../modules/cloud-run"
-
-  name            = "mbgc-auth-service"
-  project         = var.gcp_project_id
-  region          = var.gcp_region
-  public          = false
-  service_account = google_service_account.runtime["mbgc-auth-service"].email
-  invokers        = [google_service_account.runtime["mbgc-gateway"].email]
+  service_account = google_service_account.runtime["mbgc-api"].email
   labels          = local.common_labels
 }
 
@@ -307,7 +252,7 @@ resource "google_cloud_run_domain_mapping" "api" {
   }
 
   spec {
-    route_name = module.cloud_run_gateway.name
+    route_name = module.cloud_run_api.name
   }
 }
 

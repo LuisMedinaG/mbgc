@@ -1,19 +1,19 @@
 # E2E tests
 
-Playwright UI test suite for the React app. Self-contained under `e2e/` so it
-can later be extracted into its own package or service without touching the
-app code.
+Playwright UI test suite for the React app. Runs in CI without a backend — all
+API routes are intercepted at the network level by mock handlers in `helpers/api-mocks.ts`.
 
 ## Layout
 
 ```
 e2e/
-├── fixtures/           # Playwright fixtures (shared setup)
-│   └── auth.ts         # `authenticatedPage` fixture + seedAuth()
-├── helpers/            # Small, dependency-free utilities
-│   ├── nav.ts          # goToCollection / goToFirstGame / goToVibes
-│   └── mocks.ts        # mockLogin — intercepts /auth/login
-├── tests/              # Spec files, one per feature area
+├── fixtures/
+│   └── auth.ts          # authenticatedPage fixture — mocked by default, live with TEST_TOKEN
+├── helpers/
+│   ├── api-mocks.ts     # Mock handlers for all /api/v1/* routes + fixture data
+│   ├── nav.ts           # goToCollection / goToFirstGame / goToVibes
+│   └── mocks.ts         # deprecated re-export — use api-mocks.ts directly
+├── tests/               # Spec files, one per feature area
 │   ├── auth.spec.ts
 │   ├── collection.spec.ts
 │   ├── game-detail.spec.ts
@@ -23,44 +23,45 @@ e2e/
 └── README.md
 ```
 
-Playwright is configured to discover tests in `e2e/tests` only
-(see `playwright.config.ts`). Anything outside that folder is support code.
-
 ## Running
 
 ```sh
-# Unauthenticated / mocked tests only (no backend needed)
-bun run test:e2e --grep "@mocked|Auth"
+# Full suite — mocked mode, no backend needed (what CI runs)
+bun run test:e2e
 
-# Full suite (needs backend + ephemeral token)
-TEST_TOKEN=<ephemeral-jwt> bun run test:e2e
+# Interactive UI mode
+bunx playwright test --ui
 
 # Single file
-bun run test:e2e e2e/tests/collection.spec.ts
+bun run test:e2e e2e/tests/auth.spec.ts
 
-# Headed / debug
-bun run test:e2e --headed
-bun run test:e2e --debug
+# With a real backend (live mode)
+TEST_TOKEN=<supabase-jwt> bun run test:e2e
 ```
 
-The Vite dev server is started automatically by Playwright
-(`webServer.command = "bun dev"`).
+## Mock strategy
 
-## Authentication protocol
+By default (no `TEST_TOKEN`), `fixtures/auth.ts` calls `mockAll()` from
+`helpers/api-mocks.ts`, which intercepts every `/api/v1/*` request. Fixture
+data (games, collections, profile) lives in that file — update it once to
+change what all tests see.
 
-Tests must never use static usernames or passwords. Two paths are allowed:
+To override a single route inside a test:
 
-1. **Primary — mock.** Intercept `/api/v1/auth/login` via `mockLogin(page)`
-   (`helpers/mocks.ts`). Use this for anything that exercises the login UI.
-2. **Fallback — ephemeral JWT.** When a real session is required (most
-   authenticated flows), set `TEST_TOKEN` to an ephemeral JWT. The
-   `authenticatedPage` fixture seeds it into `localStorage`. Optionally set
-   `TEST_REFRESH_TOKEN`; if omitted the access token is reused.
-3. **No viable path → halt.** If neither mock nor token is available the
-   suite throws a blocker. Do not invent credentials.
+```ts
+import { mockAll, FIXTURE_GAMES } from '../helpers/api-mocks'
 
-The token is never logged, printed, or echoed. Do not add `console.log`
-statements that touch `TEST_TOKEN` or the `access_token` returned by the API.
+test.beforeEach(async ({ page }) => await mockAll(page))
+
+test('shows empty state', async ({ page }) => {
+  // Re-register the route to override — last registration wins
+  await page.route('**/api/v1/games*', route =>
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ data: [], meta: { page: 1, limit: 20, total: 0 } }) }),
+  )
+  // ...
+})
+```
 
 ## Writing a test
 
@@ -70,9 +71,9 @@ statements that touch `TEST_TOKEN` or the `access_token` returned by the API.
 import { test, expect } from '../fixtures/auth'
 import { goToFirstGame } from '../helpers/nav'
 
-test('game detail shows BGG link', async ({ authenticatedPage: page }) => {
+test('game detail shows name', async ({ authenticatedPage: page }) => {
   await goToFirstGame(page)
-  await expect(page.getByRole('link', { name: /boardgamegeek/i })).toBeVisible()
+  await expect(page.locator('h1').first()).toBeVisible()
 })
 ```
 
@@ -80,39 +81,26 @@ test('game detail shows BGG link', async ({ authenticatedPage: page }) => {
 
 ```ts
 import { test, expect } from '@playwright/test'
-import { mockLogin } from '../helpers/mocks'
+import { mockAuthLogin } from '../helpers/api-mocks'
 
-test('login success', async ({ page }) => {
-  await mockLogin(page)
+test('login form submits', async ({ page }) => {
+  await mockAuthLogin(page)
   // ...
 })
 ```
 
+## CI
+
+The `e2e` job in `.github/workflows/ci.yml` runs the full suite in mocked mode.
+On failure the Playwright report is uploaded as `playwright-report` (7-day retention).
+
+To run with a real Supabase token in CI, add `TEST_TOKEN` as a GitHub Actions
+secret and pass it via `env:` in the workflow step.
+
 ## Conventions
 
-- **One file per feature area.** Match the page or domain (`collection`,
-  `game-detail`, `vibes`). Keep each file short.
-- **No hardcoded credentials, URLs, or user IDs.** Use fixtures, env vars,
-  or data queried from the UI.
-- **Prefer role/label selectors** (`getByRole`, `getByLabel`) over
-  CSS/XPath. They double as accessibility checks.
-- **Small, composable helpers.** If a helper grows past ~15 lines, split it.
-- **No cross-file imports between spec files.** Specs depend only on
-  `fixtures/` and `helpers/`.
-- **Skip gracefully** when a precondition is missing (e.g. no player aids
-  uploaded) rather than asserting false positives.
-
-## Migration path: extracting to its own service
-
-The folder is intentionally self-contained. To lift it into a standalone
-testing service:
-
-1. `git mv react-app/e2e tests-service/`
-2. Create `tests-service/package.json` with `@playwright/test` as a dep.
-3. Copy `react-app/playwright.config.ts` over and point `webServer.command`
-   at whatever launches the app under test (Docker, a deployed URL, etc.).
-4. Update `baseURL` to an env var so the same suite runs against local,
-   staging, and production.
-
-Nothing in `fixtures/`, `helpers/`, or `tests/` imports from the React app
-source, so the move is mechanical.
+- **One file per feature area.** Match the page or domain (`collection`, `game-detail`, `vibes`).
+- **No hardcoded credentials, URLs, or user IDs.** Use `FIXTURE_*` constants from `api-mocks.ts`.
+- **Prefer role/label selectors** (`getByRole`, `getByLabel`) over CSS/XPath.
+- **No cross-file imports between spec files.** Specs depend only on `fixtures/` and `helpers/`.
+- **Skip gracefully** when a precondition is missing rather than asserting false positives.

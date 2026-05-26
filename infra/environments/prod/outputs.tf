@@ -3,33 +3,28 @@ output "pages_subdomain" {
   value       = module.pages_mbgc_web.subdomain
 }
 
-output "monolith_uri" {
-  description = "Cloud Run URL for the monolith."
-  value       = module.cloud_run_monolith.uri
-}
-
-output "gateway_uri" {
-  description = "Cloud Run URL for the API gateway (proxied at api.lumedina.dev)."
-  value       = module.cloud_run_gateway.uri
+output "api_uri" {
+  description = "Cloud Run URL for the API (proxied at api.lumedina.dev)."
+  value       = module.cloud_run_api.uri
 }
 
 output "workload_identity_provider" {
-  description = "WIF provider resource name — set as GCP_WORKLOAD_IDENTITY_PROVIDER in each service repo."
+  description = "WIF provider resource name — set as GCP_WORKLOAD_IDENTITY_PROVIDER in the monorepo."
   value       = google_iam_workload_identity_pool_provider.github.name
 }
 
 output "deploy_service_account" {
-  description = "Deploy SA email — set as GCP_SERVICE_ACCOUNT in each service repo."
+  description = "Deploy SA email — set as GCP_SERVICE_ACCOUNT in the monorepo."
   value       = google_service_account.deploy.email
 }
 
 output "terraform_service_account" {
-  description = "Terraform SA email — set as GCP_TERRAFORM_SERVICE_ACCOUNT on this repo for CI."
+  description = "Terraform SA email — for reference."
   value       = data.google_service_account.terraform.email
 }
 
 output "runtime_service_accounts" {
-  description = "Runtime SA emails keyed by service name. Each service repo reads its own to pass via --service-account in gcloud run deploy."
+  description = "Runtime SA emails keyed by service name."
   value       = { for k, sa in google_service_account.runtime : k => sa.email }
 }
 

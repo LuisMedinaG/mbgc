@@ -1,6 +1,6 @@
 # pkg/shared
 
-Shared Go module used by all `mbgc-*` microservices.
+Shared Go module used by `services/api` and any future Go services in this monorepo.
 
 ## Packages
 
@@ -43,12 +43,12 @@ Shared Go module used by all `mbgc-*` microservices.
 
 ```go
 httpx.Chain(router,
-    httpx.Logger,              // outermost — logs every request
-    httpx.RequestID,           // injects X-Request-ID
-    httpx.Recover,             // catches panics
-    httpx.SecurityHeaders,     // security headers
-    httpx.CORS(origin),        // CORS preflight
-    httpx.TrustGatewayHeaders, // internal services: reads X-User-ID from gateway
+    httpx.Logger,          // outermost — logs every request
+    httpx.RequestID,       // injects X-Request-ID
+    httpx.Recover,         // catches panics
+    httpx.SecurityHeaders, // security headers
+    httpx.CORS(origins),   // CORS preflight
+    // auth middleware (your jwt.Verifier.RequireAuth) wraps individual routes
 )
 ```
 

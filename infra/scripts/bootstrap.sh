@@ -222,11 +222,7 @@ if terraform output -raw workload_identity_provider >/dev/null 2>&1; then
   set_secret GCP_SERVICE_ACCOUNT            "$DEPLOY_SA"
   set_secret GCP_PROJECT_ID                 "$GCP_PROJECT_ID"
 
-  set_secret GCP_RUNTIME_SA_GATEWAY   "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-gateway"')"
-  set_secret GCP_RUNTIME_SA_AUTH      "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-auth-service"')"
-  set_secret GCP_RUNTIME_SA_GAME      "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-game-service"')"
-  set_secret GCP_RUNTIME_SA_IMPORTER  "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-importer-service"')"
-  set_secret GCP_RUNTIME_SA_MONOLITH  "$(printf '%s' "$RUNTIME_SAS" | jq -r '."myboardgamecollection"')"
+  set_secret GCP_RUNTIME_SA_API "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-api"')"
 fi
 
 printf '\n=== Bootstrap complete ===\n\n'

@@ -2,11 +2,7 @@ go 1.25.0
 
 use (
 	./pkg/shared
-	./services/auth
-	./services/game
-	./services/gateway
-	./services/importer
-	./services/monolith
+	./services/api
 )
 
 replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared

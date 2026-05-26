@@ -3,20 +3,18 @@
 ## Build & Test
 
 ```sh
-# All services share the same per-service Makefile interface:
+# services/api Makefile interface:
 make dev       # go run ./cmd/server  (auto-loads .env)
 make build     # CGO_ENABLED=0 go build -ldflags="-s -w" -o server ./cmd/server
 make test      # go test ./...
 make test-v    # go test -v -race ./...  ← use before every PR
 make lint      # go vet ./...
 make tidy      # go mod tidy
-
-# Services with Postgres migrations (auth, game, importer):
 make migrate-up
 make migrate-down
 
 # First-time DB setup (root Makefile) — starts Supabase + runs all migrations:
-make db-setup   # pre-flight checks .env + DATABASE_URL in each service, then migrates all three
+make db-setup   # pre-flight checks services/api/.env has DATABASE_URL, then migrates
 
 # Web (from web/):
 make dev       # Vite dev server
@@ -53,21 +51,22 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
 - Transaction pooler port `6543` — avoid; breaks session features
 - Format: `postgresql://postgres.[ref]:[pw]@aws-0-us-west-2.pooler.supabase.com:5432/postgres`
 
-## JWT / Auth (gateway)
+## JWT / Auth (services/api)
 
 - **Primary path:** ES256/RS256 via JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
   Auto-refreshed by `github.com/MicahParks/keyfunc/v3`. Leaking public keys cannot forge tokens.
 - **Legacy path:** HS256 via `SUPABASE_JWT_SECRET` — only enable if accepting tokens minted
   before the project migrated to JWT signing keys. Leave empty for new setups.
-- **Validated on every token:** signature, `exp`, `iss` = `${SUPABASE_URL}/auth/v1`,
+- **Validated on every request:** signature, `exp`, `iss` = `${SUPABASE_URL}/auth/v1`,
   `aud` = `authenticated`. Anon/service_role API keys are rejected.
-- `SUPABASE_URL` is **required** to boot the gateway. `SUPABASE_JWT_SECRET` is optional.
+- `SUPABASE_URL` is **required** to boot. `SUPABASE_JWT_SECRET` is optional.
+- JWT validation lives in `services/api/internal/jwt/` — middleware calls `httpx.SetGatewayUser` to put identity into context.
 
 ## go.work Workspace
 
-`go.work` + `replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared` means all services resolve `pkg/shared` locally — no version bump needed during development. Changes to `pkg/shared` are immediately visible to all services.
+`go.work` + `replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared` means `services/api` resolves `pkg/shared` locally — no version bump needed during development.
 
-When touching `pkg/shared`: run `make tidy` and `make test-v` in each consuming service before opening a PR.
+When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` before opening a PR.
 
 ## Code Style (non-obvious rules)
 
@@ -76,7 +75,7 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in each consuming 
 - Wrap errors with `fmt.Errorf("%w", err)`; check with `errors.Is` / `errors.As`
 - Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
 - Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
-- Extract user identity via `httpx.UserIDFromContext` — the gateway injects `X-User-ID`, `X-Is-Admin` headers
+- Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
 
 **TypeScript:**
 - Strict mode, no `any`
@@ -96,15 +95,15 @@ feature/*  →  dev  →  staging  →  main
 **Always:**
 - Include `user_id` in every query on user-owned data — multi-tenancy enforced at SQL layer
 - Use `pkg/shared/apierr` sentinels for all error paths
-- Trust gateway-forwarded headers (`X-User-ID`, `X-Is-Admin`) in downstream services — never re-validate the JWT there
+- Validate JWT in `services/api/internal/jwt/` middleware — never skip or trust forwarded headers from untrusted callers
 - Run `make test-v` before opening a PR
 
 **Ask first:**
-- Schema changes affecting multiple services
-- Any change to `pkg/shared` exported types (all 5 services depend on it)
+- Any change to `pkg/shared` exported types (`services/api` depends on it)
 - Auth flow modifications (JWT expiry, Supabase config, refresh logic, JWKS)
 - Running `supabase db push` — this writes to the hosted production database
 - New external service integrations or third-party dependencies
+- Schema changes (migrations in `services/api/migrations/`)
 
 **Never:**
 - Push directly to `main` or `staging`
