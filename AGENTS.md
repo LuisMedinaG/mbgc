@@ -67,28 +67,44 @@ When implementing a feature, annotate new code with the relevant ACIDs. When mod
 | profile | `features/profile.feature.yaml` | Profile view, BGG username, change password, admin flag |
 | api-layer | `features/api-layer.feature.yaml` | Shared error handling, envelope, middleware, config |
 
-## Build & Test
+## Setup & Build
+
+> Full first-time setup guide: **[SETUP.md](./SETUP.md)**
 
 ```sh
-# services/api Makefile interface:
-make dev       # go run ./cmd/server  (auto-loads .env)
-make build     # CGO_ENABLED=0 go build -ldflags="-s -w" -o server ./cmd/server
-make test      # go test ./...
-make test-v    # go test -v -race ./...  ← use before every PR
-make lint      # go vet ./...
-make tidy      # go mod tidy
-make migrate-up
-make migrate-down
+# Root Makefile — primary entry points:
+make setup-local   # first-time local setup (copies .env, starts Supabase, migrates)
+make dev           # start API + web in tmux
+make db-migrate    # apply pending migrations
+make db-reset      # wipe + replay local DB
+make build         # build API + web
+make test          # run Go tests
+make lint          # lint Go + web + infra
 
-# First-time DB setup (root Makefile) — starts Supabase + runs all migrations:
-make db-setup   # pre-flight checks services/api/.env has DATABASE_URL, then migrates
+# services/api Makefile:
+make dev           # go run ./cmd/server  (auto-loads .env)
+make test-v        # go test -v -race ./...  ← use before every PR
+make tidy          # go mod tidy
+make migrate-up / migrate-down
 
 # Web (from web/):
-make dev       # Vite dev server
-make build     # tsc -b && vite build
+make dev           # Vite dev server
+make build         # tsc -b && vite build
 make lint
-make test-e2e  # Playwright — requires full stack running
+make test-e2e      # Playwright — requires full stack running
 ```
+
+### Admin user
+
+Set in `services/api/.env` — created automatically on first API boot:
+
+```sh
+SEED_ADMIN_EMAIL=you@example.com
+SEED_ADMIN_PASSWORD=yourpassword
+SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
+```
+
+Idempotent — safe to leave set permanently.
 
 ## Supabase — Local vs Remote
 
