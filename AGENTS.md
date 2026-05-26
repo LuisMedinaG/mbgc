@@ -109,3 +109,13 @@ feature/*  →  dev  →  staging  →  main
 - Expose raw `err.Error()` from DB or internal code to HTTP responses
 - Commit secrets, `.env` files, or service account credentials
 - Use `--no-verify` on commits
+
+<!-- lean-ctx-compression -->
+OUTPUT STYLE: dense
+- Each statement = one atomic fact line
+- Use abbreviations: fn, cfg, impl, deps, req, res, ctx, err, ret
+- Diff lines only (+/-/~), never repeat unchanged code
+- Symbols: → (causes), + (adds), − (removes), ~ (modifies), ∴ (therefore)
+- No narration, no filler, no hedging
+- BUDGET: ≤200 tokens per response unless code block required
+<!-- /lean-ctx-compression -->
