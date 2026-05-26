@@ -591,6 +591,49 @@ gh workflow run deploy.yml --ref staging
 gh run watch
 ```
 
+### Infrastructure changes (Terraform)
+
+Terraform manages Cloud Run service shells, Cloudflare DNS/Pages, Supabase auth settings, Artifact Registry, and Workload Identity Federation. It does **not** manage Cloud Run images, env vars, or resources — those are owned by service CI/CD.
+
+**Prerequisites — set once per shell session:**
+```sh
+# Supabase Storage S3 credentials (not real AWS — Supabase uses an S3-compatible
+# API for the mbgc-tfstate state bucket; Terraform's S3 backend requires SigV4)
+export AWS_ACCESS_KEY_ID=<supabase-s3-key>
+export AWS_SECRET_ACCESS_KEY=<supabase-s3-secret>
+# Get from: Supabase Dashboard → Storage → S3 Connection
+```
+
+**Apply a change:**
+```sh
+cd infra/environments/prod
+terraform plan    # always review before applying
+terraform apply
+sh ../scripts/smoke.sh   # verify after apply
+```
+
+**Token rotation** (`supabase_access_token` expires or gets revoked):
+
+Symptom: `terraform plan` errors with `401: {"message":"Unauthorized"}` on `supabase_settings.prod`.
+
+Fix:
+1. Generate a new token: `app.supabase.com → Account → Access Tokens`
+2. Update `infra/environments/prod/terraform.tfvars`:
+   ```
+   supabase_access_token = "<new-token>"
+   ```
+3. Re-run `sh infra/scripts/bootstrap.sh` to push the updated token to GitHub secrets (keeps CI in sync)
+
+**What Terraform manages vs what CI/CD manages:**
+
+| Terraform (`infra/`) | Service CI/CD (`.github/workflows/`) |
+|---|---|
+| Cloud Run service shells (name, ingress, runtime SA, IAM) | Cloud Run image, env vars, scaling |
+| `api.your-domain.dev` custom domain mapping | Traffic splitting |
+| Cloudflare DNS + Pages project shell | Pages build settings, env vars |
+| Supabase auth settings (JWT expiry, redirect URIs) | Database schema + migrations |
+| Artifact Registry, WIF pool/provider, service accounts | — |
+
 ### Cloud Run env vars (production)
 
 Set via `gcloud run services update --set-env-vars` on each service. Terraform does not manage these — they live in the service's runtime config:
