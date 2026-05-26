@@ -24,7 +24,7 @@ components:
       1: Response[T] wraps single-item responses with data and optional meta code
       2: ListResponse[T] wraps paginated lists with page, limit, total metadata
       3: ErrorResponse wraps errors array with code, message, and optional details
-      4: Constructors: New[T](data), NewList[T](data, page, limit, total), NewError(code, message, details...)
+      4: "Constructors: New[T](data), NewList[T](data, page, limit, total), NewError(code, message, details...)"
       5: 100% unit test coverage
 
   HTTPX:
@@ -58,7 +58,7 @@ components:
       1: DATABASE_URL is required — server panics at startup if missing
       2: SUPABASE_URL is required — server panics at startup if missing
       3: PORT defaults to 8080 if not set
-      4: ALLOWED_ORIGIN defaults to http://localhost:5173 if not set
+      4: "ALLOWED_ORIGIN defaults to http://localhost:5173 if not set"
       5: BGG_TOKEN and BGG_COOKIE are optional; importer disables sync if absent
       6: SYNC_LIMIT_USER defaults to 3; SYNC_LIMIT_ADMIN defaults to 20
 

@@ -27,9 +27,9 @@ components:
     requirements:
       1: Search input debounced at 300ms before triggering API call
       2: Category dropdown filters games by BGG category (type/category/mechanic)
-      3: Players dropdown filters by player count ranges: solo, 1-2, exactly 2, 1-3, 1-4, 5+
-      4: Playtime dropdown filters by ranges: under 30min, 30-60min, over 60min
-      5: Weight dropdown filters by complexity: light (1-2), medium (2-4), heavy (4-5)
+      3: "Players dropdown filters by player count ranges: solo, 1-2, exactly 2, 1-3, 1-4, 5+"
+      4: "Playtime dropdown filters by ranges: under 30min, 30-60min, over 60min"
+      5: "Weight dropdown filters by complexity: light (1-2), medium (2-4), heavy (4-5)"
       6: Active filters are displayed as removable chips below the filter bar
       7: Removing a filter chip resets that filter to default and re-filters results
 
@@ -44,10 +44,10 @@ components:
     name: Backend API
     description: Server-side game listing and filtering
     requirements:
-      1: GET /api/v1/games accepts query params: search, category, page, limit
+      1: "GET /api/v1/games accepts query params: search, category, page, limit"
       2: Full-text search uses ts_rank with to_tsvector on search_vector column
       3: Results are scoped to the authenticated user's user_id
-      4: Response includes game metadata: id, name, thumbnail, players, playtime, weight, rating, collections
+      4: "Response includes game metadata: id, name, thumbnail, players, playtime, weight, rating, collections"
       5: Lists distinct categories from the user's game collection for filter dropdowns
 
 constraints:

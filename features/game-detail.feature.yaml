@@ -41,7 +41,7 @@ components:
     requirements:
       1: Displays the current rulebook URL if set
       2: Inline editing via PUT /api/v1/games/{id}/rules-url
-      3: Validates URL — must be https://drive.google.com/ or https://docs.google.com/
+      3: "Validates URL — must be https://drive.google.com/ or https://docs.google.com/"
       4: Shows edit/save/cancel states inline without page navigation
       5: Shows validation error for non-Google Drive/Docs URLs
 
