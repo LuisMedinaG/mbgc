@@ -66,12 +66,12 @@ make db-reset          # wipe + replay migrations (local only)
 
 ---
 
-## Production setup
+## Cloud infra setup
 
 ### 1. Fill in infra/.env
 
 ```sh
-make setup-prod     # copies infra/.env.example → infra/.env, then exits
+make setup-infra    # copies infra/.env.example → infra/.env, then exits
 ```
 
 Open `infra/.env` and fill in all values. Inline comments in the file tell you exactly where to find each one (Supabase dashboard, Cloudflare dashboard, etc.).
@@ -79,7 +79,7 @@ Open `infra/.env` and fill in all values. Inline comments in the file tell you e
 ### 2. Bootstrap infrastructure
 
 ```sh
-make bootstrap      # or: make setup-prod (re-run after filling .env)
+make bootstrap      # or: make setup-infra (re-run after filling .env)
 ```
 
 This runs `infra/scripts/bootstrap.sh` which:

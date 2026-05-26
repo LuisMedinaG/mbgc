@@ -1,4 +1,4 @@
-.PHONY: setup-local setup-prod bootstrap dev db-migrate db-reset test lint build \
+.PHONY: setup-local setup-infra bootstrap dev db-migrate db-reset test lint build \
         rotate-secrets acai-push acai-status acai-features help
 
 # Root Makefile — mbgc monorepo
@@ -36,13 +36,13 @@ setup-local:
 	fi
 	@echo "  Run: make dev"
 
-## setup-prod: First-time production setup (copies infra/.env, runs bootstrap)
-setup-prod:
+## setup-infra: First-time cloud infra setup (copies infra/.env, runs bootstrap)
+setup-infra:
 	@if [ ! -f infra/.env ]; then \
 		cp infra/.env.example infra/.env; \
 		echo "✓ Created infra/.env from infra/.env.example"; \
-		echo "  Fill in your secrets, then re-run: make setup-prod"; \
-		echo "  See SETUP.md → Production setup for a field-by-field guide."; \
+		echo "  Fill in your secrets, then re-run: make setup-infra"; \
+		echo "  See SETUP.md → Cloud infra setup for a field-by-field guide."; \
 		exit 0; \
 	fi
 	$(MAKE) bootstrap

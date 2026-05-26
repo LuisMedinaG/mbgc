@@ -45,7 +45,7 @@ func main() {
 	}
 
 	authStore := auth.NewStore(pool)
-	authHandler := auth.NewHandler(authStore)
+	authHandler := auth.NewHandler(authStore, cfg.SupabaseURL, cfg.ServiceRoleKey)
 
 	profileStore := profile.NewStore(pool)
 	profileSvc := profile.NewService(profileStore)

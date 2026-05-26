@@ -26,6 +26,33 @@ if [ -f "$INFRA_ENV" ]; then
   printf '  ✓ Loaded config from %s\n\n' "$INFRA_ENV"
 fi
 
+# Persist whatever has been collected so far — runs on every exit (including die)
+save_env() {
+  cat > "$INFRA_ENV" <<ENVEOF
+# mbgc infra config — written by bootstrap.sh
+# gitignored. Re-run bootstrap.sh to update.
+
+DOMAIN="${DOMAIN:-}"
+GCP_PROJECT_ID="${GCP_PROJECT_ID:-}"
+SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
+SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN:-}"
+S3_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID:-}"
+S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY:-}"
+CF_ACCOUNT_ID="${CF_ACCOUNT_ID:-}"
+CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-}"
+CLOUDFLARE_ZONE_ID="${CLOUDFLARE_ZONE_ID:-}"
+API_DATABASE_URL="${API_DATABASE_URL:-}"
+API_SUPABASE_URL="${API_SUPABASE_URL:-}"
+API_SUPABASE_SERVICE_ROLE_KEY="${API_SUPABASE_SERVICE_ROLE_KEY:-}"
+API_ALLOWED_ORIGIN="${API_ALLOWED_ORIGIN:-}"
+DEV_API_DATABASE_URL="${DEV_API_DATABASE_URL:-}"
+DEV_API_SUPABASE_URL="${DEV_API_SUPABASE_URL:-}"
+DEV_API_SUPABASE_SERVICE_ROLE_KEY="${DEV_API_SUPABASE_SERVICE_ROLE_KEY:-}"
+DEV_API_ALLOWED_ORIGIN="${DEV_API_ALLOWED_ORIGIN:-}"
+ENVEOF
+}
+trap save_env EXIT
+
 API_DOMAIN="api.${DOMAIN}"
 GCP_SA_EMAIL="${GCP_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
 SUPABASE_S3_ENDPOINT="https://${SUPABASE_PROJECT_REF}.storage.supabase.co/storage/v1/s3"
@@ -214,28 +241,7 @@ use_or_prompt DEV_API_ALLOWED_ORIGIN \
 # Save collected config back to infra/.env (makes next run fully silent)
 ###############################################################################
 
-cat > "$INFRA_ENV" <<ENVEOF
-# mbgc infra config — written by bootstrap.sh
-# gitignored. Re-run bootstrap.sh to update.
-
-DOMAIN="${DOMAIN}"
-GCP_PROJECT_ID="${GCP_PROJECT_ID}"
-SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF}"
-SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN}"
-S3_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID}"
-S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY}"
-CF_ACCOUNT_ID="${CF_ACCOUNT_ID}"
-CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}"
-CLOUDFLARE_ZONE_ID="${CLOUDFLARE_ZONE_ID}"
-API_DATABASE_URL="${API_DATABASE_URL}"
-API_SUPABASE_URL="${API_SUPABASE_URL}"
-API_SUPABASE_SERVICE_ROLE_KEY="${API_SUPABASE_SERVICE_ROLE_KEY}"
-API_ALLOWED_ORIGIN="${API_ALLOWED_ORIGIN}"
-DEV_API_DATABASE_URL="${DEV_API_DATABASE_URL}"
-DEV_API_SUPABASE_URL="${DEV_API_SUPABASE_URL}"
-DEV_API_SUPABASE_SERVICE_ROLE_KEY="${DEV_API_SUPABASE_SERVICE_ROLE_KEY}"
-DEV_API_ALLOWED_ORIGIN="${DEV_API_ALLOWED_ORIGIN}"
-ENVEOF
+save_env
 printf '  ✓ Saved to %s\n\n' "$INFRA_ENV"
 
 ###############################################################################
