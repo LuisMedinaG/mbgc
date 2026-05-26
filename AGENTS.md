@@ -25,8 +25,8 @@ npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":{"status":"completed"}}'
 
 ### Development workflow
 
-1. **Before starting**: `npx @acai.sh/cli features --json` to see what's pending
-2. **While implementing**: add `// ref: feature.COMPONENT.N` comments in code
+1. **Before starting work** (MANDATORY): run `npx @acai.sh/cli features --json` to see what's pending. Review the status of all features before writing any code.
+2. **While implementing**: add `// ref: feature.COMPONENT.N` comments in code next to the implementation. Tests should include the ACID in their describe/it names.
 3. **After implementing**: 
    ```sh
    npx @acai.sh/cli set-status --product mbgc --impl dev '{"feature.COMPONENT.1":{"status":"completed"}}'
@@ -34,6 +34,14 @@ npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":{"status":"completed"}}'
    ```
 4. **Review**: check dashboard at https://app.acai.sh — jump to ACID refs in code
 5. **QA accepted**: update status to `"accepted"`
+
+### Agent hooks (automatic behavior)
+
+When given a task, agents MUST:
+- **Before any code changes**: run `npx @acai.sh/cli features --json` and review pending requirements
+- **While coding**: annotate every implementation block with `// ref: <ACID>` comments
+- **After completing work**: run `acai set-status` for each completed ACID, then `acai push --all`
+- **When specs change**: re-align code to spec, update ACID references, push changes
 
 ### Spec to code traceability
 
