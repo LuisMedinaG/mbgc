@@ -258,11 +258,23 @@ fi
 
 printf '\n=== Bootstrap complete ===\n\n'
 printf 'Next steps:\n'
-printf '  1. Verify lumedina.dev in Google Search Console and add the Terraform SA as an owner:\n'
-printf '     SA email : %s\n' "$GCP_SA_EMAIL"
-printf '     Search Console: https://search.google.com/search-console/welcome\n'
-printf '     → Add property → Domain → "lumedina.dev"\n'
-printf '     → Settings → Users and permissions → Add user → %s (Owner)\n' "$GCP_SA_EMAIL"
-printf '     (Required before google_cloud_run_domain_mapping.api can apply.)\n'
-printf '\n  2. cd infra/environments/prod && terraform plan && terraform apply\n'
-printf '\n  3. Re-run this script after apply to push all GCP deploy secrets to %s.\n' "$REPO"
+
+# Check if the Cloud Run domain mapping already exists — if so, Search Console
+# ownership was already granted (it's a prerequisite for the mapping to apply).
+_STEP=1
+if ! gcloud run domain-mappings describe api.lumedina.dev \
+     --region us-central1 --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
+  printf '  %d. Verify lumedina.dev in Google Search Console and add the Terraform SA as an owner:\n' "$_STEP"
+  printf '     SA email : %s\n' "$GCP_SA_EMAIL"
+  printf '     Search Console : https://search.google.com/search-console/welcome\n'
+  printf '     → Add property → Domain → "lumedina.dev"\n'
+  printf '     → Settings → Users and permissions → Add user → %s (Owner)\n' "$GCP_SA_EMAIL"
+  printf '     (Required before google_cloud_run_domain_mapping.api can apply.)\n\n'
+  _STEP=$((_STEP + 1))
+else
+  printf '  ✓ api.lumedina.dev domain mapping exists — Search Console ownership already granted.\n\n'
+fi
+
+printf '  %d. cd infra/environments/prod && terraform plan && terraform apply\n' "$_STEP"
+_STEP=$((_STEP + 1))
+printf '\n  %d. Re-run this script after apply to push all GCP deploy secrets to %s.\n' "$_STEP" "$REPO"
