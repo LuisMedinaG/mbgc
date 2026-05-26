@@ -13,17 +13,24 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INFRA_ENV="${SCRIPT_DIR}/../.env"
 ENV_DIR="${SCRIPT_DIR}/../environments/prod"
 
-# ── Defaults (overridden by infra/.env if present) ────────────────────────────
-DOMAIN="${DOMAIN:-lumedina.dev}"
-GCP_PROJECT_ID="${GCP_PROJECT_ID:-myboardgamecollection-494214}"
-CF_ACCOUNT_ID="${CF_ACCOUNT_ID:-b54fbd0d522b22fc747619b57608bb72}"
-SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF:-mlltpfszhtxhphoaeydh}"
-
 # Source saved config — pre-fills all prompts so re-runs are silent
 if [ -f "$INFRA_ENV" ]; then
   # shellcheck disable=SC1090
   . "$INFRA_ENV"
   printf '  ✓ Loaded config from %s\n\n' "$INFRA_ENV"
+else
+  die "infra/.env not found — run: make setup-infra"
+fi
+
+# Validate required vars (must be set in infra/.env — no hardcoded fallbacks)
+_missing=""
+for _var in DOMAIN GCP_PROJECT_ID CF_ACCOUNT_ID SUPABASE_PROJECT_REF; do
+  eval "_val=\${${_var}:-}"
+  [ -n "$_val" ] || _missing="${_missing}  ${_var}\n"
+done
+if [ -n "$_missing" ]; then
+  printf 'error: required vars not set in infra/.env:\n%b' "$_missing" >&2
+  exit 1
 fi
 
 # Persist whatever has been collected so far — runs on every exit (including die)
