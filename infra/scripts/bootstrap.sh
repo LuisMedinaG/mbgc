@@ -201,8 +201,17 @@ set_secret CLOUDFLARE_ACCOUNT_ID  "$CF_ACCOUNT_ID"
 
 printf '\nSyncing Terraform backend secrets on %s...\n' "$REPO"
 
-set_secret TF_BACKEND_ACCESS_KEY  "$S3_ACCESS_KEY_ID"
-set_secret TF_BACKEND_SECRET_KEY  "$S3_SECRET_ACCESS_KEY"
+set_secret TF_BACKEND_ACCESS_KEY       "$S3_ACCESS_KEY_ID"
+set_secret TF_BACKEND_SECRET_KEY       "$S3_SECRET_ACCESS_KEY"
+
+###############################################################################
+# Sync GitHub secrets — Terraform provider vars (needed by infra.yml CI workflow)
+###############################################################################
+
+printf '\nSyncing Terraform provider secrets on %s...\n' "$REPO"
+
+set_secret TF_VAR_CLOUDFLARE_ZONE_ID    "$CLOUDFLARE_ZONE_ID"
+set_secret TF_VAR_SUPABASE_ACCESS_TOKEN "$SUPABASE_ACCESS_TOKEN"
 
 ###############################################################################
 # Terraform init
@@ -230,8 +239,21 @@ if terraform output -raw workload_identity_provider >/dev/null 2>&1; then
   set_secret GCP_WORKLOAD_IDENTITY_PROVIDER "$WIF_PROVIDER"
   set_secret GCP_SERVICE_ACCOUNT            "$DEPLOY_SA"
   set_secret GCP_PROJECT_ID                 "$GCP_PROJECT_ID"
+  set_secret GCP_TERRAFORM_SERVICE_ACCOUNT  "$(terraform output -raw terraform_service_account)"
 
   set_secret GCP_RUNTIME_SA_API "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-api"')"
+fi
+
+# Dev environment runtime SA — sync after `terraform apply` in environments/dev/.
+DEV_ENV_DIR="${SCRIPT_DIR}/../environments/dev"
+if [ -f "${DEV_ENV_DIR}/backend.hcl" ]; then
+  cd "$DEV_ENV_DIR"
+  terraform init -backend-config=backend.hcl -input=false >/dev/null 2>&1 || true
+  if terraform output -raw runtime_service_account >/dev/null 2>&1; then
+    printf '\nSyncing dev runtime SA...\n'
+    set_secret GCP_RUNTIME_SA_API_DEV "$(terraform output -raw runtime_service_account)"
+  fi
+  cd "$ENV_DIR"
 fi
 
 printf '\n=== Bootstrap complete ===\n\n'

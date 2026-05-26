@@ -2,7 +2,7 @@ name: Deploy Services
 
 on:
   push:
-    branches: [main]
+    branches: [dev, main]
   workflow_dispatch:
 
 permissions:
@@ -30,9 +30,9 @@ jobs:
             web:
               - 'web/**'
 
-  deploy-api:
+  deploy-api-prod:
     needs: changes
-    if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
+    if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
       service_name: mbgc-api
@@ -44,9 +44,23 @@ jobs:
       GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
       GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_API }}
 
+  deploy-api-dev:
+    needs: changes
+    if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && github.ref_name == 'dev'
+    uses: ./.github/workflows/deploy-cloud-run.yml
+    with:
+      service_name: mbgc-api-dev
+      dockerfile: services/api/deploy/Dockerfile
+      context: .
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_API_DEV }}
+
   deploy-web:
     needs: changes
-    if: needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch'
+    if: (needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch') && github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
