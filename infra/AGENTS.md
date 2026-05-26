@@ -1,4 +1,4 @@
-# AGENTS.md — mbgc-infra
+# AGENTS.md — mbgc infra
 
 Terraform source of truth for all mbgc cloud infrastructure. One change = one PR = one audit trail.
 
@@ -23,7 +23,7 @@ modules/
   cloud-run/            # reusable: google_cloud_run_v2_service + IAM
   cloudflare-pages/     # reusable: cloudflare_pages_project
 scripts/
-  bootstrap.sh          # idempotent: GCP SA, local files, GitHub secrets, terraform init
+  bootstrap.sh          # idempotent: GCP SA, local files, GitHub secrets → LuisMedinaG/mbgc, terraform init
   smoke.sh              # post-apply smoke tests (Cloud Run, DNS, gateway HTTPS)
 ```
 
@@ -62,7 +62,7 @@ Use `-` for stdout. Curl with `-u` won't work — Supabase S3 requires SigV4 sig
 sh scripts/bootstrap.sh
 ```
 
-Idempotent. Run **twice** on first setup: once before `apply` (creates GCP SA), once after (reads WIF outputs → pushes `GCP_WORKLOAD_IDENTITY_PROVIDER` + `GCP_TERRAFORM_SERVICE_ACCOUNT` to GitHub).
+Idempotent. Run **twice** on first setup: once before `apply` (creates GCP SA), once after (reads terraform outputs → pushes all GCP deploy secrets and per-service runtime SA secrets to `LuisMedinaG/mbgc`).
 
 IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.serviceAccountAdmin`, `iam.workloadIdentityPoolAdmin`, `artifactregistry.admin`, `resourcemanager.projectIamAdmin`, `serviceusage.serviceUsageAdmin`
 
@@ -86,7 +86,7 @@ Terraform changes are **applied manually** — there is no automated `terraform 
 - **Never run `terraform apply`** without first running `terraform plan` and showing the output.
 - **Never commit** `terraform.tfvars`, `backend.hcl`, `*.tfstate`, or `*.tfplan`.
 - **Never hardcode secrets** in `.tf` files. Sensitive values live in `terraform.tfvars` (gitignored) or `TF_VAR_*` env vars.
-- **Always work on a feature branch** — direct pushes to `main` trigger the `apply` job.
+- **Always work on a feature branch** — apply is manual, but keeping history clean matters for audit.
 - **Keep CI gates green locally before pushing:** `terraform fmt -recursive`, `tflint --recursive`, `tfsec .`. PR CI will block on these.
 
 ## Before making any change
@@ -103,10 +103,10 @@ Terraform changes are **applied manually** — there is no automated `terraform 
 
 | Managed in this repo | Managed elsewhere |
 |---|---|
-| Cloud Run service shells (name, ingress, runtime SA, IAM) | Cloud Run image/env/resources — each service repo's `gcloud run deploy` |
+| Cloud Run service shells (name, ingress, runtime SA, IAM) | Cloud Run image/env/resources — monorepo CI/CD (`deploy.yml`) |
 | Cloud Run custom domain mapping (`api.lumedina.dev`) | Cloud Run traffic splitting |
 | Artifact Registry repo | Image contents |
-| Workload Identity Federation pool + provider | GitHub Actions workflow YAML in service repos |
+| Workload Identity Federation pool + provider | GitHub Actions workflow YAML (`LuisMedinaG/mbgc`) |
 | Runtime + deploy service accounts, IAM roles | |
 | Cloudflare Pages project shell | Pages GitHub integration, build settings, env vars (CF dashboard) |
 | Cloudflare DNS records | Cloudflare WAF, caching rules |
@@ -114,8 +114,8 @@ Terraform changes are **applied manually** — there is no automated `terraform 
 
 ## Security posture (don't regress)
 
-- **WIF condition** is a repo allow-list (`assertion.repository in [...]`). Never broaden to `repository_owner` — that trusts every repo in the org.
-- **WIF bindings** are per-repo (`attribute.repository/<org>/<repo>`). Never bind with `attribute.repository_owner`.
+- **WIF condition** allows only `LuisMedinaG/mbgc`. Never broaden to `repository_owner` — that trusts every repo in the org.
+- **WIF binding** targets the monorepo (`attribute.repository/LuisMedinaG/mbgc`). Never bind with `attribute.repository_owner`.
 - **Cloud Run runtime SAs** are per-service. Never point multiple services at the same runtime SA unless they share a trust boundary.
 - **Internal services** (`public = false`) must list the gateway runtime SA in `invokers`. Network-only isolation (INTERNAL ingress) isn't sufficient — Cloud Run still requires IAM `roles/run.invoker`.
 

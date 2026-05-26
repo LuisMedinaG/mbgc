@@ -1,12 +1,13 @@
 #!/bin/sh
 # Bootstrap: provisions the terraform GCP SA, writes local credential files,
-# syncs GitHub secrets, and runs `terraform init`. Idempotent — safe to re-run.
+# syncs GitHub secrets to LuisMedinaG/mbgc, and runs `terraform init`.
+# Idempotent — safe to re-run.
 #
 # CI authenticates to GCP via Workload Identity Federation (no long-lived key).
 # Local authentication uses Application Default Credentials.
 set -eu
 
-REPO="LuisMedinaG/mbgc-infra"
+REPO="LuisMedinaG/mbgc"
 GCP_PROJECT_ID="myboardgamecollection-494214"
 GCP_SA_NAME="terraform"
 GCP_SA_EMAIL="${GCP_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
@@ -78,6 +79,7 @@ printf '\n=== mbgc-infra bootstrap ===\n\n'
 check_cmd terraform
 check_cmd gh
 check_cmd gcloud
+check_cmd jq
 
 if ! gh auth status >/dev/null 2>&1; then
   die "Not authenticated with gh. Run: gh auth login"
@@ -185,17 +187,13 @@ EOF
 printf '  ✓ %s\n' "$TFVARS"
 
 ###############################################################################
-# Sync GitHub secrets
+# Sync GitHub secrets — Cloudflare (needed by deploy.yml web job)
 ###############################################################################
 
-printf '\nSyncing GitHub secrets on %s...\n' "$REPO"
+printf '\nSyncing Cloudflare secrets on %s...\n' "$REPO"
 
-set_secret SUPABASE_ACCESS_TOKEN  "$SUPABASE_ACCESS_TOKEN"
-set_secret S3_ACCESS_KEY_ID       "$S3_ACCESS_KEY_ID"
-set_secret S3_SECRET_ACCESS_KEY   "$S3_SECRET_ACCESS_KEY"
 set_secret CLOUDFLARE_API_TOKEN   "$CLOUDFLARE_API_TOKEN"
 set_secret CLOUDFLARE_ACCOUNT_ID  "$CF_ACCOUNT_ID"
-set_secret CLOUDFLARE_ZONE_ID     "$CLOUDFLARE_ZONE_ID"
 
 ###############################################################################
 # Terraform init
@@ -214,11 +212,21 @@ terraform init -backend-config=backend.hcl -upgrade -input=false
 ###############################################################################
 
 if terraform output -raw workload_identity_provider >/dev/null 2>&1; then
-  printf '\nSyncing WIF secrets (state has outputs)...\n'
+  printf '\nSyncing GCP deploy secrets (state has outputs)...\n'
+
   WIF_PROVIDER="$(terraform output -raw workload_identity_provider)"
-  TF_SA="$(terraform output -raw terraform_service_account)"
+  DEPLOY_SA="$(terraform output -raw deploy_service_account)"
+  RUNTIME_SAS="$(terraform output -json runtime_service_accounts)"
+
   set_secret GCP_WORKLOAD_IDENTITY_PROVIDER "$WIF_PROVIDER"
-  set_secret GCP_TERRAFORM_SERVICE_ACCOUNT  "$TF_SA"
+  set_secret GCP_SERVICE_ACCOUNT            "$DEPLOY_SA"
+  set_secret GCP_PROJECT_ID                 "$GCP_PROJECT_ID"
+
+  set_secret GCP_RUNTIME_SA_GATEWAY   "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-gateway"')"
+  set_secret GCP_RUNTIME_SA_AUTH      "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-auth-service"')"
+  set_secret GCP_RUNTIME_SA_GAME      "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-game-service"')"
+  set_secret GCP_RUNTIME_SA_IMPORTER  "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-importer-service"')"
+  set_secret GCP_RUNTIME_SA_MONOLITH  "$(printf '%s' "$RUNTIME_SAS" | jq -r '."myboardgamecollection"')"
 fi
 
 printf '\n=== Bootstrap complete ===\n\n'
@@ -226,6 +234,4 @@ printf 'Next steps:\n'
 printf '  1. Verify lumedina.dev in Google Search Console and add %s as an owner\n' "$GCP_SA_EMAIL"
 printf '     (required before google_cloud_run_domain_mapping.api can apply).\n'
 printf '\n  2. terraform plan && terraform apply\n'
-printf '\n  3. Re-run this script to push GCP_WORKLOAD_IDENTITY_PROVIDER and\n'
-printf '     GCP_TERRAFORM_SERVICE_ACCOUNT to GitHub (needed for CI).\n'
-printf '\n  4. sh scripts/set-deploy-secrets.sh   # push WIF outputs to service repos\n'
+printf '\n  3. Re-run this script to push all GCP deploy secrets to %s.\n' "$REPO"

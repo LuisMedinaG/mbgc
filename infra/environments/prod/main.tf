@@ -4,18 +4,11 @@ locals {
     app = "mbgc"
   }
 
-  # Repos allowed to mint tokens for github-deploy via WIF. Adding a repo here
-  # grants it deploy rights to Cloud Run + Artifact Registry.
-  service_repos = [
-    "mbgc-gateway",
-    "mbgc-auth-service",
-    "mbgc-game-service",
-    "mbgc-importer-service",
-    "myboardgamecollection",
-  ]
+  # The monorepo holds all services and infra. One WIF binding covers all deploys.
+  service_repos = ["mbgc"]
 
-  # Every repo the WIF provider trusts (service repos + this infra repo itself).
-  trusted_repos = concat(local.service_repos, ["mbgc-infra"])
+  # Alias kept for clarity — same value, single repo.
+  trusted_repos = ["mbgc"]
 
   runtime_services = toset([
     "mbgc-gateway",
@@ -221,7 +214,7 @@ data "google_service_account" "terraform" {
 resource "google_service_account_iam_member" "wif_terraform" {
   service_account_id = data.google_service_account.terraform.name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_org}/mbgc-infra"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_org}/mbgc"
 }
 
 ###############################################################################

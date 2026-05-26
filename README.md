@@ -658,33 +658,28 @@ done
 
 ## GitHub Secrets Setup
 
-The CI/CD workflows need these secrets on the `LuisMedinaG/mbgc` repo. Run **one-time** after `terraform apply`:
+All secrets live on `LuisMedinaG/mbgc`. Run **once after `terraform apply`** — bootstrap handles everything:
 
 ```sh
-sh infra/scripts/set-deploy-secrets.sh
+sh infra/scripts/bootstrap.sh
 ```
 
-This reads `terraform output` and pushes `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, and the per-service `GCP_RUNTIME_SERVICE_ACCOUNT` to each service repo. Requires `jq`, `gh auth`, and the S3 env vars set (see [Infrastructure changes](#infrastructure-changes-terraform)).
+Bootstrap writes local credential files and pushes all required secrets to this repo. Requires `jq`, `gh auth`, `gcloud` ADC, and the S3 env vars set (see [Infrastructure changes](#infrastructure-changes-terraform)).
 
-Or set manually per repo:
+**Secrets pushed by bootstrap:**
 
-```sh
-REPO=LuisMedinaG/mbgc
-cd infra/environments/prod
-
-gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo $REPO --body \
-  "$(terraform output -raw workload_identity_provider)"
-
-gh secret set GCP_SERVICE_ACCOUNT --repo $REPO --body \
-  "$(terraform output -raw deploy_service_account)"
-
-# Per-service: GCP_RUNTIME_SERVICE_ACCOUNT (one value per repo, not a list)
-# set-deploy-secrets.sh handles this automatically for all 5 service repos
-
-# Cloudflare — from infra/environments/prod/terraform.tfvars
-gh secret set CLOUDFLARE_API_TOKEN --repo $REPO --body "<from terraform.tfvars>"
-gh secret set CLOUDFLARE_ACCOUNT_ID --repo $REPO --body "your-cloudflare-account-id"
-```
+| Secret | Source | Used by |
+|---|---|---|
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | `terraform output` | All Cloud Run deploy jobs |
+| `GCP_SERVICE_ACCOUNT` | `terraform output` | All Cloud Run deploy jobs |
+| `GCP_PROJECT_ID` | constant | All Cloud Run deploy jobs |
+| `GCP_RUNTIME_SA_GATEWAY` | `terraform output` | `deploy-gateway` job |
+| `GCP_RUNTIME_SA_AUTH` | `terraform output` | `deploy-auth` job |
+| `GCP_RUNTIME_SA_GAME` | `terraform output` | `deploy-game` job |
+| `GCP_RUNTIME_SA_IMPORTER` | `terraform output` | `deploy-importer` job |
+| `GCP_RUNTIME_SA_MONOLITH` | `terraform output` | `deploy-monolith` job |
+| `CLOUDFLARE_API_TOKEN` | prompted | `deploy-web` job |
+| `CLOUDFLARE_ACCOUNT_ID` | prompted | `deploy-web` job |
 
 **Verify (names only — values are write-only by design):**
 ```sh
@@ -763,7 +758,7 @@ mbgc/
 │   └── deploy-cloud-run.yml
 ├── go.work                    # Go workspace — all modules
 ├── Makefile                   # Root convenience commands
-├── infra/scripts/set-deploy-secrets.sh  # pushes WIF + runtime SA secrets to service repos
+├── infra/scripts/bootstrap.sh           # provisions GCP SA, writes local creds, pushes GitHub secrets
 ├── AGENTS.md                  # AI agent operating rules
 ├── CLAUDE.md                  # Claude AI context
 └── README.md                  # This file
