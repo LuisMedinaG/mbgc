@@ -9,9 +9,19 @@ description: Full-stack Go REST API + React app for tracking personal board game
 being replaced by the microservices in `services/`. All new development should
 target the microservices.
 
-**📖 Division of docs:**
-- **[CLAUDE.md](./CLAUDE.md)** — Rules, stack, structure, branching (start here)
-- **This file** — AI execution guide: code patterns, examples, boundaries
+## Migration tracking
+
+| Feature | Monolith location | Microservice target |
+|---|---|---|
+| Auth (login/refresh/logout) | `services/auth/` | `services/auth/` |
+| Profile | `services/profile/` | `services/auth/` |
+| Games CRUD | `services/games/` | `services/game/` |
+| Collections | `services/collections/` | `services/game/` |
+| BGG Import | `services/importer/` | `services/importer/` |
+| File uploads | `services/files/` | `services/game/` |
+
+**DB:** SQLite (`modernc.org/sqlite`) — single file at `/data/games.db`. Migrations are additive (`ALTER TABLE`) and idempotent.
+**Deployment:** Fly.io — `fly.toml` at repo root. Persistent volume `boardgame_data` at `/data`.
 
 ---
 

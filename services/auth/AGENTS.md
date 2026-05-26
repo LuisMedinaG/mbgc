@@ -2,6 +2,27 @@
 
 Profile service. Supabase owns identity (JWT issuance, login, refresh, logout). This service owns mbgc-specific profile data: BGG username, admin flag.
 
+## Stack
+
+- **Language:** Go 1.25
+- **Auth provider:** Supabase (JWT issued by Supabase, validated at gateway)
+- **Shared:** `github.com/LuisMedinaG/mbgc/pkg/shared`
+- **Deployment:** GCP Cloud Run — `DATABASE_URL` injected as secret
+
+## API surface (mounted under `/api/v1/profile/*` at gateway)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/profile` | Current user profile (creates on first access) |
+| `PUT` | `/api/v1/profile/bgg-username` | Update BGG username |
+
+## Env vars
+
+| Var | Purpose |
+|---|---|
+| `DATABASE_URL` | Supabase Postgres connection string |
+| `PORT` | Listen port (default 8001) |
+
 ## Commands
 
 ```sh

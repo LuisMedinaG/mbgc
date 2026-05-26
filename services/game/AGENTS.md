@@ -2,6 +2,38 @@
 
 Core domain: games, collections, player aids, file uploads. Postgres via Supabase (`games` schema).
 
+## Stack
+
+- **Language:** Go 1.25
+- **DB:** `github.com/jackc/pgx/v5` — all tables in `games` schema (not `public`)
+- **Shared:** `github.com/LuisMedinaG/mbgc/pkg/shared`
+- **Deployment:** GCP Cloud Run — `DATABASE_URL` injected as secret
+
+## DB Schema
+
+- `games.games` — core game data with FTS (tsvector)
+- `games.collections` — user-defined game groups ("vibes")
+- `games.collection_games` — M:N junction
+- `games.player_aids` — uploaded files per game
+
+## Game Model — Key Fields
+
+| Field | Type | DB column | Source |
+|---|---|---|---|
+| `Weight` | `float64` | `weight` | BGG `averageweight` |
+| `Rating` | `float64` | `rating` | BGG `average` |
+| `LanguageDependence` | `int` | `language_dependence` | BGG poll winner (0=unknown, 1–5) |
+| `RecommendedPlayers` | `[]int` | `recommended_players` | BGG poll — array of counts |
+
+## List endpoint filters
+
+| Param | Values |
+|---|---|
+| `search` | Full-text search (tsvector) |
+| `category` | Category filter |
+| `page` | Page number (default 1) |
+| `limit` | Page size (default 20) |
+
 ## Commands
 
 ```sh

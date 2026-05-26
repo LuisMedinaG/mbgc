@@ -1,6 +1,20 @@
 # AGENTS.md — web
 
-React 19 + TypeScript strict + Tailwind v4 + Vite. Deployed to Cloudflare Pages.
+React 19 + TypeScript strict + Tailwind v4 + Vite. Deployed to Cloudflare Pages; talks exclusively to mbgc-gateway.
+
+## Stack
+
+- **Language:** TypeScript (strict mode — no `any`)
+- **Framework:** React 19 + react-router-dom + Tailwind v4 (CSS-first, no `tailwind.config.js`)
+- **Build:** Vite + `@tailwindcss/vite`
+- **Deploy:** Cloudflare Pages — push to `main` auto-deploys; every PR gets a preview deploy
+- **Env var:** `VITE_API_BASE_URL` — mbgc-gateway base URL
+
+## Auth flow
+
+1. User logs in → mbgc-auth-service returns access + refresh tokens
+2. Access token (15 min) stored in memory; refresh token in `httpOnly` cookie
+3. On 401 → `api.ts` auto-refreshes via `/auth/refresh`; on refresh failure → `onAuthFailure` callback fires → logout
 
 ## Commands
 

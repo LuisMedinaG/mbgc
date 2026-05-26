@@ -1,6 +1,83 @@
 # AGENTS.md — mbgc-infra
 
-Operating rules for AI agents working in this repo.
+Terraform source of truth for all mbgc cloud infrastructure. One change = one PR = one audit trail.
+
+## Stack
+
+- **IaC:** Terraform >= 1.14
+- **State backend:** Supabase Storage S3-compatible, bucket `mbgc-tfstate`
+- **Providers:** `hashicorp/google ~> 6.0` · `cloudflare/cloudflare ~> 5.0` · `supabase/supabase ~> 1.5`
+
+## Layout
+
+```
+environments/prod/      # root module — prod is the only env
+  main.tf               # resource declarations
+  variables.tf
+  versions.tf           # provider pins + S3 backend config
+  providers.tf
+  outputs.tf
+  terraform.tfvars      # gitignored — written by bootstrap.sh
+  backend.hcl           # gitignored — written by bootstrap.sh
+modules/
+  cloud-run/            # reusable: google_cloud_run_v2_service + IAM
+  cloudflare-pages/     # reusable: cloudflare_pages_project
+scripts/
+  bootstrap.sh          # idempotent: GCP SA, local files, GitHub secrets, terraform init
+  smoke.sh              # post-apply smoke tests (Cloud Run, DNS, gateway HTTPS)
+```
+
+## Managed resources
+
+| Provider | Resources |
+|---|---|
+| GCP Cloud Run | `myboardgamecollection` (monolith, decommissioning), `mbgc-gateway`, `mbgc-game-service`, `mbgc-importer-service`, `mbgc-auth-service` |
+| Cloudflare | Pages project, DNS records for `lumedina.dev` (apex, www, api) |
+| Supabase | Auth settings (`supabase_settings`) — JWT expiry, site URL, redirect URIs, session policy |
+
+**Not managed here:** Cloud Run image/env/resources (owned by service CI/CD). Cloudflare Pages build settings (CF dashboard, `lifecycle { ignore_changes = all }`).
+
+## Workflow
+
+```sh
+cd environments/prod
+export AWS_ACCESS_KEY_ID=<supabase-s3-key>
+export AWS_SECRET_ACCESS_KEY=<supabase-s3-secret>
+terraform plan    # always review first
+terraform apply
+```
+
+## Inspecting state
+
+```sh
+aws --profile supabase s3 ls s3://mbgc-tfstate/prod/
+aws --profile supabase s3 cp s3://mbgc-tfstate/prod/terraform.tfstate -
+```
+
+Use `-` for stdout. Curl with `-u` won't work — Supabase S3 requires SigV4 signing.
+
+## Bootstrap
+
+```sh
+sh scripts/bootstrap.sh
+```
+
+Idempotent. Run **twice** on first setup: once before `apply` (creates GCP SA), once after (reads WIF outputs → pushes `GCP_WORKLOAD_IDENTITY_PROVIDER` + `GCP_TERRAFORM_SERVICE_ACCOUNT` to GitHub).
+
+IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.serviceAccountAdmin`, `iam.workloadIdentityPoolAdmin`, `artifactregistry.admin`, `resourcemanager.projectIamAdmin`, `serviceusage.serviceUsageAdmin`
+
+## CI
+
+- **`terraform.yml`** — on PR/push to `main` for `environments/**` and `modules/**`: `fmt` → `tflint` → `tfsec` → `plan` → `apply` on merge → `smoke.sh`
+- **`drift.yml`** — Monday 09:00 UTC; opens/updates `drift`-labeled GitHub issue if plan shows changes
+
+## Tests
+
+- **`smoke.sh`** — verifies Cloud Run services exist in `us-central1`, `api.lumedina.dev` resolves, gateway returns non-5xx. Override with `GCP_PROJECT`, `GCP_REGION`, `API_HOST`.
+- **`tflint`** — terraform preset + google ruleset (`.tflint.hcl`)
+- **`tfsec`** — silence intentional false positives with inline `# tfsec:ignore:<rule-id>`
+
+## Non-negotiable rules
 
 ## Non-negotiable rules
 
