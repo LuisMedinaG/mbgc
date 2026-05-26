@@ -15,16 +15,31 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - name: Check branch name
+      - name: Enforce merge path rules
         run: |
           branch="${{ github.head_ref }}"
-          if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
-            echo "✓ Branch name '$branch' is valid"
-          else
-            echo "✗ Branch name '$branch' does not match required pattern"
-            echo "  Allowed prefixes: feature/ fix/ bug/ chore/ refactor/ hotfix/"
-            echo "  Example: feature/add-game-search"
-            exit 1
+          target="${{ github.base_ref }}"
+
+          if [ "$target" = "main" ]; then
+            # Only dev → main is allowed
+            if [ "$branch" = "dev" ]; then
+              echo "✓ '$branch' → '$target' allowed"
+            else
+              echo "✗ Only 'dev' can merge into 'main' (got '$branch')"
+              echo "  Open a PR from '$branch' into 'dev' first."
+              exit 1
+            fi
+
+          elif [ "$target" = "dev" ]; then
+            # Must use an allowed prefix
+            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
+              echo "✓ '$branch' → '$target' allowed"
+            else
+              echo "✗ Branch '$branch' cannot merge into 'dev'"
+              echo "  Rename to one of: feature/ fix/ bug/ chore/ refactor/ hotfix/"
+              echo "  Example: feature/add-game-search"
+              exit 1
+            fi
           fi
 
   go-build:
