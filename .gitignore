@@ -107,6 +107,7 @@ supabase/
 .env
 .env.local
 .env.*.local
+infra/.env
 *.cert
 *.crt
 

@@ -8,16 +8,27 @@
 set -eu
 
 REPO="LuisMedinaG/mbgc"
-DOMAIN="lumedina.dev"
-API_DOMAIN="api.${DOMAIN}"
-GCP_PROJECT_ID="myboardgamecollection-494214"
 GCP_SA_NAME="terraform"
-GCP_SA_EMAIL="${GCP_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
-CF_ACCOUNT_ID="b54fbd0d522b22fc747619b57608bb72"
-SUPABASE_PROJECT_REF="mlltpfszhtxhphoaeydh"
-SUPABASE_S3_ENDPOINT="https://${SUPABASE_PROJECT_REF}.storage.supabase.co/storage/v1/s3"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INFRA_ENV="${SCRIPT_DIR}/../.env"
 ENV_DIR="${SCRIPT_DIR}/../environments/prod"
+
+# ── Defaults (overridden by infra/.env if present) ────────────────────────────
+DOMAIN="${DOMAIN:-lumedina.dev}"
+GCP_PROJECT_ID="${GCP_PROJECT_ID:-myboardgamecollection-494214}"
+CF_ACCOUNT_ID="${CF_ACCOUNT_ID:-b54fbd0d522b22fc747619b57608bb72}"
+SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF:-mlltpfszhtxhphoaeydh}"
+
+# Source saved config — pre-fills all prompts so re-runs are silent
+if [ -f "$INFRA_ENV" ]; then
+  # shellcheck disable=SC1090
+  . "$INFRA_ENV"
+  printf '  ✓ Loaded config from %s\n\n' "$INFRA_ENV"
+fi
+
+API_DOMAIN="api.${DOMAIN}"
+GCP_SA_EMAIL="${GCP_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+SUPABASE_S3_ENDPOINT="https://${SUPABASE_PROJECT_REF}.storage.supabase.co/storage/v1/s3"
 
 ###############################################################################
 # Helpers
@@ -198,6 +209,34 @@ use_or_prompt DEV_API_ALLOWED_ORIGIN \
   "Dev ALLOWED_ORIGIN (dev frontend URL, or * to allow all)" \
   "${DEV_API_ALLOWED_ORIGIN:-}" \
   "*"
+
+###############################################################################
+# Save collected config back to infra/.env (makes next run fully silent)
+###############################################################################
+
+cat > "$INFRA_ENV" <<ENVEOF
+# mbgc infra config — written by bootstrap.sh
+# gitignored. Re-run bootstrap.sh to update.
+
+DOMAIN="${DOMAIN}"
+GCP_PROJECT_ID="${GCP_PROJECT_ID}"
+SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF}"
+SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN}"
+S3_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID}"
+S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY}"
+CF_ACCOUNT_ID="${CF_ACCOUNT_ID}"
+CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN}"
+CLOUDFLARE_ZONE_ID="${CLOUDFLARE_ZONE_ID}"
+API_DATABASE_URL="${API_DATABASE_URL}"
+API_SUPABASE_URL="${API_SUPABASE_URL}"
+API_SUPABASE_SERVICE_ROLE_KEY="${API_SUPABASE_SERVICE_ROLE_KEY}"
+API_ALLOWED_ORIGIN="${API_ALLOWED_ORIGIN}"
+DEV_API_DATABASE_URL="${DEV_API_DATABASE_URL}"
+DEV_API_SUPABASE_URL="${DEV_API_SUPABASE_URL}"
+DEV_API_SUPABASE_SERVICE_ROLE_KEY="${DEV_API_SUPABASE_SERVICE_ROLE_KEY}"
+DEV_API_ALLOWED_ORIGIN="${DEV_API_ALLOWED_ORIGIN}"
+ENVEOF
+printf '  ✓ Saved to %s\n\n' "$INFRA_ENV"
 
 ###############################################################################
 # Write local credential files
