@@ -68,8 +68,10 @@ IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.servi
 
 ## CI
 
-- **`terraform.yml`** — on PR/push to `main` for `environments/**` and `modules/**`: `fmt` → `tflint` → `tfsec` → `plan` → `apply` on merge → `smoke.sh`
-- **`drift.yml`** — Monday 09:00 UTC; opens/updates `drift`-labeled GitHub issue if plan shows changes
+Terraform changes are **applied manually** — there is no automated `terraform apply` workflow.
+
+- **`ci.yml`** (root monorepo) — on PR/push: `terraform fmt -check -recursive` + `tflint` for lint gates only. Does not plan or apply.
+- **No `terraform.yml` or `drift.yml`** — these were planned but not implemented. Apply manually via `terraform plan && terraform apply` from `environments/prod/`.
 
 ## Tests
 

@@ -658,31 +658,28 @@ done
 
 ## GitHub Secrets Setup
 
-The CI/CD workflows need these secrets on the `LuisMedinaG/mbgc` repo. Run **one-time** to set them:
+The CI/CD workflows need these secrets on the `LuisMedinaG/mbgc` repo. Run **one-time** after `terraform apply`:
 
 ```sh
-sh set-deploy-secrets.sh
+sh infra/scripts/set-deploy-secrets.sh
 ```
 
-Or set manually:
+This reads `terraform output` and pushes `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SERVICE_ACCOUNT`, and the per-service `GCP_RUNTIME_SERVICE_ACCOUNT` to each service repo. Requires `jq`, `gh auth`, and the S3 env vars set (see [Infrastructure changes](#infrastructure-changes-terraform)).
+
+Or set manually per repo:
 
 ```sh
 REPO=LuisMedinaG/mbgc
-
-# GCP — fetched via gcloud
-gh secret set GCP_PROJECT_ID --repo $REPO --body "your-gcp-project-id"
+cd infra/environments/prod
 
 gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo $REPO --body \
-  "$(gcloud iam workload-identity-pools providers describe github \
-     --workload-identity-pool=github-actions --location=global \
-     --project=your-gcp-project-id --format='value(name)')"
+  "$(terraform output -raw workload_identity_provider)"
 
 gh secret set GCP_SERVICE_ACCOUNT --repo $REPO --body \
-  "github-deploy@your-gcp-project-id.iam.gserviceaccount.com"
+  "$(terraform output -raw deploy_service_account)"
 
-gh secret set GCP_RUNTIME_SERVICE_ACCOUNTS --repo $REPO --body \
-  "$(gcloud iam service-accounts list --project=your-gcp-project-id \
-     --filter='email:run-' --format='value(email)' | tr '\n' ',' | sed 's/,$//')"
+# Per-service: GCP_RUNTIME_SERVICE_ACCOUNT (one value per repo, not a list)
+# set-deploy-secrets.sh handles this automatically for all 5 service repos
 
 # Cloudflare — from infra/environments/prod/terraform.tfvars
 gh secret set CLOUDFLARE_API_TOKEN --repo $REPO --body "<from terraform.tfvars>"
@@ -766,7 +763,7 @@ mbgc/
 │   └── deploy-cloud-run.yml
 ├── go.work                    # Go workspace — all modules
 ├── Makefile                   # Root convenience commands
-├── set-deploy-secrets.sh      # GitHub secrets bootstrap
+├── infra/scripts/set-deploy-secrets.sh  # pushes WIF + runtime SA secrets to service repos
 ├── AGENTS.md                  # AI agent operating rules
 ├── CLAUDE.md                  # Claude AI context
 └── README.md                  # This file
