@@ -18,9 +18,14 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		Port:               getenv("PORT", "8000"),
-		JWTSecret:          mustenv("SUPABASE_JWT_SECRET"),
-		SupabaseURL:        getenv("SUPABASE_URL", "https://mlltpfszhtxhphoaeydh.supabase.co"),
+		Port: getenv("PORT", "8000"),
+		// Primary verification path is asymmetric (ES256/RS256) via the
+		// project's JWKS endpoint, derived from SUPABASE_URL.
+		SupabaseURL: mustenv("SUPABASE_URL"),
+		// Optional legacy HS256 shared secret. Only set this to keep verifying
+		// tokens issued before the migration to JWT signing keys; leave empty
+		// for a JWKS-only setup.
+		JWTSecret:          getenv("SUPABASE_JWT_SECRET", ""),
 		AuthServiceURL:     getenv("AUTH_SERVICE_URL", "http://localhost:8001"),
 		GameServiceURL:     getenv("GAME_SERVICE_URL", "http://localhost:8002"),
 		ImporterServiceURL: getenv("IMPORTER_SERVICE_URL", "http://localhost:8003"),

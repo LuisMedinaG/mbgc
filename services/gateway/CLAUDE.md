@@ -6,8 +6,22 @@ Validates JWTs so downstream services can trust the forwarded identity.
 ## Stack
 
 - **Language:** Go 1.25
-- **Auth:** `github.com/golang-jwt/jwt/v5` — validates `Authorization: Bearer` tokens
+- **Auth:** `github.com/golang-jwt/jwt/v5` + `github.com/MicahParks/keyfunc/v3` — validates `Authorization: Bearer` tokens
 - **Shared:** `github.com/LuisMedinaG/mbgc/pkg/shared` (middleware, envelope)
+
+## JWT verification
+
+- **Primary path — ES256/RS256 via JWKS.** Supabase signs access tokens with a
+  private key it never shares; the gateway fetches only the *public* keys from
+  `${SUPABASE_URL}/auth/v1/.well-known/jwks.json` (auto-refreshed, key rotation
+  handled by `keyfunc`). A leaked public key cannot forge tokens.
+- **Legacy path — HS256 (optional).** Enabled only when `SUPABASE_JWT_SECRET` is
+  set, to keep verifying tokens minted before the migration to JWT signing keys.
+  Symmetric: the secret can both verify *and* mint tokens, so prefer JWKS-only.
+- **Validated on every token:** signature, `exp` (required), `iss` =
+  `${SUPABASE_URL}/auth/v1`, and `aud` = `authenticated`. anon/service_role API
+  keys are rejected as user bearer tokens.
+- **Config:** `SUPABASE_URL` is required; `SUPABASE_JWT_SECRET` is optional.
 
 ## Routing table
 
@@ -44,7 +58,8 @@ make test
 ## Deployment
 
 GCP Cloud Run — deployed via GitHub Actions CI/CD.
-JWT secret injected via `SUPABASE_JWT_SECRET` env var.
+`SUPABASE_URL` injected via env var (drives JWKS verification).
+`SUPABASE_JWT_SECRET` is optional — set only for legacy HS256 fallback.
 
 <claude-mem-context>
 </claude-mem-context>

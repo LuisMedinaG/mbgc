@@ -150,33 +150,95 @@ gcloud auth application-default login
 
 ### 3. Get Supabase credentials
 
-You need **two values** from Supabase: `SUPABASE_JWT_SECRET` and `DATABASE_URL`.
+The microservices need **two required values** from Supabase (plus one optional legacy value):
 
-**Project URL:** https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh
+| Value | Used by | Required? |
+|---|---|---|
+| `SUPABASE_URL` | gateway | **Yes** — drives JWT verification |
+| `DATABASE_URL` | auth, game, importer | **Yes** — Postgres connection |
+| `SUPABASE_JWT_SECRET` | gateway | Optional — legacy HS256 fallback only |
 
-#### `SUPABASE_JWT_SECRET`
+**Project ref:** `mlltpfszhtxhphoaeydh` · **Dashboard:** https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh
 
-1. Open: https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh/settings/api
-2. Find **JWT Settings** → **JWT Secret**
-3. Click **Reveal** and copy the value
-4. Paste into `services/gateway/.env` as `SUPABASE_JWT_SECRET`
+#### Install + log in to the Supabase CLI (recommended, avoids guessing)
 
-The gateway supports both **HS256** (original) and **ES256** (ECC P-256) — it auto-detects the algorithm. For ES256, public keys are fetched from Supabase's JWKS endpoint.
+```sh
+brew install supabase/tap/supabase
+supabase login                       # opens browser, stores an access token
 
-#### `DATABASE_URL`
-
-1. Open: https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh/settings/database
-2. Scroll to **Connection string**
-3. Select **URI** tab and the **Transaction pooler** mode (port 6543)
-4. Copy the value, replace `[YOUR-PASSWORD]` with the database password
-5. If you do not have the password, click **Reset database password** in the same page
-
-Format:
-```
-postgresql://postgres.mlltpfszhtxhphoaeydh:YOUR_PASSWORD@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+# List your projects — shows the ref and the API URL for each
+supabase projects list
+# REFERENCE ID            NAME                  REGION       API URL
+# mlltpfszhtxhphoaeydh    MyBoardGameCollection us-west-2    https://mlltpfszhtxhphoaeydh.supabase.co
 ```
 
-**Important:** All three services (`auth`, `game`, `importer`) use the **same** `DATABASE_URL`. They are isolated by Postgres schema (`profile`, `games`, `importer`).
+#### `SUPABASE_URL` (required)
+
+This is the project's API URL: `https://<project-ref>.supabase.co`. The gateway
+appends `/auth/v1/.well-known/jwks.json` to it and fetches Supabase's **public**
+signing keys to verify every access token.
+
+```sh
+SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co
+```
+
+**How verification works (ES256 / JWKS):** Supabase has migrated to **JWT
+Signing Keys** — asymmetric **ES256** (ECDSA on the P-256 curve + SHA-256).
+Supabase signs each token with a **private** key it never reveals; the gateway
+verifies with the matching **public** key. Public keys are published, by `kid`
+(key id), at the project's JWKS endpoint:
+
+```sh
+curl https://mlltpfszhtxhphoaeydh.supabase.co/auth/v1/.well-known/jwks.json
+# { "keys": [ { "kid": "...", "kty": "EC", "crv": "P-256", "alg": "ES256", ... } ] }
+```
+
+The token's header carries the `kid`; the gateway matches it to a public key,
+checks the signature, and also validates `exp`, `iss`
+(`https://<ref>.supabase.co/auth/v1`), and `aud` (`authenticated`). Because the
+gateway only ever holds *public* keys, leaking them cannot forge a token — this
+is why ES256/JWKS is the secure, industry-standard setup. Key rotation (Dashboard
+→ **Settings → JWT Keys → JWT Signing Keys**) is picked up automatically.
+
+#### `SUPABASE_JWT_SECRET` (optional — legacy HS256 only)
+
+Before signing keys, Supabase signed tokens with a single **HS256** shared
+secret (symmetric — the same secret both *signs* and *verifies*, so anyone
+holding it can mint tokens). After migrating, this is shown under Dashboard →
+**Settings → JWT Keys → Legacy JWT Secret** and is **verify-only**.
+
+Leave `SUPABASE_JWT_SECRET` **empty** for a clean JWKS-only setup. Set it only if
+you still need to accept access tokens issued before the migration (they expire
+within the access-token TTL, ~1 hour). To get it: Dashboard → **Settings → JWT
+Keys → Legacy JWT Secret → Reveal**.
+
+#### `DATABASE_URL` (required)
+
+Get it from the Dashboard's **Connect** button (top bar) → **Connection string**
+→ **URI**, under the **Session pooler** section. Replace `[YOUR-PASSWORD]` with
+your database password (reset it on the same page if unknown).
+
+Format (session pooler, port 5432):
+```
+postgresql://postgres.mlltpfszhtxhphoaeydh:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+```
+
+Verify the connection with `psql` before wiring it into `.env`:
+```sh
+psql "postgresql://postgres.mlltpfszhtxhphoaeydh:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres" -c '\conninfo'
+```
+
+For a hardened (verify-full) connection, download the SSL cert from the Connect
+panel and pass it explicitly:
+```sh
+psql "sslmode=verify-full sslrootcert=/path/to/prod-supabase.cer \
+  host=aws-0-us-west-2.pooler.supabase.com dbname=postgres \
+  user=postgres.mlltpfszhtxhphoaeydh"
+```
+
+**Important:** All three services (`auth`, `game`, `importer`) use the **same**
+`DATABASE_URL`. They are isolated by Postgres schema (`profile`, `games`,
+`importer`).
 
 ### 4. Get BGG credentials (optional)
 
@@ -216,10 +278,23 @@ $EDITOR services/gateway/.env services/auth/.env services/game/.env services/imp
 Then edit each:
 
 **`services/gateway/.env`:**
+
+Local Supabase (`supabase start` — recommended):
 ```env
 PORT=8000
-SUPABASE_JWT_SECRET=<paste from step 3>
+SUPABASE_URL=http://127.0.0.1:54321   # local auth, ES256 JWKS
+SUPABASE_JWT_SECRET=                   # leave empty
+AUTH_SERVICE_URL=http://localhost:8001
+GAME_SERVICE_URL=http://localhost:8002
+IMPORTER_SERVICE_URL=http://localhost:8003
+ALLOWED_ORIGIN=http://localhost:5173
+```
+
+Remote Supabase (only when needed):
+```env
+PORT=8000
 SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co
+SUPABASE_JWT_SECRET=                   # leave empty unless using legacy HS256
 AUTH_SERVICE_URL=http://localhost:8001
 GAME_SERVICE_URL=http://localhost:8002
 IMPORTER_SERVICE_URL=http://localhost:8003
@@ -229,20 +304,21 @@ ALLOWED_ORIGIN=http://localhost:5173
 **`services/auth/.env`:**
 ```env
 PORT=8001
-DATABASE_URL=<paste from step 3>
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres   # local
+# DATABASE_URL=postgresql://postgres.[ref]:[pw]@aws-0-us-west-2.pooler.supabase.com:5432/postgres  # remote
 ```
 
 **`services/game/.env`:**
 ```env
 PORT=8002
-DATABASE_URL=<paste from step 3>
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres   # local
 DATA_DIR=data/uploads
 ```
 
 **`services/importer/.env`:**
 ```env
 PORT=8003
-DATABASE_URL=<paste from step 3>
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres   # local
 GAME_SERVICE_URL=http://localhost:8002
 BGG_TOKEN=                  # leave empty unless you have one
 BGG_COOKIE=                 # paste from step 4 if testing sync
@@ -341,6 +417,76 @@ make test-v         # verbose + race detector
 make lint           # go vet
 make clean          # remove built binaries
 ```
+
+### Supabase backend — local vs remote
+
+There are two modes. Use **local for all feature development**; remote only when you need to validate against production data or push a migration live.
+
+| | Local (`supabase start`) | Remote (hosted project) |
+|---|---|---|
+| **DB** | `127.0.0.1:54322` | Supabase pooler |
+| **Auth / JWKS** | `http://127.0.0.1:54321` | `https://mlltpfszhtxhphoaeydh.supabase.co` |
+| **Data isolation** | Fresh local copy | Production data |
+| **Cost** | Free, offline-capable | Counts against project quotas |
+| **Use for** | Feature dev, migration authoring | Migration validation, prod debugging |
+
+#### Start / stop / inspect local stack
+
+```sh
+supabase start          # starts all containers (Postgres, Auth, Studio …)
+supabase stop           # stops containers, preserves data
+supabase stop --no-backup   # stops and discards data
+supabase status         # prints all local URLs, keys, and DB connection string
+```
+
+`supabase status` is the canonical source for local credentials — no guessing:
+
+```
+DB URL  │ postgresql://postgres:postgres@127.0.0.1:54322/postgres
+Auth    │ http://127.0.0.1:54321/auth/v1
+Studio  │ http://127.0.0.1:54323
+```
+
+#### Local `.env` values (gateway + services)
+
+**`services/gateway/.env`** (local mode):
+```env
+SUPABASE_URL=http://127.0.0.1:54321   # local auth issues ES256 → JWKS-only works
+SUPABASE_JWT_SECRET=                   # leave empty
+```
+
+**`services/auth|game|importer/.env`** (local mode):
+```env
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+Run migrations against the local DB (safe to run repeatedly — idempotent):
+```sh
+make -C services/auth     migrate-up
+make -C services/game     migrate-up
+make -C services/importer migrate-up
+```
+
+#### Linking to remote (migration sync)
+
+`supabase link` connects the CLI to the hosted project so you can pull the
+remote schema and push tested migrations:
+
+```sh
+# One-time — requires supabase login with a personal access token
+# Dashboard → Account → Access Tokens → Generate new token
+supabase login --token YOUR_TOKEN
+supabase link --project-ref mlltpfszhtxhphoaeydh
+
+# Pull remote schema to seed local (first-time bootstrap)
+supabase db pull
+
+# After writing + testing a migration locally, push it to remote
+supabase db push
+```
+
+Note: `supabase link` is only needed for migration management, not for running
+the local dev stack itself.
 
 ---
 
@@ -443,9 +589,10 @@ Set via `gcloud run services update --set-env-vars` on each service. Terraform d
 PROJECT=myboardgamecollection-494214
 REGION=us-central1
 
-# Gateway needs the JWT secret
+# Gateway needs the Supabase URL (drives JWKS verification)
 gcloud run services update mbgc-gateway --region $REGION --project $PROJECT \
-  --set-env-vars=SUPABASE_JWT_SECRET=...,ALLOWED_ORIGIN=https://lumedina.dev
+  --set-env-vars=SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co,ALLOWED_ORIGIN=https://lumedina.dev
+# SUPABASE_JWT_SECRET is optional — add it only for legacy HS256 fallback
 
 # Auth, game, importer need the DB URL
 for svc in mbgc-auth-service mbgc-game-service mbgc-importer-service; do
@@ -506,7 +653,8 @@ A service crashed on startup. Most common causes:
 
 | Symptom | Fix |
 |---|---|
-| `ERROR required env var not set key=SUPABASE_JWT_SECRET` | Fill in `services/gateway/.env` |
+| `ERROR required env var not set key=SUPABASE_URL` | Fill in `services/gateway/.env` |
+| `init JWKS from ...` on gateway start | `SUPABASE_URL` wrong/unreachable — the gateway fetches public keys at boot |
 | `ERROR required env var not set key=DATABASE_URL` | Fill in `services/auth/.env`, `services/game/.env`, `services/importer/.env` |
 | `bind: address already in use` | Another process holds the port: `lsof -ti:8080 \| xargs kill -9` |
 | `vite: command not found` | Run `cd web && bun install` |

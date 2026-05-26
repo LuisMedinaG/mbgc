@@ -55,3 +55,8 @@ set-deploy-secrets.sh
 .wrangler/
 
 .vite/
+
+supabase/
+
+*.cert
+*.crt

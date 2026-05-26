@@ -22,6 +22,44 @@ make lint
 make test-e2e  # Playwright — requires full stack running
 ```
 
+## Supabase — Local vs Remote
+
+**Default: use local Supabase for all feature development.** Remote is only for migration validation before pushing live.
+
+```sh
+supabase start          # start local stack (Postgres :54322, Auth :54321, Studio :54323)
+supabase stop           # stop, preserve data
+supabase status         # print all local URLs, DB connection string, and keys
+
+# Link to remote once (requires personal access token from dashboard → Account → Access Tokens)
+supabase login --token YOUR_TOKEN
+supabase link --project-ref mlltpfszhtxhphoaeydh
+supabase db pull        # pull remote schema to local (initial bootstrap)
+supabase db push        # push locally-tested migrations to remote
+```
+
+**Local .env values** (from `supabase status`):
+```
+SUPABASE_URL=http://127.0.0.1:54321
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
+```
+
+**Connection string modes** (remote, when needed):
+- Session pooler port `5432` — use for migrations and standard backends
+- Transaction pooler port `6543` — avoid; breaks session features
+- Format: `postgresql://postgres.[ref]:[pw]@aws-0-us-west-2.pooler.supabase.com:5432/postgres`
+
+## JWT / Auth (gateway)
+
+- **Primary path:** ES256/RS256 via JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
+  Auto-refreshed by `github.com/MicahParks/keyfunc/v3`. Leaking public keys cannot forge tokens.
+- **Legacy path:** HS256 via `SUPABASE_JWT_SECRET` — only enable if accepting tokens minted
+  before the project migrated to JWT signing keys. Leave empty for new setups.
+- **Validated on every token:** signature, `exp`, `iss` = `${SUPABASE_URL}/auth/v1`,
+  `aud` = `authenticated`. Anon/service_role API keys are rejected.
+- `SUPABASE_URL` is **required** to boot the gateway. `SUPABASE_JWT_SECRET` is optional.
+
 ## go.work Workspace
 
 `go.work` + `replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared` means all services resolve `pkg/shared` locally — no version bump needed during development. Changes to `pkg/shared` are immediately visible to all services.
@@ -61,7 +99,8 @@ feature/*  →  dev  →  staging  →  main
 **Ask first:**
 - Schema changes affecting multiple services
 - Any change to `pkg/shared` exported types (all 5 services depend on it)
-- Auth flow modifications (JWT expiry, Supabase config, refresh logic)
+- Auth flow modifications (JWT expiry, Supabase config, refresh logic, JWKS)
+- Running `supabase db push` — this writes to the hosted production database
 - New external service integrations or third-party dependencies
 
 **Never:**

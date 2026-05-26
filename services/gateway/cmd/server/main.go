@@ -2,24 +2,18 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rsa"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
+	"github.com/MicahParks/keyfunc/v3"
 	jwtlib "github.com/golang-jwt/jwt/v5"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
@@ -30,7 +24,16 @@ import (
 
 func main() {
 	cfg := config.Load()
-	protect := requireAuth(cfg)
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	verifier, err := newTokenVerifier(ctx, cfg)
+	if err != nil {
+		slog.Error("failed to initialize token verifier", "error", err)
+		os.Exit(1)
+	}
+	protect := requireAuth(verifier)
 
 	mux := http.NewServeMux()
 
@@ -69,19 +72,17 @@ func main() {
 		}
 	}()
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	<-ctx.Done()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("shutdown error", "error", err)
 	}
 	slog.Info("gateway stopped")
 }
 
-// --- JWT types ---
+// --- JWT claims ---
 
 type supabaseClaims struct {
 	jwtlib.RegisteredClaims
@@ -109,177 +110,57 @@ func (c *supabaseClaims) isAdmin() bool {
 	return false
 }
 
-// --- Token verifier (HS256 + ES256/RS256 via JWKS) ---
+// --- Token verifier ---
 
+// Supabase access tokens carry aud="authenticated". anon/service_role API
+// keys use other roles and are intentionally rejected as user bearer tokens.
+const supabaseAudience = "authenticated"
+
+// tokenVerifier validates Supabase JWTs. The primary path is asymmetric
+// ES256/RS256, where Supabase signs with a private key and the gateway fetches
+// only public keys from the project's JWKS endpoint (auto-refreshed). HS256 is
+// supported as a legacy fallback only when SUPABASE_JWT_SECRET is set, to keep
+// verifying still-valid tokens issued before the migration to signing keys.
 type tokenVerifier struct {
-	secret  string
-	jwksURL string
-	jwks    map[string]interface{} // kid → public key
-	jwksMu  sync.RWMutex
-	fetched bool
+	keyfunc jwtlib.Keyfunc
+	issuer  string
 }
 
-func newTokenVerifier(cfg config.Config) *tokenVerifier {
-	return &tokenVerifier{
-		secret:  cfg.JWTSecret,
-		jwksURL: strings.TrimSuffix(cfg.SupabaseURL, "/") + "/auth/v1/.well-known/jwks.json",
-		jwks:    make(map[string]interface{}),
-	}
-}
+func newTokenVerifier(ctx context.Context, cfg config.Config) (*tokenVerifier, error) {
+	issuer := strings.TrimSuffix(cfg.SupabaseURL, "/") + "/auth/v1"
+	jwksURL := issuer + "/.well-known/jwks.json"
 
-func (v *tokenVerifier) keyfunc(t *jwtlib.Token) (interface{}, error) {
-	// HS256 / HS384 / HS512 — shared secret
-	if _, ok := t.Method.(*jwtlib.SigningMethodHMAC); ok {
-		return []byte(v.secret), nil
-	}
-
-	// RS256 / ES256 — fetch public key from Supabase JWKS
-	kid, ok := t.Header["kid"].(string)
-	if !ok {
-		return nil, fmt.Errorf("missing kid in JWT header (non-HMAC token)")
-	}
-
-	v.jwksMu.RLock()
-	key, exists := v.jwks[kid]
-	ok = exists
-	v.jwksMu.RUnlock()
-	if ok {
-		return key, nil
-	}
-
-	if err := v.fetchJWKS(); err != nil {
-		return nil, fmt.Errorf("jwks fetch: %w", err)
-	}
-
-	v.jwksMu.RLock()
-	key, exists = v.jwks[kid]
-	v.jwksMu.RUnlock()
-	if !exists {
-		return nil, fmt.Errorf("kid %q not found in JWKS", kid)
-	}
-	return key, nil
-}
-
-func (v *tokenVerifier) fetchJWKS() error {
-	resp, err := http.Get(v.jwksURL)
+	jwks, err := keyfunc.NewDefaultCtx(ctx, []string{jwksURL})
 	if err != nil {
-		return fmt.Errorf("GET %s: %w", v.jwksURL, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("JWKS returned %d", resp.StatusCode)
+		return nil, fmt.Errorf("init JWKS from %s: %w", jwksURL, err)
 	}
 
-	var set struct {
-		Keys []json.RawMessage `json:"keys"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&set); err != nil {
-		return fmt.Errorf("decode JWKS: %w", err)
-	}
-
-	v.jwksMu.Lock()
-	defer v.jwksMu.Unlock()
-
-	for _, raw := range set.Keys {
-		var jwk struct {
-			KID string `json:"kid"`
-			KTY string `json:"kty"`
-			N   string `json:"n"`
-			E   string `json:"e"`
-			CRV string `json:"crv"`
-			X   string `json:"x"`
-			Y   string `json:"y"`
-		}
-		if err := json.Unmarshal(raw, &jwk); err != nil || jwk.KID == "" {
-			continue
-		}
-		if _, exists := v.jwks[jwk.KID]; exists {
-			continue
-		}
-
-		var pubKey interface{}
-		switch jwk.KTY {
-		case "EC":
-			pubKey, err = parseECKey(jwk.CRV, jwk.X, jwk.Y)
-		case "RSA":
-			pubKey, err = parseRSAKey(jwk.N, jwk.E)
-		default:
-			continue
-		}
-		if err != nil {
-			slog.Warn("failed to parse JWK", "kid", jwk.KID, "error", err)
-			continue
-		}
-		v.jwks[jwk.KID] = pubKey
+	secret := []byte(cfg.JWTSecret)
+	if len(secret) == 0 {
+		slog.Info("HS256 disabled — no SUPABASE_JWT_SECRET set; verifying ES256/RS256 via JWKS only", "jwks", jwksURL)
+	} else {
+		slog.Info("HS256 legacy fallback enabled alongside JWKS", "jwks", jwksURL)
 	}
 
-	v.fetched = true
-	return nil
+	kf := func(t *jwtlib.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwtlib.SigningMethodHMAC); ok {
+			if len(secret) == 0 {
+				return nil, fmt.Errorf("HS256 token rejected: no legacy SUPABASE_JWT_SECRET configured")
+			}
+			return secret, nil
+		}
+		return jwks.Keyfunc(t)
+	}
+
+	return &tokenVerifier{keyfunc: kf, issuer: issuer}, nil
 }
 
-func parseECKey(crv, xb64, yb64 string) (*ecdsa.PublicKey, error) {
-	var curve elliptic.Curve
-	switch crv {
-	case "P-256":
-		curve = elliptic.P256()
-	case "P-384":
-		curve = elliptic.P384()
-	case "P-521":
-		curve = elliptic.P521()
-	default:
-		return nil, fmt.Errorf("unknown EC curve: %s", crv)
-	}
-
-	x, err := b64Decode(xb64)
-	if err != nil {
-		return nil, err
-	}
-	y, err := b64Decode(yb64)
-	if err != nil {
-		return nil, err
-	}
-
-	return &ecdsa.PublicKey{
-		Curve: curve,
-		X:     new(big.Int).SetBytes(x),
-		Y:     new(big.Int).SetBytes(y),
-	}, nil
-}
-
-func parseRSAKey(nb64, eb64 string) (*rsa.PublicKey, error) {
-	n, err := b64Decode(nb64)
-	if err != nil {
-		return nil, err
-	}
-	e, err := b64Decode(eb64)
-	if err != nil {
-		return nil, err
-	}
-
-	return &rsa.PublicKey{
-		N: new(big.Int).SetBytes(n),
-		E: int(new(big.Int).SetBytes(e).Int64()),
-	}, nil
-}
-
-func b64Decode(s string) ([]byte, error) {
-	// JWK uses base64url without padding — add padding for Go's decoder
-	s = strings.TrimRight(s, "=")
-	switch len(s) % 4 {
-	case 2:
-		s += "=="
-	case 3:
-		s += "="
-	}
-	return base64.URLEncoding.DecodeString(s)
-}
-
-// --- Parse token ---
-
-func parseToken(tokenStr string, v *tokenVerifier) (*supabaseClaims, error) {
+func (v *tokenVerifier) parse(tokenStr string) (*supabaseClaims, error) {
 	token, err := jwtlib.ParseWithClaims(tokenStr, &supabaseClaims{}, v.keyfunc,
-		jwtlib.WithValidMethods([]string{"HS256", "HS384", "HS512", "RS256", "ES256"}),
+		jwtlib.WithValidMethods([]string{"ES256", "RS256", "HS256"}),
+		jwtlib.WithIssuer(v.issuer),
+		jwtlib.WithAudience(supabaseAudience),
+		jwtlib.WithExpirationRequired(),
 	)
 	if err != nil {
 		return nil, err
@@ -293,8 +174,7 @@ func parseToken(tokenStr string, v *tokenVerifier) (*supabaseClaims, error) {
 
 // --- Middleware ---
 
-func requireAuth(cfg config.Config) func(http.Handler) http.Handler {
-	v := newTokenVerifier(cfg)
+func requireAuth(v *tokenVerifier) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			auth := r.Header.Get("Authorization")
@@ -303,7 +183,7 @@ func requireAuth(cfg config.Config) func(http.Handler) http.Handler {
 					envelope.NewError(apierr.CodeUnauthorized, "missing or malformed token"))
 				return
 			}
-			claims, err := parseToken(strings.TrimPrefix(auth, "Bearer "), v)
+			claims, err := v.parse(strings.TrimPrefix(auth, "Bearer "))
 			if err != nil {
 				httpx.WriteJSON(w, http.StatusUnauthorized,
 					envelope.NewError(apierr.CodeUnauthorized, "invalid token"))
