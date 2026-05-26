@@ -1,4 +1,4 @@
-.PHONY: dev build test lint tidy dev-all db-setup db-check-env
+.PHONY: dev build test lint tidy dev-all db-setup db-check-env acai-push acai-status acai-features
 
 # Root Makefile — mbgc monorepo
 
@@ -27,3 +27,13 @@ dev-all:
 	@tmux new-window -t mbgc -n web "cd web && bun run dev 2>&1; read"
 	@tmux select-window -t mbgc:api
 	@echo "Services started. Attach with: tmux attach -t mbgc"
+
+# ── Acai.sh spec-driven development ────────────────────────────────────────────
+acai-push:
+	npx @acai.sh/cli push --all
+
+acai-status:
+	npx @acai.sh/cli features --json
+
+acai-features:
+	npx @acai.sh/cli features

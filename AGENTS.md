@@ -19,9 +19,21 @@ npx @acai.sh/cli feature auth --json --include-refs
 # Push specs + ACID refs to the dashboard
 npx @acai.sh/cli push --all
 
-# Mark requirements as completed
-npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":"completed"}'
+# Mark requirements as completed (status must be a JSON object)
+npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":{"status":"completed"}}'
 ```
+
+### Development workflow
+
+1. **Before starting**: `npx @acai.sh/cli features --json` to see what's pending
+2. **While implementing**: add `// ref: feature.COMPONENT.N` comments in code
+3. **After implementing**: 
+   ```sh
+   npx @acai.sh/cli set-status --product mbgc --impl dev '{"feature.COMPONENT.1":{"status":"completed"}}'
+   npx @acai.sh/cli push --all
+   ```
+4. **Review**: check dashboard at https://app.acai.sh — jump to ACID refs in code
+5. **QA accepted**: update status to `"accepted"`
 
 ### Spec to code traceability
 
