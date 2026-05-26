@@ -68,57 +68,65 @@ make db-reset          # wipe + replay migrations (local only)
 
 ## Production setup
 
-### 1. Bootstrap infrastructure (once)
+### 1. Fill in infra/.env
 
 ```sh
-cd infra
-bash scripts/bootstrap.sh
+make setup-prod     # copies infra/.env.example → infra/.env, then exits
 ```
 
-This creates:
-- GCP project, Artifact Registry, Cloud Run service shell
-- Cloudflare DNS + Pages
-- Supabase project link
-- GitHub Actions secrets
+Open `infra/.env` and fill in all values. Inline comments in the file tell you exactly where to find each one (Supabase dashboard, Cloudflare dashboard, etc.).
 
-Run it twice on initial setup — first pass creates the GCP service account,
-second pass extracts outputs and syncs secrets to GitHub.
+### 2. Bootstrap infrastructure
 
-### 2. Run migrations against prod
+```sh
+make bootstrap      # or: make setup-prod (re-run after filling .env)
+```
 
-After bootstrap, push migrations from local (linked project):
+This runs `infra/scripts/bootstrap.sh` which:
+- Creates the GCP Terraform service account + IAM roles
+- Writes local `terraform.tfvars` and `backend.hcl`
+- Syncs **all** secrets to GitHub Actions (Cloudflare, GCP, Supabase, API DB credentials)
+- Runs `terraform init`
+
+Re-run it anytime a secret rotates or a new value is added to `infra/.env` — it's idempotent.
+
+### 3. Apply Terraform
+
+```sh
+cd infra/environments/prod
+terraform plan
+terraform apply
+```
+
+Then run bootstrap once more to sync the GCP WIF + service account outputs that Terraform just created:
+
+```sh
+make bootstrap
+```
+
+### 4. Run migrations against prod
 
 ```sh
 supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-### 3. Seed admin user in prod
+### 5. Deploy and seed admin
 
-Set env vars on the Cloud Run service **once**:
-
-```sh
-gcloud run services update mbgc-api \
-  --region=us-central1 \
-  --set-env-vars "SEED_ADMIN_EMAIL=you@example.com,SEED_ADMIN_PASSWORD=yourpassword,SUPABASE_SERVICE_ROLE_KEY=your-key"
-```
-
-Deploy → the API creates the admin user on first boot.
-
-After confirming login works, **remove the seed vars**:
+Merge to `main` → CI/CD deploys automatically. On first boot the API creates the admin user defined in `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (set those in the Cloud Run env via the GitHub secret `API_SUPABASE_SERVICE_ROLE_KEY` flow, or temporarily via gcloud):
 
 ```sh
 gcloud run services update mbgc-api \
   --region=us-central1 \
-  --remove-env-vars "SEED_ADMIN_EMAIL,SEED_ADMIN_PASSWORD"
+  --set-env-vars "SEED_ADMIN_EMAIL=you@example.com,SEED_ADMIN_PASSWORD=yourpassword"
 ```
 
-### 4. CI/CD (ongoing)
+Seeding is idempotent — safe to leave set permanently.
 
-- Push to a `feature/*` branch → CI runs (build, test, lint)
-- Open PR to `dev` → infra plan comment posted automatically
-- Merge to `dev` → CI gate
-- Merge `dev → main` → deploy + infra apply runs automatically
+### CI/CD (ongoing)
+
+- PR to `dev` → CI runs (build, test, lint) + infra plan comment
+- Merge `dev → main` → deploy + `terraform apply` run automatically
 
 ---
 
