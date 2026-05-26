@@ -6,3 +6,5 @@ require (
 	github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0
 	github.com/jackc/pgx/v5 v5.7.0
 )
+
+replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ../../pkg/shared

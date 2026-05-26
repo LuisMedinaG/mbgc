@@ -22,10 +22,10 @@ tidy:
 	go mod tidy
 
 migrate-up:
-	psql "$$DATABASE_URL" -f migrations/001_init.up.sql
+	bash -c 'set -a; source .env 2>/dev/null; set +a; psql "$$DATABASE_URL" -f migrations/001_init.up.sql'
 
 migrate-down:
-	psql "$$DATABASE_URL" -f migrations/001_init.down.sql
+	bash -c 'set -a; source .env 2>/dev/null; set +a; psql "$$DATABASE_URL" -f migrations/001_init.down.sql'
 
 docker-build:
 	docker build -f deploy/Dockerfile -t mbgc-game-service .

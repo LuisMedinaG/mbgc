@@ -334,18 +334,43 @@ VITE_API_BASE_URL=
 
 **Run database migrations** (one-time, per-service):
 
+For the **local Supabase** (`supabase start`), classic psql works since the dev DB is on localhost:
+
 ```sh
 # Auth schema
-make -C services/auth migrate-up
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres make -C services/auth migrate-up
 
 # Game schema
-make -C services/game migrate-up
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres make -C services/game migrate-up
 
 # Importer schema
-make -C services/importer migrate-up
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres make -C services/importer migrate-up
+```
+
+For the **remote** (linked) database, use the Supabase CLI — it handles auth and avoids connection string issues:
+
+```sh
+supabase db query --linked -f services/auth/migrations/001_init.up.sql
+supabase db query --linked -f services/game/migrations/001_init.up.sql
+supabase db query --linked -f services/importer/migrations/001_init.up.sql
 ```
 
 These create the `profile`, `games`, and `importer` schemas in your Supabase database.
+
+**Create an admin user** (after migrations):
+
+1. Create the user in the Supabase Dashboard: Authentication → Users → Add User
+2. Note the user's UUID, then promote them:
+
+```sh
+USER_ID="your-user-uuid-here"
+
+# Set is_admin in profile.users
+supabase db query --linked "INSERT INTO profile.users (id, is_admin) VALUES ('${USER_ID}', true) ON CONFLICT (id) DO UPDATE SET is_admin = true;"
+
+# Set is_admin in Supabase Auth app_metadata (gateway reads this from the JWT)
+supabase db query --linked "UPDATE auth.users SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || '{\"is_admin\": true}'::jsonb WHERE id = '${USER_ID}';"
+```
 
 ---
 
