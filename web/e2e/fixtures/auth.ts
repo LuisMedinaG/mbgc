@@ -20,13 +20,15 @@ export async function seedAuth(page: Page): Promise<void> {
   const liveToken = process.env.TEST_TOKEN
 
   if (!liveToken) {
-    // Mocked mode — intercept all API calls, seed fake tokens
+    // Mocked mode — intercept all API calls, seed fake tokens.
+    // addInitScript runs before page JS so AuthContext boots authenticated
+    // and never redirects to /login on first load.
     await mockAll(page)
-    await page.goto('/')
-    await page.evaluate(({ a, r }) => {
+    await page.addInitScript(({ a, r }) => {
       localStorage.setItem('mbgc_access', a)
       localStorage.setItem('mbgc_refresh', r)
     }, { a: MOCK_ACCESS, r: MOCK_REFRESH })
+    await page.goto('/')
     return
   }
 

@@ -169,4 +169,22 @@ export async function mockAll(page: Page): Promise<void> {
   await mockGetGame(page)
   await mockListCollections(page)
   await mockGetProfile(page)
+
+  // Registered last = runs first (Playwright LIFO).
+  // Handles CORS preflight for cross-origin API calls (port 9999 bypass);
+  // non-OPTIONS fall through to the specific mock above.
+  await page.route('**/api/v1/**', (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      return route.fulfill({
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+          'Access-Control-Max-Age': '86400',
+        },
+      })
+    }
+    return route.fallback()
+  })
 }
