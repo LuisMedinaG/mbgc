@@ -53,7 +53,6 @@ jobs:
       - name: Lint
         run: bun run lint
         working-directory: web
-        continue-on-error: true
 
       - name: Build
         run: bun run build
@@ -79,6 +78,4 @@ jobs:
           tflint_version: v0.52.0
 
       - name: TFLint
-        run: tflint --recursive --format=compact --only=terraform_deprecated_interpolation --only=terraform_unused_declarations
-        working-directory: infra
-        continue-on-error: true
+        run: tflint --chdir=infra --recursive

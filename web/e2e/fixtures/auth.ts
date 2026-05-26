@@ -55,9 +55,9 @@ type AuthFixtures = {
  * `@playwright/test` directly.
  */
 export const test = base.extend<AuthFixtures>({
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async ({ page }, fixtureUse) => {
     await seedAuth(page)
-    await use(page)
+    await fixtureUse(page)
   },
 })
 
