@@ -14,7 +14,7 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 |---|---|
 | `envelope` | `Response[T]`, `ListResponse[T]`, `ErrorResponse` — JSON wire types + constructors |
 | `apierr` | Sentinel errors (`ErrNotFound`, `ErrDuplicate`, …) + machine-readable codes + `Is*` helpers |
-| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`, `TrustGatewayHeaders`) + `WriteJSON` / `WriteError` + context accessors |
+| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`) + `WriteJSON` / `WriteError` + context accessors |
 
 ## Wire format
 

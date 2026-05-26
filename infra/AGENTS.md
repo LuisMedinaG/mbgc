@@ -62,7 +62,13 @@ Use `-` for stdout. Curl with `-u` won't work — Supabase S3 requires SigV4 sig
 sh scripts/bootstrap.sh
 ```
 
-Idempotent. Run **twice** on first setup: once before `apply` (creates GCP SA), once after (reads terraform outputs → pushes all GCP deploy secrets and per-service runtime SA secrets to `LuisMedinaG/mbgc`).
+Idempotent. Run **twice** on first setup: once before `apply` (creates GCP SA + writes local credential files), once after (reads terraform outputs → syncs all GCP deploy secrets to `LuisMedinaG/mbgc`).
+
+Post-apply, the script pushes these secrets to GitHub Actions:
+- `GCP_WORKLOAD_IDENTITY_PROVIDER` — WIF provider for GitHub OIDC token exchange
+- `GCP_SERVICE_ACCOUNT` — deploy service account email
+- `GCP_PROJECT_ID` — GCP project ID
+- `GCP_RUNTIME_SA_API` — runtime service account for `mbgc-api`
 
 IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.serviceAccountAdmin`, `iam.workloadIdentityPoolAdmin`, `artifactregistry.admin`, `resourcemanager.projectIamAdmin`, `serviceusage.serviceUsageAdmin`
 
@@ -75,11 +81,9 @@ Terraform changes are **applied manually** — there is no automated `terraform 
 
 ## Tests
 
-- **`smoke.sh`** — verifies Cloud Run services exist in `us-central1`, `api.lumedina.dev` resolves, gateway returns non-5xx. Override with `GCP_PROJECT`, `GCP_REGION`, `API_HOST`.
+- **`smoke.sh`** — verifies `mbgc-api` exists in `us-central1`, `api.lumedina.dev` resolves, API returns non-5xx. Override with `GCP_PROJECT`, `GCP_REGION`, `API_HOST`.
 - **`tflint`** — terraform preset + google ruleset (`.tflint.hcl`)
 - **`tfsec`** — silence intentional false positives with inline `# tfsec:ignore:<rule-id>`
-
-## Non-negotiable rules
 
 ## Non-negotiable rules
 
