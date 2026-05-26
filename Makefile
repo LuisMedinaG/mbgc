@@ -12,10 +12,15 @@ ENV_FILE := services/api/.env
 setup-local:
 	@if [ ! -f "$(ENV_FILE)" ]; then \
 		cp services/api/.env.example $(ENV_FILE); \
-		echo "✓ Created $(ENV_FILE) from .env.example"; \
-		echo "  → Fill in SUPABASE_SERVICE_ROLE_KEY, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD"; \
-		echo "  → Get the service role key from: supabase status (after starting)"; \
-		echo "  → Then re-run: make setup-local"; \
+		echo "✓ Created $(ENV_FILE) — DATABASE_URL and SUPABASE_URL are pre-filled for local."; \
+		echo ""; \
+		echo "  Fill in the three remaining values:"; \
+		echo "    SUPABASE_SERVICE_ROLE_KEY  ← supabase status → Secret key"; \
+		echo "    SEED_ADMIN_EMAIL           ← your admin email"; \
+		echo "    SEED_ADMIN_PASSWORD        ← your admin password (min 6 chars)"; \
+		echo ""; \
+		echo "  If Supabase isn't running yet:  supabase start && supabase status"; \
+		echo "  Then re-run:                    make setup-local"; \
 		exit 0; \
 	fi
 	@echo "Starting Supabase..."

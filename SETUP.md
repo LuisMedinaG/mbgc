@@ -13,41 +13,37 @@ Single source of truth for getting mbgc running from scratch.
 
 ## Local development
 
-### 1. Clone and configure
+### 1. Clone and start Supabase
 
 ```sh
 git clone git@github.com:LuisMedinaG/mbgc.git
 cd mbgc
-make setup-local       # creates services/api/.env from .env.example
+supabase start         # boots local Postgres + Auth (Docker required)
+supabase status        # prints URLs and keys — keep this open
 ```
 
-On first run, `setup-local` exits after creating `.env` so you can fill it in.
-
-### 2. Fill in services/api/.env
+### 2. Create and fill in services/api/.env
 
 ```sh
-# Start Supabase to get keys
-supabase start
-
-# supabase status will show:
-#   Publishable key → SUPABASE_ANON_KEY
-#   Service role key → SUPABASE_SERVICE_ROLE_KEY
+make setup-local       # creates services/api/.env from .env.example, then exits
 ```
 
-Minimum required values:
+Open `services/api/.env`. `DATABASE_URL` and `SUPABASE_URL` are **already correct for local** — do not change them. Fill in only these three:
 
-| Variable | Where to find it |
+| Variable | Value |
 |---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | `supabase status` → Secret |
-| `SEED_ADMIN_EMAIL` | Your choice |
+| `SUPABASE_SERVICE_ROLE_KEY` | `supabase status` → **Secret** key |
+| `SEED_ADMIN_EMAIL` | Your choice (e.g. `you@example.com`) |
 | `SEED_ADMIN_PASSWORD` | Your choice (min 6 chars) |
 
-Leave `SUPABASE_JWT_SECRET` empty (JWKS-only is preferred).
+> **Key naming:** the Supabase CLI now labels keys **Publishable** (anon) and **Secret** (service_role).
+> Use the **Secret** key for `SUPABASE_SERVICE_ROLE_KEY`.
+> Leave `SUPABASE_JWT_SECRET` empty — JWKS-only ES256 is the default and recommended.
 
-### 3. Finish setup
+### 3. Run migrations and start
 
 ```sh
-make setup-local       # runs migrations
+make setup-local       # Supabase already running, applies all migrations
 make dev               # starts API (port 8080) + web (port 5173) in tmux
 ```
 
@@ -56,7 +52,7 @@ The API creates the admin user on **first boot** — check the logs:
 INFO admin user ready email=you@example.com
 ```
 
-After that, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` can remain set — they're idempotent and do nothing once the user exists.
+`SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are safe to leave set — they're idempotent and do nothing once the user exists.
 
 ### Daily workflow
 
