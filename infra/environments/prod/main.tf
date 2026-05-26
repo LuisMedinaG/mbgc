@@ -182,11 +182,11 @@ resource "supabase_settings" "prod" {
   project_ref = var.supabase_project_ref
 
   auth = jsonencode({
-    site_url = "https://lumedina.dev"
+    site_url = "https://${var.domain}"
 
     # Allow Pages preview deployments and local dev as redirect targets.
     uri_allow_list = join(",", [
-      "https://lumedina.dev",
+      "https://${var.domain}",
       "https://*.mbgc-web.pages.dev",
       "http://localhost:5173",
     ])
@@ -212,7 +212,7 @@ resource "supabase_settings" "prod" {
 # Apex → Pages
 resource "cloudflare_dns_record" "apex" {
   zone_id = var.cloudflare_zone_id
-  name    = "lumedina.dev"
+  name    = var.domain
   type    = "CNAME"
   content = "mbgc-web.pages.dev"
   proxied = true
@@ -222,9 +222,9 @@ resource "cloudflare_dns_record" "apex" {
 # www → apex
 resource "cloudflare_dns_record" "www" {
   zone_id = var.cloudflare_zone_id
-  name    = "www.lumedina.dev"
+  name    = "www.${var.domain}"
   type    = "CNAME"
-  content = "lumedina.dev"
+  content = var.domain
   proxied = true
   ttl     = 1
 }
@@ -244,7 +244,7 @@ resource "cloudflare_dns_record" "www" {
 ###############################################################################
 
 resource "google_cloud_run_domain_mapping" "api" {
-  name     = "api.lumedina.dev"
+  name     = "api.${var.domain}"
   location = var.gcp_region
 
   metadata {
@@ -258,7 +258,7 @@ resource "google_cloud_run_domain_mapping" "api" {
 
 resource "cloudflare_dns_record" "api" {
   zone_id = var.cloudflare_zone_id
-  name    = "api.lumedina.dev"
+  name    = "api.${var.domain}"
   type    = "CNAME"
   content = "ghs.googlehosted.com"
   # DNS-only: Cloud Run, not Cloudflare, terminates TLS for this hostname.

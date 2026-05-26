@@ -43,3 +43,9 @@ variable "github_org" {
   type        = string
   default     = "LuisMedinaG"
 }
+
+variable "domain" {
+  description = "Root domain for the project (e.g. lumedina.dev)."
+  type        = string
+  default     = "lumedina.dev"
+}
