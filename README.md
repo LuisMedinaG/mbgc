@@ -2,7 +2,7 @@
 
 A personal board game collection app with BoardGameGeek (BGG) integration. Track games, organize collections, sync from BGG, and more.
 
-**Live:** https://lumedina.dev (frontend) · https://api.lumedina.dev (API)
+**Live:** deploy your own — see [Deployment](#deployment)
 
 ---
 
@@ -38,7 +38,7 @@ Five Go microservices behind a single API gateway, plus a React frontend. The or
                                 │
                                 ▼
                     ┌─────────────────────────┐
-                    │  gateway (JWT + CORS)   │   :8000  → api.lumedina.dev
+                    │  gateway (JWT + CORS)   │   :8000  → api.your-domain.dev
                     └─┬─────────┬─────────┬───┘
                       │         │         │
               ┌───────▼──┐ ┌────▼────┐ ┌──▼───────┐
@@ -158,7 +158,7 @@ The microservices need **two required values** from Supabase (plus one optional 
 | `DATABASE_URL` | auth, game, importer | **Yes** — Postgres connection |
 | `SUPABASE_JWT_SECRET` | gateway | Optional — legacy HS256 fallback only |
 
-**Project ref:** `mlltpfszhtxhphoaeydh` · **Dashboard:** https://supabase.com/dashboard/project/mlltpfszhtxhphoaeydh
+**Project ref:** `your-project-ref` · **Dashboard:** https://supabase.com/dashboard/project/your-project-ref
 
 #### Install + log in to the Supabase CLI (recommended, avoids guessing)
 
@@ -169,7 +169,7 @@ supabase login                       # opens browser, stores an access token
 # List your projects — shows the ref and the API URL for each
 supabase projects list
 # REFERENCE ID            NAME                  REGION       API URL
-# mlltpfszhtxhphoaeydh    MyBoardGameCollection us-west-2    https://mlltpfszhtxhphoaeydh.supabase.co
+# your-project-ref    MyBoardGameCollection us-west-2    https://your-project-ref.supabase.co
 ```
 
 #### `SUPABASE_URL` (required)
@@ -179,7 +179,7 @@ appends `/auth/v1/.well-known/jwks.json` to it and fetches Supabase's **public**
 signing keys to verify every access token.
 
 ```sh
-SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co
+SUPABASE_URL=https://your-project-ref.supabase.co
 ```
 
 **How verification works (ES256 / JWKS):** Supabase has migrated to **JWT
@@ -189,7 +189,7 @@ verifies with the matching **public** key. Public keys are published, by `kid`
 (key id), at the project's JWKS endpoint:
 
 ```sh
-curl https://mlltpfszhtxhphoaeydh.supabase.co/auth/v1/.well-known/jwks.json
+curl https://your-project-ref.supabase.co/auth/v1/.well-known/jwks.json
 # { "keys": [ { "kid": "...", "kty": "EC", "crv": "P-256", "alg": "ES256", ... } ] }
 ```
 
@@ -220,12 +220,12 @@ your database password (reset it on the same page if unknown).
 
 Format (session pooler, port 5432):
 ```
-postgresql://postgres.mlltpfszhtxhphoaeydh:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres
+postgresql://postgres.your-project-ref:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres
 ```
 
 Verify the connection with `psql` before wiring it into `.env`:
 ```sh
-psql "postgresql://postgres.mlltpfszhtxhphoaeydh:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres" -c '\conninfo'
+psql "postgresql://postgres.your-project-ref:YOUR_PASSWORD@aws-0-us-west-2.pooler.supabase.com:5432/postgres" -c '\conninfo'
 ```
 
 For a hardened (verify-full) connection, download the SSL cert from the Connect
@@ -233,7 +233,7 @@ panel and pass it explicitly:
 ```sh
 psql "sslmode=verify-full sslrootcert=/path/to/prod-supabase.cer \
   host=aws-0-us-west-2.pooler.supabase.com dbname=postgres \
-  user=postgres.mlltpfszhtxhphoaeydh"
+  user=postgres.your-project-ref"
 ```
 
 **Important:** All three services (`auth`, `game`, `importer`) use the **same**
@@ -293,7 +293,7 @@ ALLOWED_ORIGIN=http://localhost:5173
 Remote Supabase (only when needed):
 ```env
 PORT=8000
-SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co
+SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_JWT_SECRET=                   # leave empty unless using legacy HS256
 AUTH_SERVICE_URL=http://localhost:8001
 GAME_SERVICE_URL=http://localhost:8002
@@ -425,7 +425,7 @@ There are two modes. Use **local for all feature development**; remote only when
 | | Local (`supabase start`) | Remote (hosted project) |
 |---|---|---|
 | **DB** | `127.0.0.1:54322` | Supabase pooler |
-| **Auth / JWKS** | `http://127.0.0.1:54321` | `https://mlltpfszhtxhphoaeydh.supabase.co` |
+| **Auth / JWKS** | `http://127.0.0.1:54321` | `https://your-project-ref.supabase.co` |
 | **Data isolation** | Fresh local copy | Production data |
 | **Cost** | Free, offline-capable | Counts against project quotas |
 | **Use for** | Feature dev, migration authoring | Migration validation, prod debugging |
@@ -447,25 +447,7 @@ Auth    │ http://127.0.0.1:54321/auth/v1
 Studio  │ http://127.0.0.1:54323
 ```
 
-#### Local `.env` values (gateway + services)
-
-**`services/gateway/.env`** (local mode):
-```env
-SUPABASE_URL=http://127.0.0.1:54321   # local auth issues ES256 → JWKS-only works
-SUPABASE_JWT_SECRET=                   # leave empty
-```
-
-**`services/auth|game|importer/.env`** (local mode):
-```env
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-```
-
-Run migrations against the local DB (safe to run repeatedly — idempotent):
-```sh
-make -C services/auth     migrate-up
-make -C services/game     migrate-up
-make -C services/importer migrate-up
-```
+Use the values from `supabase status` to fill your `.env` files — see [Setup → step 5](#5-configure-local-env-files) for the full template.
 
 #### Linking to remote (migration sync)
 
@@ -476,7 +458,7 @@ remote schema and push tested migrations:
 # One-time — requires supabase login with a personal access token
 # Dashboard → Account → Access Tokens → Generate new token
 supabase login --token YOUR_TOKEN
-supabase link --project-ref mlltpfszhtxhphoaeydh
+supabase link --project-ref your-project-ref
 
 # Pull remote schema to seed local (first-time bootstrap)
 supabase db pull
@@ -547,8 +529,8 @@ Current coverage:
 | Component | Provider | URL |
 |---|---|---|
 | All Go services | GCP Cloud Run (`us-central1`) | `*-mbgc-*.run.app` |
-| API gateway custom domain | GCP + Cloudflare | https://api.lumedina.dev |
-| Web frontend | Cloudflare Pages | https://lumedina.dev |
+| API gateway custom domain | GCP + Cloudflare | `https://api.your-domain.dev` |
+| Web frontend | Cloudflare Pages | `https://your-domain.dev` |
 | Postgres | Supabase | (private) |
 
 ### How deploys work
@@ -586,12 +568,12 @@ gh run watch
 Set via `gcloud run services update --set-env-vars` on each service. Terraform does not manage these — they live in the service's runtime config:
 
 ```sh
-PROJECT=myboardgamecollection-494214
+PROJECT=your-gcp-project-id
 REGION=us-central1
 
 # Gateway needs the Supabase URL (drives JWKS verification)
 gcloud run services update mbgc-gateway --region $REGION --project $PROJECT \
-  --set-env-vars=SUPABASE_URL=https://mlltpfszhtxhphoaeydh.supabase.co,ALLOWED_ORIGIN=https://lumedina.dev
+  --set-env-vars=SUPABASE_URL=https://your-project-ref.supabase.co,ALLOWED_ORIGIN=https://your-domain.dev
 # SUPABASE_JWT_SECRET is optional — add it only for legacy HS256 fallback
 
 # Auth, game, importer need the DB URL
@@ -617,23 +599,23 @@ Or set manually:
 REPO=LuisMedinaG/mbgc
 
 # GCP — fetched via gcloud
-gh secret set GCP_PROJECT_ID --repo $REPO --body "myboardgamecollection-494214"
+gh secret set GCP_PROJECT_ID --repo $REPO --body "your-gcp-project-id"
 
 gh secret set GCP_WORKLOAD_IDENTITY_PROVIDER --repo $REPO --body \
   "$(gcloud iam workload-identity-pools providers describe github \
      --workload-identity-pool=github-actions --location=global \
-     --project=myboardgamecollection-494214 --format='value(name)')"
+     --project=your-gcp-project-id --format='value(name)')"
 
 gh secret set GCP_SERVICE_ACCOUNT --repo $REPO --body \
-  "github-deploy@myboardgamecollection-494214.iam.gserviceaccount.com"
+  "github-deploy@your-gcp-project-id.iam.gserviceaccount.com"
 
 gh secret set GCP_RUNTIME_SERVICE_ACCOUNTS --repo $REPO --body \
-  "$(gcloud iam service-accounts list --project=myboardgamecollection-494214 \
+  "$(gcloud iam service-accounts list --project=your-gcp-project-id \
      --filter='email:run-' --format='value(email)' | tr '\n' ',' | sed 's/,$//')"
 
 # Cloudflare — from infra/environments/prod/terraform.tfvars
 gh secret set CLOUDFLARE_API_TOKEN --repo $REPO --body "<from terraform.tfvars>"
-gh secret set CLOUDFLARE_ACCOUNT_ID --repo $REPO --body "b54fbd0d522b22fc747619b57608bb72"
+gh secret set CLOUDFLARE_ACCOUNT_ID --repo $REPO --body "your-cloudflare-account-id"
 ```
 
 **Verify (names only — values are write-only by design):**
