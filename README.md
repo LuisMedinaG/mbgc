@@ -58,7 +58,7 @@ Single Go API service behind Cloudflare Pages frontend.
 
 ### Spec-Driven Development (acai.sh)
 
-This project uses [acai.sh](https://acai.sh) — a toolkit for spec-driven development. All features are specified in `features/*.feature.yaml`. Code references requirements via ACID tags in comments.
+This project uses [acai.sh](https://acai.sh) — a toolkit for spec-driven development. All features are specified in `features/*.feature.yaml`. Code references requirements via ACID tags in comments. View the dashboard at [app.acai.sh](https://app.acai.sh).
 
 **Install:**
 ```sh
@@ -81,15 +81,16 @@ npx @acai.sh/cli push --all                # sync specs + ACID refs to dashboard
 ```
 
 **Features:**
-| Feature | Description |
-|---|---|
-| [auth](features/auth.feature.yaml) | Login, JWT validation, token refresh, multi-tenancy |
-| [collection](features/collection.feature.yaml) | Game list/grid, search, filters, pagination |
-| [game-detail](features/game-detail.feature.yaml) | Detail view, player aids, rules URL, vibes, delete |
-| [vibes](features/vibes.feature.yaml) | Collection CRUD, game assignment, discover |
-| [importer](features/importer.feature.yaml) | BGG sync, CSV import, rate limiting |
-| [profile](features/profile.feature.yaml) | Profile view, BGG username, change password |
-| [api-layer](features/api-layer.feature.yaml) | Shared errors, envelope, middleware, config |
+| Feature | Requirements | Complete | Description |
+|---|---|---|---|
+| [api-layer](features/api-layer.feature.yaml) | 35 | **35** (100%) | Shared errors, envelope, middleware, config |
+| [auth](features/auth.feature.yaml) | 31 | **31** (100%) | Login, JWT validation, token refresh, multi-tenancy |
+| [profile](features/profile.feature.yaml) | 19 | **15** (79%) | Profile view, BGG username, change password |
+| [importer](features/importer.feature.yaml) | 28 | **13** (46%) | BGG sync, CSV import, rate limiting |
+| [game-detail](features/game-detail.feature.yaml) | 33 | **5** (15%) | Detail view, player aids, rules URL, vibes, delete |
+| [collection](features/collection.feature.yaml) | 26 | **0** (0%) | Game list/grid, search, filters, pagination |
+| [vibes](features/vibes.feature.yaml) | 19 | **0** (0%) | Collection CRUD, game assignment, discover |
+| **Total** | **191** | **99** (52%) | |
 
 **ACID format:** `<feature>.<COMPONENT>.<NUMBER>` (e.g. `auth.JWT_VALIDATION.1`)
 
