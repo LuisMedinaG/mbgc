@@ -1,0 +1,95 @@
+name: Drift Detection
+
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Every Monday 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write # required for WIF auth to GCP
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: detect drift (prod)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/prod
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+      TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      TF_VAR_supabase_access_token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+
+      - name: Write backend.hcl
+        run: |
+          printf 'bucket    = "mbgc-tfstate"\nendpoints = { s3 = "https://mlltpfszhtxhphoaeydh.storage.supabase.co/storage/v1/s3" }\n' > backend.hcl
+
+      - run: terraform init -backend-config=backend.hcl -input=false
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -detailed-exitcode -input=false -no-color > plan.txt 2>&1
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+          cat plan.txt
+          set -e
+
+      - name: Open or update drift issue
+        if: steps.plan.outputs.exitcode == '2'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan.txt', 'utf8').slice(0, 60000);
+            const date = new Date().toISOString().slice(0, 10);
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'drift',
+              state: 'open',
+            });
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.data[0].number,
+                body: `### Drift still present — ${date}\n\`\`\`hcl\n${plan}\n\`\`\``,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Terraform drift detected — ${date}`,
+                labels: ['drift'],
+                body: `Terraform detected out-of-band changes in prod.\n\n\`\`\`hcl\n${plan}\n\`\`\`\n\nResolve with \`terraform apply\` or update the config to match reality.`,
+              });
+            }
+
+      - name: Fail on drift
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          echo "Drift detected — see opened/updated issue."
+          exit 1

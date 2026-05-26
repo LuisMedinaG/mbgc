@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx @acai.sh/cli features --json 2>/dev/null || true",
+            "statusMessage": "Loading acai feature status..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx @acai.sh/cli push --all 2>/dev/null || true",
+            "statusMessage": "Syncing specs to acai dashboard..."
+          }
+        ]
+      }
+    ]
+  }
+}

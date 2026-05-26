@@ -1,0 +1,73 @@
+# api-layer.feature.yaml — Shared API Layer & Conventions
+feature:
+  name: api-layer
+  product: mbgc
+  description: |
+    Shared Go library (pkg/shared) providing error handling,
+    JSON envelope types, HTTP middleware, and context utilities.
+
+components:
+  APIERR:
+    name: Error sentinels
+    description: Typed error constants with machine-readable codes
+    requirements:
+      1: Defines sentinel errors for all HTTP error categories
+      2: Each sentinel implements an identifiable error interface
+      3: Provides Is* helper functions for type-checking errors
+      4: Errors wrap a machine-readable code in the error value
+      5: 100% unit test coverage for all sentinels and helpers
+
+  ENVELOPE:
+    name: JSON response envelope
+    description: Standard JSON wire format for all API responses
+    requirements:
+      1: Response[T] wraps single-item responses with data and optional meta code
+      2: ListResponse[T] wraps paginated lists with page, limit, total metadata
+      3: ErrorResponse wraps errors array with code, message, and optional details
+      4: "Constructors: New[T](data), NewList[T](data, page, limit, total), NewError(code, message, details...)"
+      5: 100% unit test coverage
+
+  HTTPX:
+    name: HTTP utilities
+    description: Middleware, JSON writers, and context helpers
+    requirements:
+      1: WriteJSON(w, status, v) sets content-type and writes JSON response
+      2: WriteError(w, err) maps sentinel errors to HTTP status codes
+      3: Chain helper composes multiple middleware handlers in order
+      4: SecurityHeaders sets nosniff, DENY framing, and CSP headers
+      5: CORS validates allowed origins and handles OPTIONS preflight
+      6: Recover catches panics with slog logging and returns 500
+      7: RequestID generates and attaches UUID to each request
+      8: Logger logs method, path, status, and latency via slog
+
+  CONTEXT:
+    name: Context helpers
+    description: Functions for reading user identity from request context
+    requirements:
+      1: SetGatewayUser stores userID, username, and isAdmin in context
+      2: UserIDFromContext retrieves the authenticated user UUID
+      3: UsernameFromContext retrieves the authenticated username
+      4: IsAdminFromContext retrieves the admin flag
+      5: RequestIDFromContext retrieves the per-request UUID
+      6: Missing context values return empty string or false
+
+  CONFIG:
+    name: Configuration loading
+    description: Server configuration from environment variables
+    requirements:
+      1: DATABASE_URL is required — server panics at startup if missing
+      2: SUPABASE_URL is required — server panics at startup if missing
+      3: PORT defaults to 8080 if not set
+      4: "ALLOWED_ORIGIN defaults to http://localhost:5173 if not set"
+      5: BGG_TOKEN and BGG_COOKIE are optional; importer disables sync if absent
+      6: SYNC_LIMIT_USER defaults to 3; SYNC_LIMIT_ADMIN defaults to 20
+
+constraints:
+  CODE:
+    name: Code style constraints
+    requirements:
+      1: All Go code uses slog for structured logging
+      2: Errors are wrapped with fmt.Errorf("%w", err)
+      3: Raw err.Error() is never returned to HTTP clients — apierr sentinels only
+      4: WriteJSON and WriteError are used exclusively for response serialization
+      5: User identity is extracted via httpx.UserIDFromContext

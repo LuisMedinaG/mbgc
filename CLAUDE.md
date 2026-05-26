@@ -1,59 +1,53 @@
-# mbgc — Ecosystem Context
+@AGENTS.md
 
-Personal board game collection app. Originally a Go monolith (`myboardgamecollection`),
-being decomposed into focused microservices. Both coexist during migration.
+# mbgc — Monorepo
 
-## Services
+Personal board game collection app. Consolidated Go API + React frontend.
 
-| Repo | Lang | Role | Deploy |
-|---|---|---|---|
-| `myboardgamecollection` | Go | Monolith (HTMX + REST API) — full feature set | GCP Cloud Run |
-| `mbgc-gateway` | Go | API gateway — JWT validation, routing, CORS | GCP Cloud Run |
-| `mbgc-auth-service` | Go | Profile service — BGG username, quotas, admin roles (Supabase auth) | GCP Cloud Run |
-| `mbgc-game-service` | Go | Core domain — games, collections, player aids, file uploads | GCP Cloud Run |
-| `mbgc-importer-service` | Go | BGG sync + CSV import | GCP Cloud Run |
-| `mbgc-web` | TypeScript | React frontend | Cloudflare Pages |
-| `mbgc-shared` | Go | Shared module — response envelope, error codes, HTTP middleware | (library) |
-| `mbgc-infra` | HCL | Terraform IaC — GCP, Cloudflare, Supabase | — |
-      
+## Directory Structure
+
+```
+mbgc/
+├── pkg/shared/          Go shared library (envelope, apierr, httpx)
+├── services/
+│   └── api/             Single consolidated Go API (auth, games, collections, importer, profile)
+├── web/                 React + Vite + TypeScript + Tailwind
+├── infra/               Terraform — GCP Cloud Run, Cloudflare, Supabase
+│   └── scripts/
+│       ├── bootstrap.sh       one-time infra provisioning + GitHub secrets sync
+│       └── rotate-secrets.sh  secret rotation (cloudflare | supabase | api | all)
+├── scripts/             Operational scripts (admin user provisioning)
+└── SETUP.md             Canonical first-time setup guide (local + prod)
+```
+
 ## Request Flow
 
 ```
-Browser / mbgc-web
+Browser / web
       │
       ▼
-mbgc-gateway  (validates JWT, routes by path prefix)
-      ├──▶ mbgc-auth-service     /auth/*  /profile/*
-      ├──▶ mbgc-game-service     /games/* /collections/* /player-aids/*
-      └──▶ mbgc-importer-service /import/*
+services/api  (JWT validation via JWKS + all route handlers)
+  /api/v1/auth/*         auth ping
+  /api/v1/profile/*      user profile, BGG username
+  /api/v1/games/*        games, collections, player aids
+  /api/v1/collections/*  vibes/collections CRUD
+  /api/v1/import/*       BGG sync, CSV import
+  /healthz               health check
 ```
 
-The monolith (`myboardgamecollection`) runs independently and is not behind the gateway.
+JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
 
-## Shared Conventions
+## CI/CD
 
-- **Language:** Go 1.25 (services) · TypeScript / React (web)
-- **Auth:** JWT — access tokens (15 min), refresh tokens (30 day)
-- **Response envelope:** `{ "data": ... }` success · `{ "error": { "code": "...", "message": "..." } }` failure
-- **Pagination:** `{ "data": [...], "meta": { "page": 1, "limit": 20, "total": N } }` on list responses
-- **Errors:** sentinel errors in `mbgc-shared` — never leak raw DB errors to clients
-- **DB:** SQLite (`modernc.org/sqlite`) in monolith; services may use Postgres via Supabase
-
-## Branching Strategy (all repos)
-
-```
-feature/*  →  dev  →  staging  →  main
-```
-
-Promotion: `dev → staging` and `staging → main` require PRs.
-Direct push to `main`/`staging` is blocked (admin bypass exists for emergencies).
+- **CI** — `.github/workflows/ci.yml`: build + test + vet, web lint/build, infra lint
+- **Deploy** — `.github/workflows/deploy.yml`: deploys `services/api` on push to `main`
+- **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR, `terraform apply` on merge to `main`
+- **Secrets** — `infra/scripts/bootstrap.sh` provisions infra + syncs secrets to GitHub Actions
+- **Rotation** — `make rotate-secrets` or `infra/scripts/rotate-secrets.sh` to rotate any secret group
 
 ## Infrastructure
 
-- **GCP Cloud Run** — all Go services; deploy via GCP Workload Identity (see `set-deploy-secrets.sh`)
-- **Cloudflare Pages** — `mbgc-web` frontend
-- **Supabase** — auth provider for microservices
-- **Terraform** — `mbgc-infra` is the single source of truth for all cloud resources
-
-<claude-mem-context>
-</claude-mem-context>
+- **GCP Cloud Run** — `mbgc-api` single service (`services/api`)
+- **Cloudflare Pages** — `web/` frontend
+- **Supabase** — auth provider + Postgres (migrations in `services/api/migrations/`)
+- **Terraform** — `infra/` is the single source of truth (no Fly.io)

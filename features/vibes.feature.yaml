@@ -1,0 +1,52 @@
+# vibes.feature.yaml — Collections ("Vibes") Management
+feature:
+  name: vibes
+  product: mbgc
+  description: |
+    Custom game collections called "vibes". Create, rename, delete
+    collections. Browse games by collection. Assign games to collections.
+
+components:
+  LIST:
+    name: List collections
+    description: Browse and view user's custom collections
+    requirements:
+      1: GET /api/v1/collections returns all collections for the authenticated user
+      2: Each collection is displayed as a color-coded pill on the Vibes page
+      3: Each pill shows the collection name and game count
+      4: Clicking a collection pill navigates to a filtered view of games in that collection
+      5: Collections are unique by name per user
+
+  CRUD:
+    name: Collection CRUD
+    description: Create, rename, and delete collections
+    requirements:
+      1: Create collection via POST /api/v1/collections with {name, description?}
+      2: Collection name is required; duplicate names per user return 409 Conflict
+      3: Update/rename collection via PUT /api/v1/collections/{id}
+      4: Delete collection via DELETE /api/v1/collections/{id}
+      5: Deleting a collection cascade-removes entries from collection_games join table
+      6: Vibes page has a "manage" mode toggle for rename/delete actions
+
+  ASSIGN:
+    name: Assign games to collections
+    description: Add/remove games from collections
+    requirements:
+      1: POST /api/v1/games/{id}/collections accepts a JSON array of collection IDs
+      2: Replaces the entire set of collection assignments for the game (not additive)
+      3: Game detail page shows a checklist UI for assigning/unassigning vibes
+      4: Game list items in list view show vibe pills for assigned collections
+
+  DISCOVER:
+    name: Discover games within collections
+    description: Filter and browse games within a specific collection
+    requirements:
+      1: GET /api/v1/discover returns games filtered by collection ID
+      2: Supports the same filter parameters as GET /api/v1/games (search, category, page, limit)
+      3: Response includes total count matching the filtered query
+
+constraints:
+  BULK:
+    name: Bulk collection operations
+    requirements:
+      1: POST /api/v1/games/bulk-collections supports adding multiple games to collections at once

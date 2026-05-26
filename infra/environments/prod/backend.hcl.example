@@ -1,0 +1,11 @@
+# Copy to backend.hcl (gitignored) and fill in values.
+# Pass to terraform init:
+#   terraform init -backend-config=backend.hcl
+#
+# Credentials come from env vars:
+#   AWS_ACCESS_KEY_ID     = Supabase S3 access key ID
+#   AWS_SECRET_ACCESS_KEY = Supabase S3 secret access key
+#   (from Supabase dashboard → Storage → S3 Connection)
+
+bucket    = "mbgc-tfstate"
+endpoints = { s3 = "https://mlltpfszhtxhphoaeydh.storage.supabase.co/storage/v1/s3" }

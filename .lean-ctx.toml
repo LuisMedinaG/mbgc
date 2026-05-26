@@ -1,0 +1,21 @@
+# lean-ctx project-local config — committed, applies to all contributors
+# Docs: https://leanctx.com/docs/configuration/
+
+extra_ignore_patterns = [
+  "web/node_modules/**",
+  "web/dist/**",
+  "web/.vite/**",
+  "infra/.terraform/**",
+  "infra/.terraform.lock.hcl",
+  "**/vendor/**",
+  "services/monolith/**",    # deprecated, being decommissioned
+  "**/*.pb.go",              # generated protobuf (if added later)
+]
+
+redirect_exclude = [
+  ".lean-ctx/**",
+  ".claude/**",
+  "*.json",
+  "AGENTS.md",
+  "CLAUDE.md",
+]

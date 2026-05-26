@@ -1,0 +1,91 @@
+name: Deploy to Cloud Run
+
+on:
+  workflow_call:
+    inputs:
+      service_name:
+        description: Cloud Run service name (must match Terraform-managed service).
+        required: true
+        type: string
+      region:
+        description: GCP region.
+        required: false
+        type: string
+        default: us-central1
+      dockerfile:
+        description: Path to Dockerfile.
+        required: false
+        type: string
+        default: Dockerfile
+      context:
+        description: Docker build context.
+        required: false
+        type: string
+        default: .
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: true
+      GCP_SERVICE_ACCOUNT:
+        required: true
+      GCP_PROJECT_ID:
+        required: true
+      GCP_RUNTIME_SERVICE_ACCOUNT:
+        required: true
+      DATABASE_URL:
+        required: true
+      SUPABASE_URL:
+        required: true
+      SUPABASE_SERVICE_ROLE_KEY:
+        required: false
+      ALLOWED_ORIGIN:
+        required: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ${{ inputs.region }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mbgc/${{ inputs.service_name }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+
+      - name: Build and push image
+        run: |
+          docker build -f "$DOCKERFILE" -t "$IMAGE" "$CONTEXT"
+          docker push "$IMAGE"
+        env:
+          DOCKERFILE: ${{ inputs.dockerfile }}
+          CONTEXT: ${{ inputs.context }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --image "$IMAGE" \
+            --region "$REGION" \
+            --project "$PROJECT" \
+            --service-account "$RUNTIME_SA" \
+            --update-env-vars "DATABASE_URL=$DATABASE_URL,SUPABASE_URL=$SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY,ALLOWED_ORIGIN=$ALLOWED_ORIGIN" \
+            --quiet
+        env:
+          SERVICE: ${{ inputs.service_name }}
+          REGION: ${{ inputs.region }}
+          PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+          RUNTIME_SA: ${{ secrets.GCP_RUNTIME_SERVICE_ACCOUNT }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}

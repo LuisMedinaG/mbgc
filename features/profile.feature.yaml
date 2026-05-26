@@ -1,0 +1,52 @@
+# profile.feature.yaml — Profile Management
+feature:
+  name: profile
+  product: mbgc
+  description: |
+    User profile management including BGG username configuration
+    and password changes.
+
+components:
+  VIEW:
+    name: View profile
+    description: Display user profile information
+    requirements:
+      1: GET /api/v1/profile returns the user's profile (lazy-upsert on first access)
+      2: Displays the Supabase username (from user_metadata)
+      3: Displays the configured BGG username (editable)
+      4: Shows account information read from Supabase Auth metadata
+
+  BGG_USERNAME:
+    name: BGG username management
+    description: Set and update the user's BoardGameGeek username
+    requirements:
+      1: PUT /api/v1/profile/bgg-username updates the BGG username
+      2: BGG username is required for BGG sync operations
+      3: Username can be empty/null to clear the setting
+      4: Update is scoped to authenticated user via JWT user_id
+
+  CHANGE_PASSWORD:
+    name: Change password
+    description: Allow users to change their Supabase Auth password
+    requirements:
+      1: Change password form requires current password and new password
+      2: Validates new password meets minimum length requirement
+      3: Calls Supabase Auth API to update the password
+      4: On success, shows confirmation; on failure, shows error without leaking details
+
+  ADMIN:
+    name: Admin flag
+    description: Admin user identification
+    requirements:
+      1: is_admin flag is stored in profile.users table
+      2: is_admin is also stored in Supabase app_metadata for JWT inclusion
+      3: Admin check is available via httpx.IsAdminFromContext(ctx)
+      4: Admin users have elevated rate limits for BGG sync
+      5: Only admins can trigger full-refresh BGG syncs
+
+constraints:
+  SEC:
+    name: Security constraints
+    requirements:
+      1: Password changes must NOT log plaintext passwords
+      2: BGG username must be sanitized before storage

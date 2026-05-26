@@ -1,0 +1,174 @@
+name: Terraform
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "environments/**"
+      - "modules/**"
+      - ".github/workflows/terraform.yml"
+  push:
+    branches: [main]
+    paths:
+      - "environments/**"
+      - "modules/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write # required for WIF auth to GCP
+
+concurrency:
+  group: terraform-prod
+  cancel-in-progress: false
+
+env:
+  TF_VERSION: 1.14.8
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  AWS_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+  TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  TF_VAR_cloudflare_account_id: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+  TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+  TF_VAR_supabase_access_token: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - run: terraform fmt -check -recursive .
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.52.0
+      - run: tflint --init
+      - run: tflint --recursive --format=compact
+
+  security:
+    name: security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          soft_fail: false
+
+  plan:
+    name: plan (prod)
+    if: github.event_name == 'pull_request'
+    needs: [fmt, lint, security]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: environments/prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Write backend.hcl
+        run: |
+          printf 'bucket    = "mbgc-tfstate"\nendpoints = { s3 = "https://mlltpfszhtxhphoaeydh.storage.supabase.co/storage/v1/s3" }\n' > backend.hcl
+
+      - run: terraform init -backend-config=backend.hcl -input=false
+      - run: terraform validate
+
+      - id: plan
+        # Exit codes: 0 = no changes, 1 = error, 2 = changes. Treat 0/2 as success.
+        run: |
+          set +e
+          terraform plan -input=false -no-color -detailed-exitcode -out=tfplan
+          code=$?
+          echo "exitcode=$code" >> "$GITHUB_OUTPUT"
+          [ "$code" = "1" ] && exit 1 || exit 0
+
+      - id: show
+        run: terraform show -no-color tfplan
+
+      - name: Comment plan on PR
+        uses: actions/github-script@v7
+        env:
+          PLAN_OUTPUT: ${{ steps.show.outputs.stdout }}
+        with:
+          script: |
+            const raw = process.env.PLAN_OUTPUT || '';
+            const LIMIT = 60000;
+            const plan = raw.length > LIMIT
+              ? raw.slice(0, LIMIT) + '\n\n… truncated, see job logs for full plan.'
+              : raw;
+            const body = "<!-- terraform-plan -->\n### Terraform plan\n```hcl\n" + plan + "\n```";
+            const comments = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const prior = comments.data.find(c => c.body.includes("<!-- terraform-plan -->"));
+            if (prior) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: prior.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            }
+
+  apply:
+    name: apply (prod)
+    # Explicit parens: push-to-main OR manual dispatch.
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch' }}
+    needs: [fmt, lint, security]
+    runs-on: ubuntu-latest
+    # Configure a "production" Environment in repo settings with required
+    # reviewers so apply cannot run without human approval.
+    environment: production
+    defaults:
+      run:
+        working-directory: environments/prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_TERRAFORM_SERVICE_ACCOUNT }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Write backend.hcl
+        run: |
+          printf 'bucket    = "mbgc-tfstate"\nendpoints = { s3 = "https://mlltpfszhtxhphoaeydh.storage.supabase.co/storage/v1/s3" }\n' > backend.hcl
+
+      - run: terraform init -backend-config=backend.hcl -input=false
+      - run: terraform plan -input=false -out=tfplan
+      - run: terraform apply -input=false -auto-approve tfplan
+
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Smoke tests
+        working-directory: ${{ github.workspace }}
+        run: sh scripts/smoke.sh

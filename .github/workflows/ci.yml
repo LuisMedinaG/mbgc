@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  branch-name:
+    name: Branch Name Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Enforce merge path rules
+        run: |
+          branch="${{ github.head_ref }}"
+          target="${{ github.base_ref }}"
+
+          if [ "$target" = "main" ]; then
+            # Only dev → main is allowed
+            if [ "$branch" = "dev" ]; then
+              echo "✓ '$branch' → '$target' allowed"
+            else
+              echo "✗ Only 'dev' can merge into 'main' (got '$branch')"
+              echo "  Open a PR from '$branch' into 'dev' first."
+              exit 1
+            fi
+
+          elif [ "$target" = "dev" ]; then
+            # Must use an allowed prefix
+            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
+              echo "✓ '$branch' → '$target' allowed"
+            else
+              echo "✗ Branch '$branch' cannot merge into 'dev'"
+              echo "  Rename to one of: feature/ fix/ bug/ chore/ refactor/ hotfix/"
+              echo "  Example: feature/add-game-search"
+              exit 1
+            fi
+          fi
+
+  go-build:
+    name: Go Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+          cache: true
+
+      - name: Build
+        run: |
+          go build ./pkg/shared/...
+          go build ./services/api/...
+
+      - name: Test
+        run: |
+          go test ./pkg/shared/... -cover
+          go test ./services/api/... -cover
+
+      - name: Vet
+        run: |
+          go vet ./pkg/shared/...
+          go vet ./services/api/...
+
+  web-build:
+    name: Web Build & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: web
+
+      - name: Lint
+        run: bun run lint
+        working-directory: web
+
+      - name: Build
+        run: bun run build
+        working-directory: web
+        env:
+          VITE_API_BASE_URL: ""
+
+  infra-lint:
+    name: Infra Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.52.0
+
+      - name: TFLint
+        run: tflint --chdir=infra --recursive
