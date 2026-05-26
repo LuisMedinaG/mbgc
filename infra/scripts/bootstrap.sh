@@ -196,6 +196,15 @@ set_secret CLOUDFLARE_API_TOKEN   "$CLOUDFLARE_API_TOKEN"
 set_secret CLOUDFLARE_ACCOUNT_ID  "$CF_ACCOUNT_ID"
 
 ###############################################################################
+# Sync GitHub secrets — Terraform backend (needed by infra.yml CI workflow)
+###############################################################################
+
+printf '\nSyncing Terraform backend secrets on %s...\n' "$REPO"
+
+set_secret TF_BACKEND_ACCESS_KEY  "$S3_ACCESS_KEY_ID"
+set_secret TF_BACKEND_SECRET_KEY  "$S3_SECRET_ACCESS_KEY"
+
+###############################################################################
 # Terraform init
 ###############################################################################
 

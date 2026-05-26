@@ -11,14 +11,16 @@ Terraform source of truth for all mbgc cloud infrastructure. One change = one PR
 ## Layout
 
 ```
-environments/prod/      # root module — prod is the only env
-  main.tf               # resource declarations
-  variables.tf
-  versions.tf           # provider pins + S3 backend config
-  providers.tf
-  outputs.tf
-  terraform.tfvars      # gitignored — written by bootstrap.sh
-  backend.hcl           # gitignored — written by bootstrap.sh
+environments/
+  prod/                 # production root module
+    main.tf             # resource declarations
+    variables.tf
+    versions.tf         # provider pins + S3 backend config (key: prod/terraform.tfstate)
+    providers.tf
+    outputs.tf
+    terraform.tfvars    # gitignored — written by bootstrap.sh
+    backend.hcl         # gitignored — written by bootstrap.sh
+  dev/                  # dev root module (planned — mirrors prod with cheaper defaults)
 modules/
   cloud-run/            # reusable: google_cloud_run_v2_service + IAM
   cloudflare-pages/     # reusable: cloudflare_pages_project
@@ -64,7 +66,15 @@ sh scripts/bootstrap.sh
 
 Idempotent. Run **twice** on first setup: once before `apply` (creates GCP SA + writes local credential files), once after (reads terraform outputs → syncs all GCP deploy secrets to `LuisMedinaG/mbgc`).
 
-Post-apply, the script pushes these secrets to GitHub Actions:
+The script pushes these secrets to GitHub Actions:
+
+On first run (before `apply`):
+- `CLOUDFLARE_API_TOKEN` — Cloudflare deploy token
+- `CLOUDFLARE_ACCOUNT_ID` — Cloudflare account
+- `TF_BACKEND_ACCESS_KEY` — Supabase S3 access key ID (for `infra.yml` CI workflow)
+- `TF_BACKEND_SECRET_KEY` — Supabase S3 secret access key (for `infra.yml` CI workflow)
+
+Post-apply (re-run after `terraform apply`):
 - `GCP_WORKLOAD_IDENTITY_PROVIDER` — WIF provider for GitHub OIDC token exchange
 - `GCP_SERVICE_ACCOUNT` — deploy service account email
 - `GCP_PROJECT_ID` — GCP project ID
@@ -74,10 +84,9 @@ IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.servi
 
 ## CI
 
-Terraform changes are **applied manually** — there is no automated `terraform apply` workflow.
-
-- **`ci.yml`** (root monorepo) — on PR/push: `terraform fmt -check -recursive` + `tflint` for lint gates only. Does not plan or apply.
-- **No `terraform.yml` or `drift.yml`** — these were planned but not implemented. Apply manually via `terraform plan && terraform apply` from `environments/prod/`.
+- **`ci.yml`** (root monorepo) — on PR touching `infra/**`: `terraform fmt -check -recursive` + `tflint`. Lint only, never applies.
+- **`infra.yml`** (planned) — `terraform plan` on PR, `terraform apply` on merge to `main`. Uses `TF_BACKEND_ACCESS_KEY`/`TF_BACKEND_SECRET_KEY` secrets + WIF for GCP. Apply is gated behind a GitHub Environment protection rule.
+- Until `infra.yml` exists: apply manually via `terraform plan && terraform apply` from `environments/prod/`.
 
 ## Tests
 

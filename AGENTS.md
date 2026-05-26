@@ -131,11 +131,17 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 ## Git Workflow
 
 ```
-feature/*  →  dev  →  staging  →  main
+feature/*
+fix/*        →  dev  ──PR──▶  main
+chore/*
+refactor/*
 ```
-- Branch from `dev`, not `main`
+
+- **Branch from `dev`**, never from `main`
+- **Prefix rules:** use `feature/*`, `fix/*`, `chore/*`, or `refactor/*` — **never `claude/*`**
+- All PRs target `dev`; `dev → main` is the release gate (branch protection enforced)
 - Commit subject: imperative present tense, 50-char max (`fix: ...`, `add: ...`, `remove: ...`)
-- All promotions (`dev → staging`, `staging → main`) require a PR + passing CI
+- All merges to `dev` and `main` require a PR + passing CI
 
 ## Boundaries
 
@@ -153,7 +159,7 @@ feature/*  →  dev  →  staging  →  main
 - Schema changes (migrations in `services/api/migrations/`)
 
 **Never:**
-- Push directly to `main` or `staging`
+- Push directly to `main` or `dev`
 - Query user-owned data without a `user_id` WHERE clause
 - Expose raw `err.Error()` from DB or internal code to HTTP responses
 - Commit secrets, `.env` files, or service account credentials
