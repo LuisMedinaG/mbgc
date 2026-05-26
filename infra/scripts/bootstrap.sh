@@ -165,6 +165,40 @@ use_or_prompt CLOUDFLARE_ZONE_ID \
   "${CLOUDFLARE_ZONE_ID:-}" \
   ""
 
+printf '\n'
+printf 'Prod API credentials (Supabase dashboard → Settings → Database / API):\n'
+use_or_prompt_secret API_DATABASE_URL \
+  "Prod DATABASE_URL (Settings → Database → URI, port 5432)" \
+  "${API_DATABASE_URL:-}"
+use_or_prompt API_SUPABASE_URL \
+  "Prod SUPABASE_URL" \
+  "${API_SUPABASE_URL:-}" \
+  "https://${SUPABASE_PROJECT_REF}.supabase.co"
+use_or_prompt_secret API_SUPABASE_SERVICE_ROLE_KEY \
+  "Prod service_role key (Settings → API Keys → Legacy → service_role)" \
+  "${API_SUPABASE_SERVICE_ROLE_KEY:-}"
+use_or_prompt API_ALLOWED_ORIGIN \
+  "Prod ALLOWED_ORIGIN (frontend URL, e.g. https://lumedina.dev)" \
+  "${API_ALLOWED_ORIGIN:-}" \
+  "https://${DOMAIN}"
+
+printf '\n'
+printf 'Dev API credentials (your dev Supabase project):\n'
+use_or_prompt_secret DEV_API_DATABASE_URL \
+  "Dev DATABASE_URL (Settings → Database → URI, port 5432)" \
+  "${DEV_API_DATABASE_URL:-}"
+use_or_prompt DEV_API_SUPABASE_URL \
+  "Dev SUPABASE_URL" \
+  "${DEV_API_SUPABASE_URL:-}" \
+  ""
+use_or_prompt_secret DEV_API_SUPABASE_SERVICE_ROLE_KEY \
+  "Dev service_role key (Settings → API Keys → Legacy → service_role)" \
+  "${DEV_API_SUPABASE_SERVICE_ROLE_KEY:-}"
+use_or_prompt DEV_API_ALLOWED_ORIGIN \
+  "Dev ALLOWED_ORIGIN (dev frontend URL, or * to allow all)" \
+  "${DEV_API_ALLOWED_ORIGIN:-}" \
+  "*"
+
 ###############################################################################
 # Write local credential files
 ###############################################################################
@@ -214,6 +248,24 @@ printf '\nSyncing Terraform provider secrets on %s...\n' "$REPO"
 
 set_secret TF_VAR_CLOUDFLARE_ZONE_ID    "$CLOUDFLARE_ZONE_ID"
 set_secret TF_VAR_SUPABASE_ACCESS_TOKEN "$SUPABASE_ACCESS_TOKEN"
+
+###############################################################################
+# Sync GitHub secrets — API runtime (needed by deploy.yml for Cloud Run env vars)
+###############################################################################
+
+printf '\nSyncing prod API secrets on %s...\n' "$REPO"
+
+set_secret API_DATABASE_URL              "$API_DATABASE_URL"
+set_secret API_SUPABASE_URL             "$API_SUPABASE_URL"
+set_secret API_SUPABASE_SERVICE_ROLE_KEY "$API_SUPABASE_SERVICE_ROLE_KEY"
+set_secret API_ALLOWED_ORIGIN           "$API_ALLOWED_ORIGIN"
+
+printf '\nSyncing dev API secrets on %s...\n' "$REPO"
+
+set_secret DEV_API_DATABASE_URL              "$DEV_API_DATABASE_URL"
+set_secret DEV_API_SUPABASE_URL             "$DEV_API_SUPABASE_URL"
+set_secret DEV_API_SUPABASE_SERVICE_ROLE_KEY "$DEV_API_SUPABASE_SERVICE_ROLE_KEY"
+set_secret DEV_API_ALLOWED_ORIGIN           "$DEV_API_ALLOWED_ORIGIN"
 
 ###############################################################################
 # Terraform init
