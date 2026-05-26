@@ -20,11 +20,17 @@ func NewHandler(svc *Service, limitUser, limitAdmin int) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
+	// ref: importer.BGG_SYNC.1 — POST /api/v1/import/sync
 	mux.Handle("POST /api/v1/import/sync", auth(http.HandlerFunc(h.Sync)))
+	// ref: importer.CSV_IMPORT.2 — POST /api/v1/import/csv/preview
 	mux.Handle("POST /api/v1/import/csv/preview", auth(http.HandlerFunc(h.CSVPreview)))
+	// ref: importer.CSV_IMPORT.7 — POST /api/v1/import/csv
 	mux.Handle("POST /api/v1/import/csv", auth(http.HandlerFunc(h.CSVImport)))
 }
 
+// ref: importer.BGG_SYNC.9 — admin-only full refresh mode
+// ref: importer.BGG_SYNC.4 — rate-limited syncs per user
+// ref: importer.BGG_SYNC.8 — returns SyncResult with counts
 func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
@@ -44,6 +50,9 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, envelope.New(result))
 }
 
+// ref: importer.CSV_IMPORT.2 — multipart form upload
+// ref: importer.CSV_IMPORT.3 — auto-detects BGG ID column header
+// ref: importer.CSV_IMPORT.4 — returns up to 100 preview rows
 func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
@@ -65,6 +74,9 @@ func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(rows, 1, len(rows), len(rows)))
 }
 
+// ref: importer.CSV_IMPORT.7 — JSON body with bgg_ids array
+// ref: importer.CSV_IMPORT.8 — deduplicates by BGG ID
+// ref: importer.CSV_IMPORT.9 — returns import count results
 func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {

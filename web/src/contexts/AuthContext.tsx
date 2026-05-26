@@ -24,9 +24,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokens.getAccess() ? { username: '' } : null,
   )
   const [loading, setLoading] = useState(!tokens.getAccess())
+  // ref: auth.TOKEN_REFRESH.4 — refresh failure clears tokens and redirects to /login
   const navigate = useNavigate()
 
   useEffect(() => {
+    // ref: auth.TOKEN_REFRESH.1 — 401 triggers token refresh
     setOnAuthFailure(() => {
       setUser(null)
       navigate('/login', { replace: true })

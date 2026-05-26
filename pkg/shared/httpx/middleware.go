@@ -12,6 +12,7 @@ import (
 )
 
 // Chain applies middlewares to h in order — first middleware is outermost.
+// ref: api-layer.HTTPX.3 — composes middleware handlers in order
 //
 //	httpx.Chain(router, httpx.Logger, httpx.RequestID, httpx.Recover)
 //	// executes: Logger → RequestID → Recover → router
@@ -23,6 +24,7 @@ func Chain(h http.Handler, mw ...func(http.Handler) http.Handler) http.Handler {
 }
 
 // SecurityHeaders adds standard security response headers.
+// ref: api-layer.HTTPX.4 — nosniff, DENY framing, CSP
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -35,8 +37,7 @@ func SecurityHeaders(next http.Handler) http.Handler {
 }
 
 // CORS applies CORS headers for the given list of allowed origins.
-// If the request Origin matches an entry in allowedOrigins it is echoed back;
-// otherwise the header is omitted (browser will block the request).
+// ref: api-layer.HTTPX.5 — validates allowed origins, handles OPTIONS
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	allowed := make(map[string]struct{}, len(allowedOrigins))
 	for _, o := range allowedOrigins {
@@ -62,6 +63,7 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 }
 
 // Recover catches panics, logs the stack trace, and returns 500.
+// ref: api-layer.HTTPX.6 — catches panics, logs via slog, returns 500
 func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -79,7 +81,7 @@ func Recover(next http.Handler) http.Handler {
 }
 
 // RequestID injects a unique request ID into context and the X-Request-ID response header.
-// Propagates an existing X-Request-ID from the client if present (useful for distributed tracing).
+// ref: api-layer.HTTPX.7 — generates and attaches UUID to each request
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-ID")
@@ -92,6 +94,7 @@ func RequestID(next http.Handler) http.Handler {
 }
 
 // Logger logs method, path, status, and latency via slog structured logging.
+// ref: api-layer.HTTPX.8 — logs method, path, status, latency via slog
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

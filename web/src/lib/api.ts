@@ -3,6 +3,8 @@ import type { Game } from '../types/game'
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? '') + '/api/v1'
 
 // ── Token storage ──────────────────────────────────────────────────────────────
+// ref: auth.LOGIN.3 — access/refresh tokens stored in localStorage
+// ref: auth.TOKEN_REFRESH.4 — tokens cleared on auth failure
 const ACCESS_KEY  = 'mbgc_access'
 const REFRESH_KEY = 'mbgc_refresh'
 
@@ -35,6 +37,9 @@ let onAuthFailureCb: (() => void) | null = null
 export function setOnAuthFailure(cb: () => void) { onAuthFailureCb = cb }
 
 // ── Core fetch with auto-refresh ───────────────────────────────────────────────
+// ref: auth.TOKEN_REFRESH.1 — on 401, uses refresh token to get new access token
+// ref: auth.TOKEN_REFRESH.2 — retries original request with new access token
+// ref: auth.TOKEN_REFRESH.3 — coalesces concurrent refresh attempts
 let refreshPromise: Promise<void> | null = null
 
 function ensureRefreshPromise(refreshToken: string): Promise<void> {

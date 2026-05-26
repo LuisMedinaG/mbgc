@@ -19,6 +19,8 @@ const EMPTY_FILTERS: FilterState = {
 }
 
 export default function CollectionPage() {
+  // ref: collection.GAME_LIST.2 — full-text search support
+  // ref: collection.GAME_LIST.3 — list/grid view toggle
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const { games, total, categories, loading, error, fetchGames } = useGames()

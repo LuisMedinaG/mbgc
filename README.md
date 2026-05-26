@@ -56,6 +56,43 @@ Single Go API service behind Cloudflare Pages frontend.
 
 **Auth flow:** Supabase issues JWTs → `services/api` validates on every request via JWKS → extracts user identity into request context.
 
+### Spec-Driven Development (acai.sh)
+
+This project uses [acai.sh](https://acai.sh) — a toolkit for spec-driven development. All features are specified in `features/*.feature.yaml`. Code references requirements via ACID tags in comments.
+
+**Install:**
+```sh
+npm install --save-dev @acai.sh/cli
+# or: bun add --dev @acai.sh/cli
+```
+
+**Authenticate** — create a team at https://app.acai.sh, then save your token:
+```sh
+# add to .env:
+ACAI_API_TOKEN=at_your_secret_team_token
+```
+
+**Common commands:**
+```sh
+npx @acai.sh/cli skill                    # learn the spec-driven workflow
+npx @acai.sh/cli features --json           # list all features + status
+npx @acai.sh/cli feature auth --json       # inspect a feature in detail
+npx @acai.sh/cli push --all                # sync specs + ACID refs to dashboard
+```
+
+**Features:**
+| Feature | Description |
+|---|---|
+| [auth](features/auth.feature.yaml) | Login, JWT validation, token refresh, multi-tenancy |
+| [collection](features/collection.feature.yaml) | Game list/grid, search, filters, pagination |
+| [game-detail](features/game-detail.feature.yaml) | Detail view, player aids, rules URL, vibes, delete |
+| [vibes](features/vibes.feature.yaml) | Collection CRUD, game assignment, discover |
+| [importer](features/importer.feature.yaml) | BGG sync, CSV import, rate limiting |
+| [profile](features/profile.feature.yaml) | Profile view, BGG username, change password |
+| [api-layer](features/api-layer.feature.yaml) | Shared errors, envelope, middleware, config |
+
+**ACID format:** `<feature>.<COMPONENT>.<NUMBER>` (e.g. `auth.JWT_VALIDATION.1`)
+
 ---
 
 ## Prerequisites
@@ -552,6 +589,8 @@ mbgc/
 │   ├── deploy.yml
 │   └── deploy-cloud-run.yml
 ├── go.work                    # Go workspace
+├── features/                  # acai.sh feature specs
+├── .acai/                     # acai CLI config
 ├── Makefile                   # Root convenience commands
 ├── AGENTS.md                  # AI agent operating rules
 └── CLAUDE.md                  # Claude AI context

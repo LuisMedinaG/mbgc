@@ -15,8 +15,8 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-// supabaseAudience is the expected aud claim for user access tokens.
-// anon/service_role API keys use other roles and are intentionally rejected.
+// sub: auth.JWT_VALIDATION.7 — validates aud claim = "authenticated"
+// sub: auth.JWT_VALIDATION.8 — rejects anon/service_role API keys
 const supabaseAudience = "authenticated"
 
 type claims struct {
@@ -54,6 +54,10 @@ type Verifier struct {
 }
 
 // NewVerifier initialises the JWKS client and returns a ready Verifier.
+// ref: auth.JWT_VALIDATION.1 — fetches JWKS at boot
+// ref: auth.JWT_VALIDATION.2 — auto-refreshes via keyfunc/v3
+// ref: auth.JWT_VALIDATION.3 — validates ES256/RS256 signatures
+// ref: auth.JWT_VALIDATION.4 — optional HS256 legacy fallback
 func NewVerifier(ctx context.Context, supabaseURL, jwtSecret string) (*Verifier, error) {
 	issuer := strings.TrimSuffix(supabaseURL, "/") + "/auth/v1"
 	jwksURL := issuer + "/.well-known/jwks.json"
@@ -83,6 +87,9 @@ func NewVerifier(ctx context.Context, supabaseURL, jwtSecret string) (*Verifier,
 	return &Verifier{keyfunc: kf, issuer: issuer}, nil
 }
 
+// ref: auth.JWT_VALIDATION.5 — validates exp claim
+// ref: auth.JWT_VALIDATION.6 — validates iss claim
+// ref: auth.JWT_VALIDATION.7 — validates aud claim
 func (v *Verifier) parse(tokenStr string) (*claims, error) {
 	token, err := jwtlib.ParseWithClaims(tokenStr, &claims{}, v.keyfunc,
 		jwtlib.WithValidMethods([]string{"ES256", "RS256", "HS256"}),
@@ -101,6 +108,9 @@ func (v *Verifier) parse(tokenStr string) (*claims, error) {
 }
 
 // RequireAuth is middleware that validates the Bearer JWT and populates context.
+// ref: auth.JWT_VALIDATION.9 — extracts user identity into request context
+// ref: auth.JWT_VALIDATION.10 — returns 401 for any validation failure
+// ref: profile.ADMIN.3 — admin flag available via httpx.IsAdminFromContext
 func (v *Verifier) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")

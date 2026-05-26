@@ -1,0 +1,71 @@
+# game-detail.feature.yaml — Game Detail Page
+feature:
+  name: game-detail
+  product: mbgc
+  description: |
+    Individual game detail view showing metadata, player aids,
+    collection assignments (vibes), rulebook URL, and delete action.
+
+components:
+  DETAIL_VIEW:
+    name: Game detail display
+    description: Full game detail page at /games/:id
+    requirements:
+      1: Fetches single game from GET /api/v1/games/{id} with collections and player aids
+      2: Displays hero image (large) at top of page
+      3: Shows game name, year published
+      4: Shows player count range (e.g. "2-4 players")
+      5: Shows playtime in minutes
+      6: Shows BGG complexity weight with label (light/medium/heavy)
+      7: Shows BGG average rating as star rating
+      8: Shows game description text
+      9: Renders type, category, and mechanic tags as colored chips
+      10: Shows language dependence level if available
+      11: Shows recommended player counts if available
+
+  PLAYER_AIDS:
+    name: Player aid image management
+    description: Upload, view, and delete player aid reference images per game
+    requirements:
+      1: Upload player aid images (PNG, JPEG, GIF, WebP) via POST /api/v1/games/{id}/player-aids
+      2: Each aid has a filename and optional text label
+      3: Displays player aid thumbnails in a horizontal strip below game details
+      4: Clicking a thumbnail opens a full-screen lightbox viewer
+      5: Lightbox supports keyboard navigation (left/right arrows, escape to close)
+      6: Delete a player aid via DELETE /api/v1/games/{id}/player-aids/{aid_id}
+      7: Player aid images are stored on disk in a configurable data directory
+
+  RULES_URL:
+    name: Rulebook URL editor
+    description: Inline editor for storing and validating Google Drive rulebook links
+    requirements:
+      1: Displays the current rulebook URL if set
+      2: Inline editing via PUT /api/v1/games/{id}/rules-url
+      3: Validates URL — must be https://drive.google.com/ or https://docs.google.com/
+      4: Shows edit/save/cancel states inline without page navigation
+      5: Shows validation error for non-Google Drive/Docs URLs
+
+  VIBE_ASSIGN:
+    name: Collection assignment on game detail
+    description: Assign/remove game from collections (vibes) on the detail page
+    requirements:
+      1: Shows a checklist of all user collections with checkbox state per game
+      2: On check/uncheck, calls POST /api/v1/games/{id}/collections with full collection ID set
+      3: Changes are reflected immediately in the UI without page reload
+
+  DELETE:
+    name: Delete game
+    description: Remove a game from the user's collection
+    requirements:
+      1: DELETE /api/v1/games/{id} removes the game
+      2: Requires confirmation before executing deletion
+      3: Verifies user_id matches the game owner before deletion
+      4: On success, navigates back to collection page
+      5: Deleted game's player aids and collection assignments are cascade-deleted by DB
+
+constraints:
+  STORAGE:
+    name: Storage constraints
+    requirements:
+      1: Player aid uploads must be limited to a reasonable max file size
+      2: Uploaded files must be validated for image content type

@@ -4,6 +4,8 @@ import { useAuth } from '../hooks/useAuth'
 import { ApiError } from '../lib/api'
 
 export default function LoginPage() {
+  // ref: auth.LOGIN.1 — username and password input form at /login
+  // ref: auth.LOGIN.5 — displays inline error without leaking user existence
   const { login } = useAuth()
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
@@ -16,6 +18,9 @@ export default function LoginPage() {
     setError('')
     setSubmitting(true)
     try {
+      // ref: auth.LOGIN.2 — calls Supabase Auth signIn
+      // ref: auth.LOGIN.3 — stores tokens in localStorage on success
+      // ref: auth.LOGIN.4 — redirects to collection page on success
       await login(username, password)
       navigate('/', { replace: true })
     } catch (err) {

@@ -1,5 +1,52 @@
 # AGENTS.md — mbgc monorepo
 
+## Acai — Spec-Driven Development
+
+This project uses [acai.sh](https://acai.sh) for spec-driven development. All features are specified in `features/*.feature.yaml`. Code is annotated with ACID references (e.g. `// ref: auth.JWT_VALIDATION.1`).
+
+### Quick commands for agents
+
+```sh
+# Learn the acai workflow (run once per session)
+npx @acai.sh/cli skill
+
+# See current feature status
+npx @acai.sh/cli features --json
+
+# Inspect a specific feature
+npx @acai.sh/cli feature auth --json --include-refs
+
+# Push specs + ACID refs to the dashboard
+npx @acai.sh/cli push --all
+
+# Mark requirements as completed
+npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":"completed"}'
+```
+
+### Spec to code traceability
+
+Every requirement has an ACID (Acceptance Criteria ID) in the format `<feature>.<COMPONENT>.<NUMBER>`. Code references these in comments:
+
+```
+// ref: auth.JWT_VALIDATION.1 — fetches JWKS at boot
+// ref: importer.BGG_SYNC.9 — admin-only full refresh
+// ref: vibes.CRUD.1 — create collection
+```
+
+When implementing a feature, annotate new code with the relevant ACIDs. When modifying existing specs, also update affected ACID references in code.
+
+### Active features
+
+| Feature | File | Status |
+|---|---|---|
+| auth | `features/auth.feature.yaml` | Core login, JWT validation, token refresh, multi-tenancy |
+| collection | `features/collection.feature.yaml` | Game list/grid, search, filters, pagination |
+| game-detail | `features/game-detail.feature.yaml` | Detail view, player aids, rules URL, vibe assign, delete |
+| vibes | `features/vibes.feature.yaml` | Collection CRUD, assign, discover |
+| importer | `features/importer.feature.yaml` | BGG sync, CSV import, rate limiting |
+| profile | `features/profile.feature.yaml` | Profile view, BGG username, change password, admin flag |
+| api-layer | `features/api-layer.feature.yaml` | Shared error handling, envelope, middleware, config |
+
 ## Build & Test
 
 ```sh

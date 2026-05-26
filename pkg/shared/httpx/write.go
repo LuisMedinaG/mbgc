@@ -11,6 +11,7 @@ import (
 )
 
 // WriteJSON serializes v as JSON with the given HTTP status code.
+// ref: api-layer.HTTPX.1 — WriteJSON sets content-type and writes response
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -21,6 +22,7 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 
 // WriteError maps a sentinel error to the correct HTTP status and error envelope.
 // Unknown errors become 500 and are logged server-side — internal details are never leaked.
+// ref: api-layer.HTTPX.2 — maps sentinels to HTTP status codes
 func WriteError(w http.ResponseWriter, err error) {
 	var status int
 	var code, msg string
