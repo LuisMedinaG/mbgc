@@ -15,6 +15,9 @@ make tidy      # go mod tidy
 make migrate-up
 make migrate-down
 
+# First-time DB setup (root Makefile) — starts Supabase + runs all migrations:
+make db-setup   # pre-flight checks .env + DATABASE_URL in each service, then migrates all three
+
 # Web (from web/):
 make dev       # Vite dev server
 make build     # tsc -b && vite build

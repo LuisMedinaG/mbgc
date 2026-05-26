@@ -1,7 +1,31 @@
-.PHONY: dev build test lint tidy clean dev-all
+.PHONY: dev build test lint tidy clean dev-all db-setup db-check-env
 
 # Root Makefile — mbgc monorepo
 SERVICES := gateway auth game importer monolith
+DB_SERVICES := auth game importer
+
+db-check-env:
+	@for svc in $(DB_SERVICES); do \
+		env_file="services/$$svc/.env"; \
+		if [ ! -f "$$env_file" ]; then \
+			echo "ERROR: $$env_file not found. Copy services/$$svc/.env.example and set DATABASE_URL."; \
+			exit 1; \
+		fi; \
+		if ! grep -q "DATABASE_URL" "$$env_file"; then \
+			echo "ERROR: DATABASE_URL not set in $$env_file"; \
+			exit 1; \
+		fi; \
+	done
+	@echo "✓ .env files OK"
+
+db-setup: db-check-env
+	@echo "Starting local Supabase..."
+	supabase start
+	@echo "Running migrations..."
+	$(MAKE) -C services/auth migrate-up
+	$(MAKE) -C services/game migrate-up
+	$(MAKE) -C services/importer migrate-up
+	@echo "Done. Run 'supabase status' to see local URLs and keys."
 
 dev-all:
 	@tmux kill-session -t mbgc 2>/dev/null || true

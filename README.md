@@ -332,19 +332,22 @@ SYNC_LIMIT_ADMIN=20
 VITE_API_BASE_URL=
 ```
 
-**Run database migrations** (one-time, per-service):
+**Run database migrations** (one-time, automated):
 
-For the **local Supabase** (`supabase start`), classic psql works since the dev DB is on localhost:
+Once each service `.env` has `DATABASE_URL` set (step 5 above), a single command handles everything:
 
 ```sh
-# Auth schema
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres make -C services/auth migrate-up
+make db-setup
+```
 
-# Game schema
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres make -C services/game migrate-up
+This starts local Supabase and runs all three service migrations in order. Migrations are idempotent (`IF NOT EXISTS`) so re-running is safe. The pre-flight check will error with a clear message if any `.env` is missing or `DATABASE_URL` is unset.
 
-# Importer schema
-DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres make -C services/importer migrate-up
+To run per-service manually instead:
+
+```sh
+make -C services/auth migrate-up
+make -C services/game migrate-up
+make -C services/importer migrate-up
 ```
 
 For the **remote** (linked) database, use the Supabase CLI — it handles auth and avoids connection string issues:
