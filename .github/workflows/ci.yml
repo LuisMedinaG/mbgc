@@ -10,6 +10,23 @@ permissions:
   contents: read
 
 jobs:
+  branch-name:
+    name: Branch Name Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check branch name
+        run: |
+          branch="${{ github.head_ref }}"
+          if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
+            echo "✓ Branch name '$branch' is valid"
+          else
+            echo "✗ Branch name '$branch' does not match required pattern"
+            echo "  Allowed prefixes: feature/ fix/ bug/ chore/ refactor/ hotfix/"
+            echo "  Example: feature/add-game-search"
+            exit 1
+          fi
+
   go-build:
     name: Go Build & Test
     runs-on: ubuntu-latest
