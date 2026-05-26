@@ -15,7 +15,7 @@ go.work.sum
 # Build output
 ##############################################################################
 /bin/
-server
+services/api/server
 dist/
 dist-ssr/
 out/
