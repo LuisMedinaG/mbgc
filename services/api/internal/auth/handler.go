@@ -46,7 +46,7 @@ type tokenData struct {
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
 		httpx.WriteError(w, fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest))
 		return
 	}
@@ -64,14 +64,14 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	var result tokenData
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		httpx.WriteError(w, fmt.Errorf("decode supabase response: %w", err))
+	if resp.StatusCode != http.StatusOK {
+		httpx.WriteError(w, apierr.ErrWrongPassword)
 		return
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		httpx.WriteError(w, apierr.ErrWrongPassword)
+	var result tokenData
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		httpx.WriteError(w, fmt.Errorf("decode supabase response: %w", err))
 		return
 	}
 

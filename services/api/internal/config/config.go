@@ -29,7 +29,7 @@ func Load() Config {
 		SupabaseURL: mustenv("SUPABASE_URL"),
 		// Optional legacy HS256 shared secret — leave empty for JWKS-only (recommended).
 		JWTSecret:         os.Getenv("SUPABASE_JWT_SECRET"),
-		ServiceRoleKey:    os.Getenv("SUPABASE_SERVICE_ROLE_KEY"),
+		ServiceRoleKey:    mustenv("SUPABASE_SERVICE_ROLE_KEY"),
 		AllowedOrigin:     getenv("ALLOWED_ORIGIN", "http://localhost:5173"),
 		BGGToken:          os.Getenv("BGG_TOKEN"),
 		BGGCookie:         os.Getenv("BGG_COOKIE"),
