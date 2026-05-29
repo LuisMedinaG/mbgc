@@ -73,12 +73,20 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
+          # Build --update-env-vars, skipping secrets that are empty (not yet set)
+          # to avoid overwriting existing Cloud Run env vars with blank values.
+          _env=""
+          _add() { [ -n "$2" ] && _env="${_env:+$_env,}$1=$2"; }
+          _add DATABASE_URL              "$DATABASE_URL"
+          _add SUPABASE_URL              "$SUPABASE_URL"
+          _add SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
+          _add ALLOWED_ORIGIN            "$ALLOWED_ORIGIN"
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
             --region "$REGION" \
             --project "$PROJECT" \
             --service-account "$RUNTIME_SA" \
-            --update-env-vars "DATABASE_URL=$DATABASE_URL,SUPABASE_URL=$SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY,ALLOWED_ORIGIN=$ALLOWED_ORIGIN" \
+            ${_env:+--update-env-vars "$_env"} \
             --quiet
         env:
           SERVICE: ${{ inputs.service_name }}

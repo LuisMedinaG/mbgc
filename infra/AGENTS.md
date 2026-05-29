@@ -74,6 +74,13 @@ On first run (before `apply`):
 - `TF_BACKEND_ACCESS_KEY` — Supabase S3 access key ID (for `infra.yml` CI workflow)
 - `TF_BACKEND_SECRET_KEY` — Supabase S3 secret access key (for `infra.yml` CI workflow)
 
+On first run (before `apply`), also prompts for and syncs API runtime secrets:
+- `API_DATABASE_URL` — prod Supabase postgres connection string
+- `API_SUPABASE_URL` — prod Supabase project URL
+- `API_SUPABASE_SERVICE_ROLE_KEY` — prod service_role key (bypasses RLS; admin seed)
+- `API_ALLOWED_ORIGIN` — prod frontend URL for CORS
+- `DEV_API_DATABASE_URL` / `DEV_API_SUPABASE_URL` / `DEV_API_SUPABASE_SERVICE_ROLE_KEY` / `DEV_API_ALLOWED_ORIGIN` — same for dev environment
+
 Post-apply (re-run after `terraform apply`):
 - `GCP_WORKLOAD_IDENTITY_PROVIDER` — WIF provider for GitHub OIDC token exchange
 - `GCP_SERVICE_ACCOUNT` — deploy service account email

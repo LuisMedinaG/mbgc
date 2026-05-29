@@ -1,4 +1,4 @@
-.PHONY: setup-local setup-prod dev db-migrate db-reset test lint build \
+.PHONY: setup-local setup-infra bootstrap dev db-migrate db-reset test lint build \
         rotate-secrets acai-push acai-status acai-features help
 
 # Root Makefile — mbgc monorepo
@@ -12,10 +12,15 @@ ENV_FILE := services/api/.env
 setup-local:
 	@if [ ! -f "$(ENV_FILE)" ]; then \
 		cp services/api/.env.example $(ENV_FILE); \
-		echo "✓ Created $(ENV_FILE) from .env.example"; \
-		echo "  → Fill in SUPABASE_SERVICE_ROLE_KEY, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD"; \
-		echo "  → Get the service role key from: supabase status (after starting)"; \
-		echo "  → Then re-run: make setup-local"; \
+		echo "✓ Created $(ENV_FILE) — DATABASE_URL and SUPABASE_URL are pre-filled for local."; \
+		echo ""; \
+		echo "  Fill in the three remaining values:"; \
+		echo "    SUPABASE_SERVICE_ROLE_KEY  ← supabase status → Secret key"; \
+		echo "    SEED_ADMIN_EMAIL           ← your admin email"; \
+		echo "    SEED_ADMIN_PASSWORD        ← your admin password (min 6 chars)"; \
+		echo ""; \
+		echo "  If Supabase isn't running yet:  supabase start && supabase status"; \
+		echo "  Then re-run:                    make setup-local"; \
 		exit 0; \
 	fi
 	@echo "Starting Supabase..."
@@ -24,25 +29,27 @@ setup-local:
 	$(MAKE) db-migrate
 	@echo ""
 	@echo "✓ Local setup complete."
-	@echo "  Admin user will be created on first 'make dev' if SEED_ADMIN_EMAIL is set."
+	@if grep -q '^SEED_ADMIN_EMAIL=.\+' $(ENV_FILE) 2>/dev/null; then \
+		echo "  ✓ Admin user will be seeded on first 'make dev' (SEED_ADMIN_EMAIL is set)."; \
+	else \
+		echo "  ⚠ Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in $(ENV_FILE) to seed an admin on first boot."; \
+	fi
 	@echo "  Run: make dev"
 
-## setup-prod: Production bootstrap guide
-setup-prod:
-	@echo "Production setup — run these steps in order:"
-	@echo ""
-	@echo "  1. Bootstrap GCP + Cloudflare + Supabase infrastructure:"
-	@echo "       cd infra && bash scripts/bootstrap.sh"
-	@echo ""
-	@echo "  2. Set secrets in GitHub (CI/CD will auto-deploy on merge to main)."
-	@echo ""
-	@echo "  3. Set SEED_ADMIN_EMAIL + SEED_ADMIN_PASSWORD in Cloud Run env vars:"
-	@echo "       gcloud run services update mbgc-api --region=us-central1 \\"
-	@echo "         --set-env-vars SEED_ADMIN_EMAIL=you@example.com,SEED_ADMIN_PASSWORD=secret"
-	@echo ""
-	@echo "  4. The API creates the admin user on first boot. Remove the seed vars after."
-	@echo ""
-	@echo "  See SETUP.md for full details."
+## setup-infra: First-time cloud infra setup (copies infra/.env, runs bootstrap)
+setup-infra:
+	@if [ ! -f infra/.env ]; then \
+		cp infra/.env.example infra/.env; \
+		echo "✓ Created infra/.env from infra/.env.example"; \
+		echo "  Fill in your secrets, then re-run: make setup-infra"; \
+		echo "  See SETUP.md → Cloud infra setup for a field-by-field guide."; \
+		exit 0; \
+	fi
+	$(MAKE) bootstrap
+
+## bootstrap: Run infra/scripts/bootstrap.sh (provisions GCP/CF/Supabase, syncs GitHub secrets)
+bootstrap:
+	bash infra/scripts/bootstrap.sh
 
 # ── Daily development ────────────────────────────────────────────────────────
 

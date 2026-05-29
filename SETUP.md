@@ -13,41 +13,37 @@ Single source of truth for getting mbgc running from scratch.
 
 ## Local development
 
-### 1. Clone and configure
+### 1. Clone and start Supabase
 
 ```sh
 git clone git@github.com:LuisMedinaG/mbgc.git
 cd mbgc
-make setup-local       # creates services/api/.env from .env.example
+supabase start         # boots local Postgres + Auth (Docker required)
+supabase status        # prints URLs and keys — keep this open
 ```
 
-On first run, `setup-local` exits after creating `.env` so you can fill it in.
-
-### 2. Fill in services/api/.env
+### 2. Create and fill in services/api/.env
 
 ```sh
-# Start Supabase to get keys
-supabase start
-
-# supabase status will show:
-#   Publishable key → SUPABASE_ANON_KEY
-#   Service role key → SUPABASE_SERVICE_ROLE_KEY
+make setup-local       # creates services/api/.env from .env.example, then exits
 ```
 
-Minimum required values:
+Open `services/api/.env`. `DATABASE_URL` and `SUPABASE_URL` are **already correct for local** — do not change them. Fill in only these three:
 
-| Variable | Where to find it |
+| Variable | Value |
 |---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | `supabase status` → Secret |
-| `SEED_ADMIN_EMAIL` | Your choice |
+| `SUPABASE_SERVICE_ROLE_KEY` | `supabase status` → **Secret** key |
+| `SEED_ADMIN_EMAIL` | Your choice (e.g. `you@example.com`) |
 | `SEED_ADMIN_PASSWORD` | Your choice (min 6 chars) |
 
-Leave `SUPABASE_JWT_SECRET` empty (JWKS-only is preferred).
+> **Key naming:** the Supabase CLI now labels keys **Publishable** (anon) and **Secret** (service_role).
+> Use the **Secret** key for `SUPABASE_SERVICE_ROLE_KEY`.
+> Leave `SUPABASE_JWT_SECRET` empty — JWKS-only ES256 is the default and recommended.
 
-### 3. Finish setup
+### 3. Run migrations and start
 
 ```sh
-make setup-local       # runs migrations
+make setup-local       # Supabase already running, applies all migrations
 make dev               # starts API (port 8080) + web (port 5173) in tmux
 ```
 
@@ -56,7 +52,7 @@ The API creates the admin user on **first boot** — check the logs:
 INFO admin user ready email=you@example.com
 ```
 
-After that, `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` can remain set — they're idempotent and do nothing once the user exists.
+`SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are safe to leave set — they're idempotent and do nothing once the user exists.
 
 ### Daily workflow
 
@@ -70,59 +66,67 @@ make db-reset          # wipe + replay migrations (local only)
 
 ---
 
-## Production setup
+## Cloud infra setup
 
-### 1. Bootstrap infrastructure (once)
+### 1. Fill in infra/.env
 
 ```sh
-cd infra
-bash scripts/bootstrap.sh
+make setup-infra    # copies infra/.env.example → infra/.env, then exits
 ```
 
-This creates:
-- GCP project, Artifact Registry, Cloud Run service shell
-- Cloudflare DNS + Pages
-- Supabase project link
-- GitHub Actions secrets
+Open `infra/.env` and fill in all values. Inline comments in the file tell you exactly where to find each one (Supabase dashboard, Cloudflare dashboard, etc.).
 
-Run it twice on initial setup — first pass creates the GCP service account,
-second pass extracts outputs and syncs secrets to GitHub.
+### 2. Bootstrap infrastructure
 
-### 2. Run migrations against prod
+```sh
+make bootstrap      # or: make setup-infra (re-run after filling .env)
+```
 
-After bootstrap, push migrations from local (linked project):
+This runs `infra/scripts/bootstrap.sh` which:
+- Creates the GCP Terraform service account + IAM roles
+- Writes local `terraform.tfvars` and `backend.hcl`
+- Syncs **all** secrets to GitHub Actions (Cloudflare, GCP, Supabase, API DB credentials)
+- Runs `terraform init`
+
+Re-run it anytime a secret rotates or a new value is added to `infra/.env` — it's idempotent.
+
+### 3. Apply Terraform
+
+```sh
+cd infra/environments/prod
+terraform plan
+terraform apply
+```
+
+Then run bootstrap once more to sync the GCP WIF + service account outputs that Terraform just created:
+
+```sh
+make bootstrap
+```
+
+### 4. Run migrations against prod
 
 ```sh
 supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-### 3. Seed admin user in prod
+### 5. Deploy and seed admin
 
-Set env vars on the Cloud Run service **once**:
-
-```sh
-gcloud run services update mbgc-api \
-  --region=us-central1 \
-  --set-env-vars "SEED_ADMIN_EMAIL=you@example.com,SEED_ADMIN_PASSWORD=yourpassword,SUPABASE_SERVICE_ROLE_KEY=your-key"
-```
-
-Deploy → the API creates the admin user on first boot.
-
-After confirming login works, **remove the seed vars**:
+Merge to `main` → CI/CD deploys automatically. On first boot the API creates the admin user defined in `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` (set those in the Cloud Run env via the GitHub secret `API_SUPABASE_SERVICE_ROLE_KEY` flow, or temporarily via gcloud):
 
 ```sh
 gcloud run services update mbgc-api \
   --region=us-central1 \
-  --remove-env-vars "SEED_ADMIN_EMAIL,SEED_ADMIN_PASSWORD"
+  --set-env-vars "SEED_ADMIN_EMAIL=you@example.com,SEED_ADMIN_PASSWORD=yourpassword"
 ```
 
-### 4. CI/CD (ongoing)
+Seeding is idempotent — safe to leave set permanently.
 
-- Push to a `feature/*` branch → CI runs (build, test, lint)
-- Open PR to `dev` → infra plan comment posted automatically
-- Merge to `dev` → CI gate
-- Merge `dev → main` → deploy + infra apply runs automatically
+### CI/CD (ongoing)
+
+- PR to `dev` → CI runs (build, test, lint) + infra plan comment
+- Merge `dev → main` → deploy + `terraform apply` run automatically
 
 ---
 
