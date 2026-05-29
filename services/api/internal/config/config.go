@@ -84,11 +84,16 @@ func sanitizeDatabaseURL(rawURL string) string {
 	if i := strings.Index(hostpath, "/"); i >= 0 {
 		host, path = hostpath[:i], hostpath[i:]
 	}
+	rawQuery := ""
+	if i := strings.Index(path, "?"); i >= 0 {
+		path, rawQuery = path[:i], path[i+1:]
+	}
 	u := &url.URL{
-		Scheme: rawURL[:schemeEnd],
-		User:   url.UserPassword(username, password),
-		Host:   host,
-		Path:   path,
+		Scheme:   rawURL[:schemeEnd],
+		User:     url.UserPassword(username, password),
+		Host:     host,
+		Path:     path,
+		RawQuery: rawQuery,
 	}
 	return u.String()
 }
