@@ -1,117 +1,122 @@
 #!/bin/sh
-# Bootstrap: provisions the terraform GCP SA, writes local credential files,
-# syncs GitHub secrets to LuisMedinaG/mbgc, and runs `terraform init`.
-# Idempotent — safe to re-run.
+# infra/scripts/bootstrap.sh — GCP provider
+#
+# One-time infra provisioning: creates the Terraform GCP service account,
+# writes local credential files, syncs secrets to GitHub, and runs terraform init.
+# Idempotent — safe to re-run. Re-runs are silent when infra/.env is complete.
 #
 # CI authenticates to GCP via Workload Identity Federation (no long-lived key).
-# Local authentication uses Application Default Credentials.
+# Local runs use Application Default Credentials (gcloud auth application-default login).
+
 set -eu
 
+# ── Constants ──────────────────────────────────────────────────────────────────
+
 REPO="LuisMedinaG/mbgc"
-DOMAIN="lumedina.dev"
-API_DOMAIN="api.${DOMAIN}"
-GCP_PROJECT_ID="myboardgamecollection-494214"
 GCP_SA_NAME="terraform"
-GCP_SA_EMAIL="${GCP_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
-CF_ACCOUNT_ID="b54fbd0d522b22fc747619b57608bb72"
-SUPABASE_PROJECT_REF="mlltpfszhtxhphoaeydh"
-SUPABASE_S3_ENDPOINT="https://${SUPABASE_PROJECT_REF}.storage.supabase.co/storage/v1/s3"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INFRA_ENV="${SCRIPT_DIR}/../.env"
 ENV_DIR="${SCRIPT_DIR}/../environments/prod"
+DEV_ENV_DIR="${SCRIPT_DIR}/../environments/dev"
 
-###############################################################################
-# Helpers
-###############################################################################
+# ── Shared helpers ─────────────────────────────────────────────────────────────
 
-die() { printf 'error: %s\n' "$1" >&2; exit 1; }
+# shellcheck source=lib/common.sh
+. "${SCRIPT_DIR}/lib/common.sh"
 
-check_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "'$1' is required but not installed"
+# ── save_env ───────────────────────────────────────────────────────────────────
+# Persists all collected vars to infra/.env on every exit (via trap below).
+# Listed here because the variable set is specific to this provider/project.
+
+save_env() {
+  cat > "$INFRA_ENV" <<ENVEOF
+# mbgc infra config — written by bootstrap.sh
+# gitignored. Re-run bootstrap.sh to update.
+
+DOMAIN="${DOMAIN:-}"
+GCP_PROJECT_ID="${GCP_PROJECT_ID:-}"
+SUPABASE_PROJECT_REF="${SUPABASE_PROJECT_REF:-}"
+SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN:-}"
+S3_ACCESS_KEY_ID="${S3_ACCESS_KEY_ID:-}"
+S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY:-}"
+CF_ACCOUNT_ID="${CF_ACCOUNT_ID:-}"
+CLOUDFLARE_API_TOKEN="${CLOUDFLARE_API_TOKEN:-}"
+CLOUDFLARE_ZONE_ID="${CLOUDFLARE_ZONE_ID:-}"
+API_DATABASE_URL="${API_DATABASE_URL:-}"
+API_SUPABASE_URL="${API_SUPABASE_URL:-}"
+API_SUPABASE_SERVICE_ROLE_KEY="${API_SUPABASE_SERVICE_ROLE_KEY:-}"
+API_ALLOWED_ORIGIN="${API_ALLOWED_ORIGIN:-}"
+DEV_API_DATABASE_URL="${DEV_API_DATABASE_URL:-}"
+DEV_API_SUPABASE_URL="${DEV_API_SUPABASE_URL:-}"
+DEV_API_SUPABASE_SERVICE_ROLE_KEY="${DEV_API_SUPABASE_SERVICE_ROLE_KEY:-}"
+DEV_API_ALLOWED_ORIGIN="${DEV_API_ALLOWED_ORIGIN:-}"
+ENVEOF
+  chmod 600 "$INFRA_ENV"
 }
 
-use_or_prompt() {
-  _var="$1"; _desc="$2"; _env_val="${3:-}"; _default="${4:-}"
-  if [ -n "$_env_val" ]; then
-    eval "${_var}=\"\${_env_val}\""
-    printf '  ✓ %s (from environment)\n' "$_desc"
-    return
-  fi
-  if [ -n "$_default" ]; then
-    printf '%s [%s]: ' "$_desc" "$_default"
-  else
-    printf '%s: ' "$_desc"
-  fi
-  read -r _input
-  if [ -z "$_input" ] && [ -n "$_default" ]; then
-    eval "${_var}=\"\${_default}\""
-  elif [ -n "$_input" ]; then
-    eval "${_var}=\"\${_input}\""
-  else
-    die "$_desc is required"
-  fi
-}
+# ── Config ─────────────────────────────────────────────────────────────────────
 
-use_or_prompt_secret() {
-  _var="$1"; _desc="$2"; _env_val="${3:-}"
-  if [ -n "$_env_val" ]; then
-    eval "${_var}=\"\${_env_val}\""
-    printf '  ✓ %s (from environment)\n' "$_desc"
-    return
-  fi
-  printf '%s: ' "$_desc"
-  stty -echo 2>/dev/null || true
-  read -r _input
-  stty echo 2>/dev/null || true
-  printf '\n'
-  [ -n "$_input" ] || die "$_desc is required"
-  eval "${_var}=\"\${_input}\""
-}
+[ -f "$INFRA_ENV" ] || die "infra/.env not found — run: make setup-infra"
+# shellcheck disable=SC1090
+. "$INFRA_ENV"
 
-set_secret() {
-  printf '%s' "$2" | gh secret set "$1" --repo "$REPO"
-  printf '  ✓ %s\n' "$1"
-}
+_missing=""
+for _var in DOMAIN GCP_PROJECT_ID CF_ACCOUNT_ID SUPABASE_PROJECT_REF; do
+  eval "_val=\${${_var}:-}"
+  [ -n "$_val" ] || _missing="${_missing}  ${_var}\n"
+done
+if [ -n "$_missing" ]; then
+  printf 'error: required vars missing from infra/.env:\n%b' "$_missing" >&2
+  exit 1
+fi
 
-###############################################################################
-# Prerequisites
-###############################################################################
+GCP_SA_EMAIL="${GCP_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+API_DOMAIN="api.${DOMAIN}"
+SUPABASE_S3_ENDPOINT="https://${SUPABASE_PROJECT_REF}.storage.supabase.co/storage/v1/s3"
 
-printf '\n=== mbgc-infra bootstrap ===\n\n'
+trap save_env EXIT
+
+# ── Prerequisites ──────────────────────────────────────────────────────────────
+
+printf '=== mbgc infra bootstrap ===\n\n'
+printf '── prerequisites ──\n'
 
 check_cmd terraform
 check_cmd gh
 check_cmd gcloud
 check_cmd jq
 
-if ! gh auth status >/dev/null 2>&1; then
-  die "Not authenticated with gh. Run: gh auth login"
-fi
+gh auth status >/dev/null 2>&1 \
+  || die "not authenticated with gh — run: gh auth login"
+gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null \
+  | grep -q . \
+  || die "not authenticated with gcloud — run: gcloud auth login"
 
-if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | grep -q .; then
-  die "Not authenticated with gcloud. Run: gcloud auth login"
-fi
+printf '  ✓ all tools present and authenticated\n'
+printf '  ✓ loaded config from %s\n' "$INFRA_ENV"
 
-###############################################################################
-# GCP — terraform service account (no key; CI auths via WIF)
-###############################################################################
+# ── GCP service account ────────────────────────────────────────────────────────
 
-printf 'Setting up GCP service account...\n\n'
+printf '\n── gcp service account ──\n'
 
-# Enable required APIs.
-for api in run.googleapis.com artifactregistry.googleapis.com iamcredentials.googleapis.com cloudresourcemanager.googleapis.com; do
-  gcloud services enable "$api" --project "$GCP_PROJECT_ID" >/dev/null 2>&1 || true
+for _api in \
+  run.googleapis.com \
+  artifactregistry.googleapis.com \
+  iamcredentials.googleapis.com \
+  cloudresourcemanager.googleapis.com; do
+  gcloud services enable "$_api" --project "$GCP_PROJECT_ID" >/dev/null 2>&1 || true
 done
+printf '  ✓ APIs enabled\n'
 
-if ! gcloud iam service-accounts describe "$GCP_SA_EMAIL" --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
+if ! gcloud iam service-accounts describe "$GCP_SA_EMAIL" \
+     --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
   gcloud iam service-accounts create "$GCP_SA_NAME" \
     --project "$GCP_PROJECT_ID" \
     --display-name "Terraform" >/dev/null
-  printf '  ✓ service account created: %s\n' "$GCP_SA_EMAIL"
-else
-  printf '  ✓ service account exists: %s\n' "$GCP_SA_EMAIL"
 fi
+printf '  ✓ service account: %s\n' "$GCP_SA_EMAIL"
 
-for role in \
+for _role in \
   roles/run.admin \
   roles/iam.serviceAccountUser \
   roles/iam.serviceAccountAdmin \
@@ -121,162 +126,173 @@ for role in \
   roles/serviceusage.serviceUsageAdmin; do
   gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
     --member "serviceAccount:${GCP_SA_EMAIL}" \
-    --role "$role" \
+    --role "$_role" \
     --condition=None >/dev/null 2>&1
 done
-printf '  ✓ IAM roles granted\n\n'
+printf '  ✓ IAM roles granted\n'
 
-printf 'Ensuring local Application Default Credentials...\n'
+printf '\n── application default credentials ──\n'
 if ! gcloud auth application-default print-access-token >/dev/null 2>&1; then
   gcloud auth application-default login
 else
-  printf '  ✓ ADC already configured\n'
+  printf '  ✓ ADC configured\n'
 fi
-printf '\n'
 
-###############################################################################
-# Collect remaining credentials
-###############################################################################
+# ── Credentials ────────────────────────────────────────────────────────────────
 
-printf 'Collecting credentials...\n\n'
+printf '\n── credentials ──\n'
 
-use_or_prompt_secret SUPABASE_ACCESS_TOKEN \
+prompt_secret SUPABASE_ACCESS_TOKEN \
   "Supabase personal access token (app.supabase.com → Account → Access Tokens)" \
   "${SUPABASE_ACCESS_TOKEN:-}"
 
-printf '\n'
-use_or_prompt_secret S3_ACCESS_KEY_ID \
-  "Supabase S3 access key ID (dashboard → Storage → S3 Connection)" \
+prompt_secret S3_ACCESS_KEY_ID \
+  "Supabase S3 access key ID (Storage → S3 Connection)" \
   "${S3_ACCESS_KEY_ID:-${AWS_ACCESS_KEY_ID:-}}"
-use_or_prompt_secret S3_SECRET_ACCESS_KEY \
+prompt_secret S3_SECRET_ACCESS_KEY \
   "Supabase S3 secret access key" \
-  "${S3_SECRET_ACCESS_KEY:-${AWS_SECRET_ACCESS_KEY:-}}"
+  "${S3_SECRET_ACCESS_KEY:-}"
 
-printf '\n'
-use_or_prompt_secret CLOUDFLARE_API_TOKEN \
+prompt_secret CLOUDFLARE_API_TOKEN \
   "Cloudflare API token (Zone:Edit + Pages:Edit + DNS:Edit)" \
   "${CLOUDFLARE_API_TOKEN:-}"
-use_or_prompt CF_ACCOUNT_ID \
+prompt_value CF_ACCOUNT_ID \
   "Cloudflare account ID" \
-  "" \
-  "$CF_ACCOUNT_ID"
-use_or_prompt CLOUDFLARE_ZONE_ID \
-  "Cloudflare zone ID for lumedina.dev" \
+  "${CF_ACCOUNT_ID:-}" \
+  ""
+prompt_value CLOUDFLARE_ZONE_ID \
+  "Cloudflare zone ID for ${DOMAIN}" \
   "${CLOUDFLARE_ZONE_ID:-}" \
   ""
 
-###############################################################################
-# Write local credential files
-###############################################################################
+printf '\n  prod API (Supabase → Settings → Database / API):\n'
+prompt_secret API_DATABASE_URL \
+  "Prod DATABASE_URL (Settings → Database → URI, port 5432)" \
+  "${API_DATABASE_URL:-}"
+prompt_value API_SUPABASE_URL \
+  "Prod SUPABASE_URL" \
+  "${API_SUPABASE_URL:-}" \
+  "https://${SUPABASE_PROJECT_REF}.supabase.co"
+prompt_secret API_SUPABASE_SERVICE_ROLE_KEY \
+  "Prod service_role key (Settings → API → Legacy API keys)" \
+  "${API_SUPABASE_SERVICE_ROLE_KEY:-}"
+prompt_value API_ALLOWED_ORIGIN \
+  "Prod ALLOWED_ORIGIN" \
+  "${API_ALLOWED_ORIGIN:-}" \
+  "https://${DOMAIN}"
 
-printf '\nWriting local credential files...\n'
+printf '\n  dev API:\n'
+prompt_secret DEV_API_DATABASE_URL \
+  "Dev DATABASE_URL (Settings → Database → URI, port 5432)" \
+  "${DEV_API_DATABASE_URL:-}"
+prompt_value DEV_API_SUPABASE_URL \
+  "Dev SUPABASE_URL" \
+  "${DEV_API_SUPABASE_URL:-}" \
+  ""
+prompt_secret DEV_API_SUPABASE_SERVICE_ROLE_KEY \
+  "Dev service_role key (Settings → API → Legacy API keys)" \
+  "${DEV_API_SUPABASE_SERVICE_ROLE_KEY:-}"
+prompt_value DEV_API_ALLOWED_ORIGIN \
+  "Dev ALLOWED_ORIGIN (or * to allow all)" \
+  "${DEV_API_ALLOWED_ORIGIN:-}" \
+  "*"
 
-BACKEND_HCL="${ENV_DIR}/backend.hcl"
-TFVARS="${ENV_DIR}/terraform.tfvars"
+# ── Local credential files ─────────────────────────────────────────────────────
 
-cat > "$BACKEND_HCL" <<EOF
+printf '\n── local credential files ──\n'
+
+cat > "${ENV_DIR}/backend.hcl" <<EOF
 bucket    = "mbgc-tfstate"
 endpoints = { s3 = "${SUPABASE_S3_ENDPOINT}" }
 EOF
-printf '  ✓ %s\n' "$BACKEND_HCL"
+printf '  ✓ %s\n' "${ENV_DIR}/backend.hcl"
 
-cat > "$TFVARS" <<EOF
+cat > "${ENV_DIR}/terraform.tfvars" <<EOF
 cloudflare_api_token  = "${CLOUDFLARE_API_TOKEN}"
 cloudflare_account_id = "${CF_ACCOUNT_ID}"
 cloudflare_zone_id    = "${CLOUDFLARE_ZONE_ID}"
 supabase_access_token = "${SUPABASE_ACCESS_TOKEN}"
 EOF
-printf '  ✓ %s\n' "$TFVARS"
+printf '  ✓ %s\n' "${ENV_DIR}/terraform.tfvars"
 
-###############################################################################
-# Sync GitHub secrets — Cloudflare (needed by deploy.yml web job)
-###############################################################################
+# ── GitHub secrets ─────────────────────────────────────────────────────────────
 
-printf '\nSyncing Cloudflare secrets on %s...\n' "$REPO"
+sync_secrets "github secrets — cloudflare (deploy.yml)" \
+  CLOUDFLARE_API_TOKEN  "$CLOUDFLARE_API_TOKEN" \
+  CLOUDFLARE_ACCOUNT_ID "$CF_ACCOUNT_ID"
 
-set_secret CLOUDFLARE_API_TOKEN   "$CLOUDFLARE_API_TOKEN"
-set_secret CLOUDFLARE_ACCOUNT_ID  "$CF_ACCOUNT_ID"
+sync_secrets "github secrets — terraform backend (infra.yml)" \
+  TF_BACKEND_ACCESS_KEY "$S3_ACCESS_KEY_ID" \
+  TF_BACKEND_SECRET_KEY "$S3_SECRET_ACCESS_KEY"
 
-###############################################################################
-# Sync GitHub secrets — Terraform backend (needed by infra.yml CI workflow)
-###############################################################################
+sync_secrets "github secrets — terraform provider vars (infra.yml)" \
+  TF_VAR_CLOUDFLARE_ZONE_ID    "$CLOUDFLARE_ZONE_ID" \
+  TF_VAR_SUPABASE_ACCESS_TOKEN "$SUPABASE_ACCESS_TOKEN"
 
-printf '\nSyncing Terraform backend secrets on %s...\n' "$REPO"
+sync_secrets "github secrets — prod API (deploy.yml)" \
+  API_DATABASE_URL              "$API_DATABASE_URL" \
+  API_SUPABASE_URL              "$API_SUPABASE_URL" \
+  API_SUPABASE_SERVICE_ROLE_KEY "$API_SUPABASE_SERVICE_ROLE_KEY" \
+  API_ALLOWED_ORIGIN            "$API_ALLOWED_ORIGIN"
 
-set_secret TF_BACKEND_ACCESS_KEY       "$S3_ACCESS_KEY_ID"
-set_secret TF_BACKEND_SECRET_KEY       "$S3_SECRET_ACCESS_KEY"
+sync_secrets "github secrets — dev API (deploy.yml)" \
+  DEV_API_DATABASE_URL              "$DEV_API_DATABASE_URL" \
+  DEV_API_SUPABASE_URL              "$DEV_API_SUPABASE_URL" \
+  DEV_API_SUPABASE_SERVICE_ROLE_KEY "$DEV_API_SUPABASE_SERVICE_ROLE_KEY" \
+  DEV_API_ALLOWED_ORIGIN            "$DEV_API_ALLOWED_ORIGIN"
 
-###############################################################################
-# Sync GitHub secrets — Terraform provider vars (needed by infra.yml CI workflow)
-###############################################################################
+# ── Terraform init ─────────────────────────────────────────────────────────────
 
-printf '\nSyncing Terraform provider secrets on %s...\n' "$REPO"
-
-set_secret TF_VAR_CLOUDFLARE_ZONE_ID    "$CLOUDFLARE_ZONE_ID"
-set_secret TF_VAR_SUPABASE_ACCESS_TOKEN "$SUPABASE_ACCESS_TOKEN"
-
-###############################################################################
-# Terraform init
-###############################################################################
-
-printf '\nRunning terraform init...\n'
-cd "$ENV_DIR"
+printf '\n── terraform init ──\n'
 
 export AWS_ACCESS_KEY_ID="$S3_ACCESS_KEY_ID"
 export AWS_SECRET_ACCESS_KEY="$S3_SECRET_ACCESS_KEY"
 
+cd "$ENV_DIR"
 terraform init -backend-config=backend.hcl -upgrade -input=false
 
-###############################################################################
-# Post-apply: sync WIF secrets if terraform state already has them
-###############################################################################
-
+# Post-apply: sync WIF and deploy SA secrets once terraform state has outputs.
+# Re-run bootstrap after `terraform apply` to push these.
 if terraform output -raw workload_identity_provider >/dev/null 2>&1; then
-  printf '\nSyncing GCP deploy secrets (state has outputs)...\n'
-
-  WIF_PROVIDER="$(terraform output -raw workload_identity_provider)"
-  DEPLOY_SA="$(terraform output -raw deploy_service_account)"
-  RUNTIME_SAS="$(terraform output -json runtime_service_accounts)"
-
-  set_secret GCP_WORKLOAD_IDENTITY_PROVIDER "$WIF_PROVIDER"
-  set_secret GCP_SERVICE_ACCOUNT            "$DEPLOY_SA"
-  set_secret GCP_PROJECT_ID                 "$GCP_PROJECT_ID"
-  set_secret GCP_TERRAFORM_SERVICE_ACCOUNT  "$(terraform output -raw terraform_service_account)"
-
-  set_secret GCP_RUNTIME_SA_API "$(printf '%s' "$RUNTIME_SAS" | jq -r '."mbgc-api"')"
+  _runtime_sas="$(terraform output -json runtime_service_accounts)"
+  sync_secrets "github secrets — gcp deploy (post-apply)" \
+    GCP_WORKLOAD_IDENTITY_PROVIDER "$(terraform output -raw workload_identity_provider)" \
+    GCP_SERVICE_ACCOUNT            "$(terraform output -raw deploy_service_account)" \
+    GCP_TERRAFORM_SERVICE_ACCOUNT  "$(terraform output -raw terraform_service_account)" \
+    GCP_PROJECT_ID                 "$GCP_PROJECT_ID" \
+    GCP_RUNTIME_SA_API             "$(printf '%s' "$_runtime_sas" | jq -r '."mbgc-api"')"
 fi
 
-# Dev environment runtime SA — sync after `terraform apply` in environments/dev/.
-DEV_ENV_DIR="${SCRIPT_DIR}/../environments/dev"
+# Dev environment runtime SA — available after `terraform apply` in environments/dev/.
 if [ -f "${DEV_ENV_DIR}/backend.hcl" ]; then
   cd "$DEV_ENV_DIR"
-  terraform init -backend-config=backend.hcl -input=false >/dev/null 2>&1 || true
-  if terraform output -raw runtime_service_account >/dev/null 2>&1; then
-    printf '\nSyncing dev runtime SA...\n'
-    set_secret GCP_RUNTIME_SA_API_DEV "$(terraform output -raw runtime_service_account)"
+  if terraform init -backend-config=backend.hcl -input=false >/dev/null 2>&1 \
+      && terraform output -raw runtime_service_account >/dev/null 2>&1; then
+    sync_secrets "github secrets — dev runtime SA" \
+      GCP_RUNTIME_SA_API_DEV "$(terraform output -raw runtime_service_account)"
   fi
   cd "$ENV_DIR"
 fi
 
-printf '\n=== Bootstrap complete ===\n\n'
-printf 'Next steps:\n'
+# ── Next steps ─────────────────────────────────────────────────────────────────
 
-# Check if the Cloud Run domain mapping already exists — if so, Search Console
-# ownership was already granted (it's a prerequisite for the mapping to apply).
-_STEP=1
+printf '\n=== bootstrap complete ===\n\n'
+
+_step=1
+
 if ! gcloud run domain-mappings describe "$API_DOMAIN" \
      --region us-central1 --project "$GCP_PROJECT_ID" >/dev/null 2>&1; then
-  printf '  %d. Verify %s in Google Search Console and add the Terraform SA as an owner:\n' "$_STEP" "$DOMAIN"
-  printf '     SA email : %s\n' "$GCP_SA_EMAIL"
-  printf '     Search Console : https://search.google.com/search-console/welcome\n'
+  printf '%d. Verify %s in Google Search Console and grant the Terraform SA owner access:\n' \
+    "$_step" "$DOMAIN"
+  printf '     SA:  %s\n' "$GCP_SA_EMAIL"
+  printf '     URL: https://search.google.com/search-console/welcome\n'
   printf '     → Add property → Domain → "%s"\n' "$DOMAIN"
-  printf '     → Settings → Users and permissions → Add user → %s (Owner)\n' "$GCP_SA_EMAIL"
-  printf '     (Required before google_cloud_run_domain_mapping.api can apply.)\n\n'
-  _STEP=$((_STEP + 1))
+  printf '     → Settings → Users and permissions → Add user → %s (Owner)\n\n' "$GCP_SA_EMAIL"
+  _step=$((_step + 1))
 else
-  printf '  ✓ %s domain mapping exists — Search Console ownership already granted.\n\n' "$API_DOMAIN"
+  printf '  ✓ %s domain mapping exists\n\n' "$API_DOMAIN"
 fi
 
-printf '  %d. cd infra/environments/prod && terraform plan && terraform apply\n' "$_STEP"
-_STEP=$((_STEP + 1))
-printf '\n  %d. Re-run this script after apply to push all GCP deploy secrets to %s.\n' "$_STEP" "$REPO"
+printf '%d. cd infra/environments/prod && terraform plan && terraform apply\n' "$_step"
+_step=$((_step + 1))
+printf '%d. Re-run this script after apply to push GCP deploy secrets to %s.\n' "$_step" "$REPO"

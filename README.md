@@ -97,6 +97,7 @@ GCP auth uses **Workload Identity Federation** — no long-lived keys committed.
 - [SETUP.md](./SETUP.md) — first-time setup (local + prod), admin user, migrations
 - [docs/deployment.md](./docs/deployment.md) — GitHub secrets, Cloud Run env vars, Terraform details
 - [docs/troubleshooting.md](./docs/troubleshooting.md) — common errors and fixes
+- [docs/runbook/](./docs/runbook/) — categorized issue database; search with `rg "error text" docs/runbook/`
 
 ## Contributing
 

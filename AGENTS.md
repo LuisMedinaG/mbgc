@@ -39,6 +39,7 @@ npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":{"status":"completed"}}'
 
 When given a task, agents MUST:
 - **Before any code changes**: run `npx @acai.sh/cli features --json` and review pending requirements
+- **Before debugging errors**: search the runbook for known fixes — `rg "<error text>" docs/runbook/`. If no match, document the fix after resolving by loading the `add-runbook` skill.
 - **While coding**: annotate every implementation block with `// ref: <ACID>` comments
 - **After completing work**: run `acai set-status` for each completed ACID, then `acai push --all`
 - **When specs change**: re-align code to spec, update ACID references, push changes

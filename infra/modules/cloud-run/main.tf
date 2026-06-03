@@ -22,15 +22,14 @@ resource "google_cloud_run_v2_service" "this" {
 
   lifecycle {
     # Image, env vars, resources, and scaling are owned by each service repo's
-    # CI/CD (`gcloud run deploy` flags). Declaring scaling in Terraform causes
-    # perpetual drift because GCP returns computed defaults the provider SDK
-    # treats as zero-values and re-plans on every run.
+    # CI/CD (`gcloud run deploy` flags). Ignoring the entire template prevents
+    # Terraform from overwriting the live container spec when updating other
+    # fields (labels, ingress, service_account, deletion_protection).
+    # See: https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
     ignore_changes = [
-      template[0].containers[0].image,
-      template[0].containers[0].env,
-      template[0].containers[0].resources,
-      template[0].scaling,
-      scaling,
+      template,
+      client,
+      client_version,
     ]
   }
 }
