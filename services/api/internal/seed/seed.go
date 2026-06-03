@@ -28,6 +28,11 @@ func AdminUser(ctx context.Context, cfg config.Config, db *pgxpool.Pool) error {
 		return fmt.Errorf("auth user: %w", err)
 	}
 
+	// ref: profile.ADMIN.2 — is_admin must be in app_metadata for JWT inclusion
+	if err := ensureAdminAppMetadata(ctx, cfg, userID); err != nil {
+		return fmt.Errorf("app_metadata: %w", err)
+	}
+
 	if err := ensureAdminProfile(ctx, db, userID); err != nil {
 		return fmt.Errorf("admin profile: %w", err)
 	}
@@ -41,12 +46,16 @@ func AdminUser(ctx context.Context, cfg config.Config, db *pgxpool.Pool) error {
 func ensureAuthUser(ctx context.Context, cfg config.Config) (string, error) {
 	baseURL := strings.TrimSuffix(cfg.SupabaseURL, "/")
 
-	body, _ := json.Marshal(map[string]interface{}{
+	payload := map[string]interface{}{
 		"email":         cfg.SeedAdminEmail,
 		"password":      cfg.SeedAdminPassword,
 		"email_confirm": true,
-	})
+	}
+	if cfg.SeedAdminUsername != "" {
+		payload["user_metadata"] = map[string]string{"username": cfg.SeedAdminUsername}
+	}
 
+	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx,
 		http.MethodPost,
 		baseURL+"/auth/v1/admin/users",
@@ -88,11 +97,50 @@ func ensureAuthUser(ctx context.Context, cfg config.Config) (string, error) {
 	return result.ID, nil
 }
 
+// ensureAdminAppMetadata sets app_metadata.is_admin = true (and optionally
+// user_metadata.username) so the flag is present in every JWT the user receives.
+func ensureAdminAppMetadata(ctx context.Context, cfg config.Config, userID string) error {
+	baseURL := strings.TrimSuffix(cfg.SupabaseURL, "/")
+
+	update := map[string]interface{}{
+		"app_metadata": map[string]bool{"is_admin": true},
+	}
+	if cfg.SeedAdminUsername != "" {
+		update["user_metadata"] = map[string]string{"username": cfg.SeedAdminUsername}
+	}
+
+	body, _ := json.Marshal(update)
+	req, err := http.NewRequestWithContext(ctx,
+		http.MethodPut,
+		baseURL+"/auth/v1/admin/users/"+userID,
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("apikey", cfg.ServiceRoleKey)
+	req.Header.Set("Authorization", "Bearer "+cfg.ServiceRoleKey)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var result struct{ Msg string `json:"msg"` }
+		json.NewDecoder(resp.Body).Decode(&result)
+		return fmt.Errorf("admin API returned %d: %s", resp.StatusCode, result.Msg)
+	}
+	return nil
+}
+
 func lookupAuthUserByEmail(ctx context.Context, cfg config.Config) (string, error) {
 	baseURL := strings.TrimSuffix(cfg.SupabaseURL, "/")
 	req, err := http.NewRequestWithContext(ctx,
 		http.MethodGet,
-		baseURL+"/auth/v1/admin/users",
+		baseURL+"/auth/v1/admin/users?per_page=1000",
 		nil,
 	)
 	if err != nil {
