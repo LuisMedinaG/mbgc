@@ -47,6 +47,9 @@ jobs:
       SUPABASE_URL: ${{ secrets.API_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.API_SUPABASE_SERVICE_ROLE_KEY }}
       ALLOWED_ORIGIN: ${{ secrets.API_ALLOWED_ORIGIN }}
+      SEED_ADMIN_EMAIL: ${{ secrets.API_SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.API_SEED_ADMIN_PASSWORD }}
+      SEED_ADMIN_USERNAME: ${{ secrets.API_SEED_ADMIN_USERNAME }}
 
   deploy-api-dev:
     needs: changes
@@ -65,6 +68,9 @@ jobs:
       SUPABASE_URL: ${{ secrets.DEV_API_SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEV_API_SUPABASE_SERVICE_ROLE_KEY }}
       ALLOWED_ORIGIN: ${{ secrets.DEV_API_ALLOWED_ORIGIN }}
+      SEED_ADMIN_EMAIL: ${{ secrets.DEV_API_SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.DEV_API_SEED_ADMIN_PASSWORD }}
+      SEED_ADMIN_USERNAME: ${{ secrets.DEV_API_SEED_ADMIN_USERNAME }}
 
   deploy-web:
     needs: changes

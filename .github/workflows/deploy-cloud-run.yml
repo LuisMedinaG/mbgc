@@ -39,6 +39,12 @@ on:
         required: false
       ALLOWED_ORIGIN:
         required: false
+      SEED_ADMIN_EMAIL:
+        required: false
+      SEED_ADMIN_PASSWORD:
+        required: false
+      SEED_ADMIN_USERNAME:
+        required: false
 
 permissions:
   contents: read
@@ -81,6 +87,9 @@ jobs:
           _add SUPABASE_URL              "$SUPABASE_URL"
           _add SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
           _add ALLOWED_ORIGIN            "$ALLOWED_ORIGIN"
+          _add SEED_ADMIN_EMAIL          "$SEED_ADMIN_EMAIL"
+          _add SEED_ADMIN_PASSWORD       "$SEED_ADMIN_PASSWORD"
+          _add SEED_ADMIN_USERNAME       "$SEED_ADMIN_USERNAME"
           gcloud run deploy "$SERVICE" \
             --image "$IMAGE" \
             --region "$REGION" \
@@ -97,3 +106,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ALLOWED_ORIGIN: ${{ secrets.ALLOWED_ORIGIN }}
+          SEED_ADMIN_EMAIL: ${{ secrets.SEED_ADMIN_EMAIL }}
+          SEED_ADMIN_PASSWORD: ${{ secrets.SEED_ADMIN_PASSWORD }}
+          SEED_ADMIN_USERNAME: ${{ secrets.SEED_ADMIN_USERNAME }}
