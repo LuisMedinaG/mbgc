@@ -48,6 +48,6 @@ JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
 ## Infrastructure
 
 - **GCP Cloud Run** — `mbgc-api` single service (`services/api`)
-- **Cloudflare Pages** — `web/` frontend
+- **Cloudflare** — Pages frontend, DNS for `lumedina.dev` (see [docs/runbook/cloudflare/](docs/runbook/cloudflare/))
 - **Supabase** — auth provider + Postgres (migrations in `services/api/migrations/`)
 - **Terraform** — `infra/` is the single source of truth (no Fly.io)
