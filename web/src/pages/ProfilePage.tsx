@@ -26,6 +26,8 @@ export default function ProfilePage() {
   const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState<Msg | null>(null)
 
+  // ref: profile.VIEW.2 — displays Supabase username from user_metadata
+  // ref: profile.VIEW.3 — displays configured BGG username (editable)
   useEffect(() => {
     api.getProfile().then(p => {
       setUsername(p.username)
@@ -45,6 +47,9 @@ export default function ProfilePage() {
     } finally { setBggSaving(false) }
   }
 
+  // ref: profile.CHANGE_PASSWORD.1 — requires current and new password fields
+  // ref: profile.CHANGE_PASSWORD.3 — calls Supabase Auth API to update password
+  // ref: profile.CHANGE_PASSWORD.4 — shows confirmation on success, error without leaking details
   async function changePassword() {
     setPwSaving(true); setPwMsg(null)
     try {

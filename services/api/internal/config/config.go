@@ -27,17 +27,17 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		Port:        getenv("PORT", "8080"),
-		DatabaseURL: sanitizeDatabaseURL(mustenv("DATABASE_URL")),
-		SupabaseURL: mustenv("SUPABASE_URL"),
+		Port:        getenv("PORT", "8080"),          // ref: api-layer.CONFIG.3 — defaults to 8080
+		DatabaseURL: sanitizeDatabaseURL(mustenv("DATABASE_URL")),  // ref: api-layer.CONFIG.1 — required, panics if missing
+		SupabaseURL: mustenv("SUPABASE_URL"),          // ref: api-layer.CONFIG.2 — required, panics if missing
 		// Optional legacy HS256 shared secret — leave empty for JWKS-only (recommended).
 		JWTSecret:         os.Getenv("SUPABASE_JWT_SECRET"),
 		ServiceRoleKey:    mustenv("SUPABASE_SERVICE_ROLE_KEY"),
-		AllowedOrigin:     getenv("ALLOWED_ORIGIN", "http://localhost:5173"),
-		BGGToken:          os.Getenv("BGG_TOKEN"),
-		BGGCookie:         os.Getenv("BGG_COOKIE"),
-		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),
-		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),
+		AllowedOrigin:     getenv("ALLOWED_ORIGIN", "http://localhost:5173"),  // ref: api-layer.CONFIG.4 — defaults to localhost:5173
+		BGGToken:          os.Getenv("BGG_TOKEN"),    // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
+		BGGCookie:         os.Getenv("BGG_COOKIE"),   // ref: api-layer.CONFIG.5
+		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),    // ref: api-layer.CONFIG.6 — defaults to 3
+		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),  // ref: api-layer.CONFIG.6 — defaults to 20
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),

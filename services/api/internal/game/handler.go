@@ -18,20 +18,21 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// ref: auth.MIDDLEWARE.6 — JWT auth middleware applied per-route, not globally
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
-	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))
-	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))
-	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))
-	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections)))
-	mux.Handle("POST /api/v1/games/bulk-collections", auth(http.HandlerFunc(h.BulkCollections)))
-	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))
-	mux.Handle("POST /api/v1/games/{id}/player-aids", auth(http.HandlerFunc(h.UploadPlayerAid)))
-	mux.Handle("DELETE /api/v1/games/{id}/player-aids/{aid_id}", auth(http.HandlerFunc(h.DeletePlayerAid)))
-	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))
-	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))
-	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))
-	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection)))
-	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))
+	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))            // ref: collection.API.1
+	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))          // ref: game-detail.DETAIL_VIEW.1
+	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))    // ref: game-detail.DELETE.1
+	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections))) // ref: vibes.ASSIGN.1
+	mux.Handle("POST /api/v1/games/bulk-collections", auth(http.HandlerFunc(h.BulkCollections)))    // ref: vibes.BULK.1
+	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))        // ref: game-detail.RULES_URL.2
+	mux.Handle("POST /api/v1/games/{id}/player-aids", auth(http.HandlerFunc(h.UploadPlayerAid)))    // ref: game-detail.PLAYER_AIDS.1
+	mux.Handle("DELETE /api/v1/games/{id}/player-aids/{aid_id}", auth(http.HandlerFunc(h.DeletePlayerAid))) // ref: game-detail.PLAYER_AIDS.6
+	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))    // ref: vibes.LIST.1
+	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))  // ref: vibes.CRUD.1
+	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))  // ref: vibes.CRUD.3
+	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection))) // ref: vibes.CRUD.4
+	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))              // ref: vibes.DISCOVER.1
 }
 
 func requireUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
@@ -96,6 +97,7 @@ func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ref: vibes.ASSIGN.2 — replaces entire collection assignment set for the game
 func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 	userID, ok := requireUserID(w, r)
 	if !ok {

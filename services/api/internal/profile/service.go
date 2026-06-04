@@ -11,6 +11,7 @@ func NewService(st *Store) *Service {
 }
 
 // GetProfile returns the profile, creating it on first access (lazy upsert).
+// ref: profile.VIEW.1 — GET /api/v1/profile with lazy upsert on first access
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	p, err := s.store.GetProfile(ctx, userID)
 	if err == nil {

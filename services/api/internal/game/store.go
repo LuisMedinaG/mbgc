@@ -31,6 +31,7 @@ func (s *Store) CreateGame(ctx context.Context, userID string, bggID int) (int64
 	return 0, fmt.Errorf("not implemented")
 }
 
+// ref: auth.MULTI_TENANCY.1 — WHERE user_id = $1 scopes all queries to the owner
 func (s *Store) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
 	var exists bool
 	err := s.db.QueryRow(ctx,
@@ -39,6 +40,8 @@ func (s *Store) GameExistsByBGGID(ctx context.Context, userID string, bggID int)
 	return exists, err
 }
 
+// ref: game-detail.DELETE.3 — verifies user_id matches game owner before deletion
+// ref: auth.MULTI_TENANCY.3 — mutation verifies user_id from JWT matches resource owner
 func (s *Store) DeleteGame(ctx context.Context, id int64, userID string) error {
 	tag, err := s.db.Exec(ctx,
 		`DELETE FROM games.games WHERE id = $1 AND user_id = $2`, id, userID)
@@ -66,6 +69,7 @@ func (s *Store) UpdateCollection(ctx context.Context, id int64, userID, name, de
 	return fmt.Errorf("not implemented")
 }
 
+// ref: auth.MULTI_TENANCY.3 — verifies user_id before deleting collection
 func (s *Store) DeleteCollection(ctx context.Context, id int64, userID string) error {
 	tag, err := s.db.Exec(ctx,
 		`DELETE FROM games.collections WHERE id = $1 AND user_id = $2`, id, userID)
