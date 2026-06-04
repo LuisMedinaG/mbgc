@@ -59,6 +59,7 @@ jobs:
           set +e
           terraform plan -no-color -detailed-exitcode -out=tfplan 2>&1 | tee plan.txt
           echo "exitcode=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          echo "plan_file=$PWD/plan.txt" >> "$GITHUB_OUTPUT"
           set -e
 
       - name: Post plan comment
@@ -67,7 +68,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const raw = fs.readFileSync('infra/environments/prod/plan.txt', 'utf8');
+            const raw = fs.readFileSync('${{ steps.plan.outputs.plan_file }}', 'utf8');
             const plan = raw.length > 60000 ? raw.slice(0, 60000) + '\n\n...(truncated — see full output in CI logs)' : raw;
             const exitcode = '${{ steps.plan.outputs.exitcode }}';
             const status = exitcode === '0' ? '✅ no changes' : exitcode === '2' ? '⚠️ changes pending' : '❌ plan failed';

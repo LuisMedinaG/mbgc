@@ -14,13 +14,11 @@
 package envelope
 
 // Response wraps a single resource.
-// ref: api-layer.ENVELOPE.1 — single-item response with data field
 type Response[T any] struct {
 	Data T `json:"data"`
 }
 
 // ListResponse wraps a paginated collection.
-// ref: api-layer.ENVELOPE.2 — paginated list with page/limit/total metadata
 type ListResponse[T any] struct {
 	Data []T  `json:"data"`
 	Meta Meta `json:"meta"`
@@ -34,7 +32,6 @@ type Meta struct {
 }
 
 // ErrorResponse is returned for all error conditions.
-// ref: api-layer.ENVELOPE.3 — error response with code, message, optional details
 type ErrorResponse struct {
 	Error APIError `json:"error"`
 }
@@ -47,7 +44,6 @@ type APIError struct {
 }
 
 // New wraps a single resource in a Response.
-// ref: api-layer.ENVELOPE.4 — New/NewList/NewError constructors
 func New[T any](data T) Response[T] {
 	return Response[T]{Data: data}
 }

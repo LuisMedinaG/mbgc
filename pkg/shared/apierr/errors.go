@@ -23,10 +23,6 @@ const (
 
 // Sentinel errors returned by the service layer.
 // Use errors.Is for comparison; wrap with fmt.Errorf("%w", ...) to add context.
-// ref: api-layer.APIERR.1 — defines sentinel errors for all HTTP categories
-// ref: api-layer.APIERR.2 — each sentinel is a unique value identifiable via errors.Is
-// ref: api-layer.APIERR.3 — provides Is* helper functions
-// ref: api-layer.APIERR.4 — each wraps a machine-readable code
 var (
 	ErrBadRequest    = errors.New("bad request")
 	ErrDuplicate     = errors.New("duplicate")

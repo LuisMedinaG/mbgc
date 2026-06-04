@@ -2,8 +2,8 @@ package game
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,17 +18,17 @@ func NewStore(db *pgxpool.Pool) *Store {
 
 func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
 	// TODO: full-text search with tsvector + filters
-	return nil, 0, fmt.Errorf("not implemented")
+	return nil, 0, apierr.ErrNotFound
 }
 
 func (s *Store) GetGame(ctx context.Context, id int64, userID string) (*Game, error) {
 	// TODO: fetch game + collections + player aids
-	return nil, fmt.Errorf("not implemented")
+	return nil, apierr.ErrNotFound
 }
 
 func (s *Store) CreateGame(ctx context.Context, userID string, bggID int) (int64, error) {
 	// TODO: INSERT INTO games.games ...
-	return 0, fmt.Errorf("not implemented")
+	return 0, apierr.ErrNotFound
 }
 
 // ref: auth.MULTI_TENANCY.1 — WHERE user_id = $1 scopes all queries to the owner
@@ -49,24 +49,24 @@ func (s *Store) DeleteGame(ctx context.Context, id int64, userID string) error {
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("not found")
+		return apierr.ErrNotFound
 	}
 	return nil
 }
 
 func (s *Store) ListCollections(ctx context.Context, userID string) ([]Collection, error) {
 	// TODO: SELECT ... FROM games.collections WHERE user_id = $1 ORDER BY name
-	return nil, fmt.Errorf("not implemented")
+	return nil, apierr.ErrNotFound
 }
 
 func (s *Store) CreateCollection(ctx context.Context, userID, name, description string) (*Collection, error) {
 	// TODO: INSERT INTO games.collections ...
-	return nil, fmt.Errorf("not implemented")
+	return nil, apierr.ErrNotFound
 }
 
 func (s *Store) UpdateCollection(ctx context.Context, id int64, userID, name, description string) error {
 	// TODO: UPDATE games.collections ...
-	return fmt.Errorf("not implemented")
+	return apierr.ErrNotFound
 }
 
 // ref: auth.MULTI_TENANCY.3 — verifies user_id before deleting collection
@@ -77,14 +77,14 @@ func (s *Store) DeleteCollection(ctx context.Context, id int64, userID string) e
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("not found")
+		return apierr.ErrNotFound
 	}
 	return nil
 }
 
 func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error {
 	// TODO: transaction — delete existing, insert new
-	return fmt.Errorf("not implemented")
+	return apierr.ErrNotFound
 }
 
 // ref: game-detail.RULES_URL.2 — stores validated rules URL scoped to user_id
@@ -97,7 +97,7 @@ func (s *Store) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesU
 		return err
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("not found")
+		return apierr.ErrNotFound
 	}
 	return nil
 }

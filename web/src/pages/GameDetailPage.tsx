@@ -110,7 +110,7 @@ export default function GameDetailPage() {
 
   return (
     <div className="pb-2">
-      {/* Hero image — ref: game-detail.DETAIL_VIEW.2 — displays hero image at top */}
+      {/* ref: game-detail.DETAIL_VIEW.2 — full metadata render (hero image, stats, tags, etc.) */}
       <div className="-mx-4 h-[240px] relative overflow-hidden bg-edge">
         <img
           src={game.image || game.thumbnail}
@@ -140,7 +140,7 @@ export default function GameDetailPage() {
         </div>
       </div>
 
-      {/* Stats row — ref: game-detail.DETAIL_VIEW.4 players, .5 playtime, .6 weight */}
+      {/* Stats row */}
       <div className="card grid grid-cols-3 my-4 overflow-hidden">
         {[
           { label: 'Players',    value: playersStr(game), sub: 'count' },
@@ -158,7 +158,7 @@ export default function GameDetailPage() {
         ))}
       </div>
 
-      {/* Description — ref: game-detail.DETAIL_VIEW.8 */}
+      {/* Description */}
       {game.description && (
         <div className="card p-4 mb-3">
           <h2 className="text-[0.85rem] font-bold text-muted uppercase tracking-wider mb-3">About</h2>
@@ -178,7 +178,7 @@ export default function GameDetailPage() {
         </div>
       )}
 
-      {/* Tags — ref: game-detail.DETAIL_VIEW.9 — type, category, mechanic chips */}
+      {/* Tags */}
       {(game.types.length > 0 || game.categories.length > 0 || game.mechanics.length > 0) && (
         <div className="card p-4 mb-3 flex flex-col gap-3">
           <TagList label="Type" tags={game.types} variant="type" />

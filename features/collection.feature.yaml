@@ -11,49 +11,27 @@ components:
     name: Game list/grid display
     description: Fetches and displays the user's board game collection
     requirements:
-      1: Fetches games from GET /api/v1/games with pagination (page/limit)
-      2: Supports full-text search via Postgres tsvector on game name and description
-      3: Supports list view (vertical list items) and grid view (card tiles)
-      4: Persists view mode preference (list vs grid) in localStorage
-      5: Game cards show thumbnail, name, player count, playtime, weight badge, and star rating
-      6: Game list items show thumbnail, name, player count, playtime, weight badge, and assigned vibe pills
-      7: Shows loading skeleton placeholders while fetching
-      8: Shows empty state illustration when no games match current filters
-      9: Shows error message on API failure
+      1: Fetches games from GET /api/v1/games with pagination (page/limit); backend returns total count
+      2: Supports list view and grid view; view mode persisted in localStorage
+      3: Shows loading skeleton while fetching, empty state when no games match, error message on failure
 
   FILTERS:
     name: Game filters
-    description: Client-side filtering by category, players, playtime, and weight
+    description: Filter by search, category, players, playtime, and weight
     requirements:
       1: Search input debounced at 300ms before triggering API call
-      2: Category dropdown filters games by BGG category (type/category/mechanic)
-      3: "Players dropdown filters by player count ranges: solo, 1-2, exactly 2, 1-3, 1-4, 5+"
-      4: "Playtime dropdown filters by ranges: under 30min, 30-60min, over 60min"
-      5: "Weight dropdown filters by complexity: light (1-2), medium (2-4), heavy (4-5)"
-      6: Active filters are displayed as removable chips below the filter bar
-      7: Removing a filter chip resets that filter to default and re-filters results
-
-  PAGINATION:
-    name: Pagination
-    description: Paginated game results
-    requirements:
-      1: Backend returns total count and current page/limit in response metadata
-      2: Frontend renders pagination controls when more results exist
+      2: "Dropdowns filter by: category (BGG type/category/mechanic), player count ranges, playtime ranges, weight/complexity"
+      3: Active filters shown as removable chips below the filter bar; removing a chip resets that filter
 
   API:
     name: Backend API
-    description: Server-side game listing and filtering
+    description: Server-side game listing and full-text search
     requirements:
-      1: "GET /api/v1/games accepts query params: search, category, page, limit"
-      2: Full-text search uses ts_rank with to_tsvector on search_vector column
-      3: Results are scoped to the authenticated user's user_id
-      4: "Response includes game metadata: id, name, thumbnail, players, playtime, weight, rating, collections"
-      5: Lists distinct categories from the user's game collection for filter dropdowns
+      1: "GET /api/v1/games accepts search, category, page, limit; results scoped to user_id; returns game metadata with assigned collections"
+      2: Full-text search uses ts_rank with to_tsvector on search_vector; endpoint also returns distinct categories for filter dropdowns
 
 constraints:
   PERF:
-    name: Performance constraints
+    name: Performance
     requirements:
-      1: Client-side filtering is memoized (useMemo) to avoid re-computation on every render
-      2: Search debounce prevents API calls on every keystroke
-      3: Image loading uses lazy loading and fallback placeholder for missing thumbnails
+      1: Client-side filter results are memoized (useMemo); search is debounced; images use lazy loading with fallback placeholder

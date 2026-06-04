@@ -71,8 +71,22 @@ jobs:
           go build ./services/api/...
       - name: Test
         run: |
-          go test ./pkg/shared/... -cover
-          go test ./services/api/... -cover
+          go test ./pkg/shared/... -coverprofile=coverage-shared.out -covermode=atomic
+          go test ./services/api/... -coverprofile=coverage-api.out -covermode=atomic
+          echo '## Coverage' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage-api.out >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: |
+            coverage-shared.out
+            coverage-api.out
+          retention-days: 7
       - name: Vet
         run: |
           go vet ./pkg/shared/...
