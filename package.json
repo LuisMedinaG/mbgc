@@ -1,5 +1,13 @@
 {
   "devDependencies": {
-    "@acai.sh/cli": "^0.0.3"
+    "@acai.sh/cli": "^0.0.3",
+    "@types/bun": "latest"
+  },
+  "name": "mbgc",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "peerDependencies": {
+    "typescript": "^5"
   }
 }

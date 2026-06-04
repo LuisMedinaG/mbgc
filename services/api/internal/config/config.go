@@ -22,6 +22,7 @@ type Config struct {
 	// Admin seed — only used on first boot if set. Idempotent.
 	SeedAdminEmail    string
 	SeedAdminPassword string
+	SeedAdminUsername string // optional display name; falls back to email in JWTs if unset
 }
 
 func Load() Config {
@@ -39,6 +40,7 @@ func Load() Config {
 		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
+		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),
 	}
 }
 

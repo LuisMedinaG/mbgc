@@ -6,6 +6,8 @@ set -eu
 PROJECT="${GCP_PROJECT:-myboardgamecollection-494214}"
 REGION="${GCP_REGION:-us-central1}"
 API_HOST="${API_HOST:-api.lumedina.dev}"
+CF_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}"
+CF_API_TOKEN="${CLOUDFLARE_API_TOKEN:-}"
 
 EXPECTED_SERVICES="mbgc-auth-service mbgc-game-service mbgc-gateway mbgc-importer-service myboardgamecollection"
 
@@ -35,4 +37,35 @@ case "$code" in
   *) fail "gateway unreachable (http=$code)" ;;
 esac
 
+echo ""
+echo "==> Cloudflare Pages deployment status"
+
+if [ -z "$CF_ACCOUNT_ID" ] || [ -z "$CF_API_TOKEN" ]; then
+  echo "warn: CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not set — skipping Pages checks"
+else
+  _cf_resp="$(curl -s -H "Authorization: Bearer $CF_API_TOKEN" \
+    "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/pages/projects/mbgc-web/deployments" || printf '{}')"
+
+  _success="$(printf '%s' "$_cf_resp" | jq -r '.success // false')"
+  if [ "$_success" != "true" ]; then
+    _error="$(printf '%s' "$_cf_resp" | jq -r '.errors[0].message // "unknown error"')"
+    echo "warn: cloudflare api error — $_error"
+  else
+    _latest="$(printf '%s' "$_cf_resp" | jq -r '.result[0] // empty')"
+    if [ -z "$_latest" ]; then
+      echo "warn: no Pages deployments found"
+    else
+      _status="$(printf '%s' "$_latest" | jq -r '.status // "unknown"')"
+      _created="$(printf '%s' "$_latest" | jq -r '.created_on // "unknown"')"
+      case "$_status" in
+        success)   ok "latest Pages build succeeded ($_created)" ;;
+        failure)   fail "latest Pages build failed ($_created) — check dashboard" ;;
+        queued)    echo "warn: Pages build in progress — recheck later" ;;
+        *)         echo "warn: Pages build status unknown ($_status)" ;;
+      esac
+    fi
+  fi
+fi
+
+echo ""
 echo "==> All smoke checks passed"

@@ -22,12 +22,13 @@ resource "google_cloud_run_v2_service" "this" {
 
   lifecycle {
     # Image, env vars, resources, and scaling are owned by each service repo's
-    # CI/CD (`gcloud run deploy` flags). Ignoring the entire template prevents
-    # Terraform from overwriting the live container spec when updating other
-    # fields (labels, ingress, service_account, deletion_protection).
+    # CI/CD (`gcloud run deploy` flags). Ignoring template + top-level scaling
+    # prevents Terraform from overwriting the live container spec or re-introducing
+    # drift from the service-level scaling block set by gcloud.
     # See: https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
     ignore_changes = [
       template,
+      scaling,
       client,
       client_version,
     ]

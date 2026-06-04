@@ -4,6 +4,7 @@ Common issues and their fixes for the mbgc infrastructure.
 
 ## Categories
 
+- [Cloudflare](cloudflare/) — DNS, Pages, token management, setup
 - [Cloud Run](cloud-run/)
 - [Terraform](terraform/)
 - [Supabase](supabase/)

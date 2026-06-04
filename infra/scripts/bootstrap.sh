@@ -165,6 +165,18 @@ prompt_value CLOUDFLARE_ZONE_ID \
   "${CLOUDFLARE_ZONE_ID:-}" \
   ""
 
+printf '\n── cloudflare token validation ──\n'
+_cf_response="$(curl -s -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+  https://api.cloudflare.com/client/v4/user/tokens/verify || printf '{}')"
+_cf_status="$(printf '%s' "$_cf_response" | jq -r '.success // false')"
+if [ "$_cf_status" = "true" ]; then
+  _cf_token_id="$(printf '%s' "$_cf_response" | jq -r '.result.id // "unknown"')"
+  printf '  ✓ token valid (id: %s)\n' "${_cf_token_id:0:16}..."
+else
+  _cf_error="$(printf '%s' "$_cf_response" | jq -r '.errors[0].message // "unknown error"')"
+  die "invalid cloudflare token — $_cf_error (see: dash.cloudflare.com/profile/api-tokens)"
+fi
+
 printf '\n  prod API (Supabase → Settings → Database / API):\n'
 prompt_secret API_DATABASE_URL \
   "Prod DATABASE_URL (Settings → Database → URI, port 5432)" \
