@@ -163,6 +163,8 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 **TypeScript:**
 - Strict mode, no `any`
 - All API calls through `web/src/lib/api.ts` — never raw `fetch()` in components or hooks
+- Server state via TanStack Query (`@tanstack/react-query` v5) — use `useQuery`/`useMutation`; never hand-roll `useState`+`useEffect` for API calls. Query keys in `web/src/lib/queryKeys.ts`, client config in `web/src/lib/queryClient.ts`
+- Hook conventions: `useGames(filters)`, `useGame(id)`, `useCollections()`, `useProfile()` — one hook per domain, exported from `web/src/hooks/`
 
 ## Git Workflow
 
