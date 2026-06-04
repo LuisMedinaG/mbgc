@@ -1,9 +1,10 @@
 # deploy-cloud-run.yml — Reusable workflow: build Docker image and deploy to Cloud Run.
 # Called by pipeline.yml (deploy-api-prod / deploy-api-dev jobs). Not triggered directly.
 #
-# Steps: GCP auth via Workload Identity Federation → docker build + push to Artifact Registry
-#        (tagged with commit SHA) → gcloud run deploy with non-empty env vars.
-# ref: ci-cd.DEPLOY_API.4, ci-cd.DEPLOY_API.5, ci-cd.DEPLOY_API.6
+# Steps: GCP auth via Workload Identity Federation → run DB migrations → docker build + push
+#        to Artifact Registry (tagged with commit SHA) → gcloud run deploy with non-empty env vars.
+# Migrations use raw psql — safe to run every deploy because all SQL is idempotent (IF NOT EXISTS).
+# ref: ci-cd.DEPLOY_API.4, ci-cd.DEPLOY_API.5, ci-cd.DEPLOY_API.6, ci-cd.DEPLOY_API.7
 name: Deploy to Cloud Run
 
 on:
@@ -63,6 +64,16 @@ jobs:
       IMAGE: ${{ inputs.region }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mbgc/${{ inputs.service_name }}:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Run database migrations
+        run: |
+          command -v psql || sudo apt-get install -y --no-install-recommends postgresql-client
+          for f in services/api/migrations/*.up.sql; do
+            echo "→ $f"
+            psql "$DATABASE_URL" -f "$f"
+          done
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - id: auth
         uses: google-github-actions/auth@v2

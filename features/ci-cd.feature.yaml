@@ -46,6 +46,7 @@ components:
       4: Docker image is tagged with the commit SHA for traceability
       5: Empty optional secrets (SEED_ADMIN_*) are omitted from --update-env-vars to avoid overwriting existing Cloud Run values
       6: GCP auth uses Workload Identity Federation — no service account key files stored in GitHub
+      7: Database migrations run via psql before the Cloud Run deploy on every push — all SQL is idempotent (IF NOT EXISTS / CREATE OR REPLACE)
 
   DEPLOY_WEB:
     name: Web deployment

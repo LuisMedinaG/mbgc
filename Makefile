@@ -1,5 +1,5 @@
 .PHONY: setup-local setup-infra bootstrap dev db-migrate db-reset test lint build \
-        rotate-secrets acai-push acai-status acai-features help
+        rotate-secrets acai-push acai-status acai-features sync-branch-protection help
 
 # Root Makefile — mbgc monorepo
 # Run `make help` to see all targets.
@@ -106,6 +106,19 @@ acai-status:
 ## acai-features: List all features
 acai-features:
 	npx @acai.sh/cli features
+
+# ── GitHub ───────────────────────────────────────────────────────────────────
+
+## sync-branch-protection: Update GitHub required status checks to match pipeline.yml job names
+## sync-branch-protection: Run this after renaming any job in pipeline.yml
+sync-branch-protection:
+	@BODY='{"required_status_checks":{"strict":false,"contexts":["Go","Web","Infra Lint","Branch Rules"]},"enforce_admins":false,"required_pull_request_reviews":null,"restrictions":null}'; \
+	for branch in dev main; do \
+		echo "$$BODY" | gh api --method PUT \
+		  "repos/LuisMedinaG/mbgc/branches/$$branch/protection" \
+		  --input - \
+		  && echo "✓ $$branch" || echo "✗ $$branch (run: gh auth login)"; \
+	done
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 

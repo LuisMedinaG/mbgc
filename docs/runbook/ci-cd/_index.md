@@ -10,17 +10,50 @@ PR opened/updated
   └── infra-lint     (terraform fmt + tflint)
 
 Push to dev
-  ├── go ──────────► deploy-api-dev   (Cloud Run: mbgc-api-dev)
+  ├── go ──────────► deploy-api-dev   (migrate dev DB → deploy Cloud Run: mbgc-api-dev)
   ├── web            (lint + build, no web deploy on dev)
   └── infra-lint
 
 Push to main
-  ├── go ──────────► deploy-api-prod  (Cloud Run: mbgc-api)
+  ├── go ──────────► deploy-api-prod  (migrate prod DB → deploy Cloud Run: mbgc-api)
   ├── web ─────────► deploy-web       (Cloudflare Pages: mbgc-web)
   └── infra-lint
 ```
 
 All jobs live in `.github/workflows/pipeline.yml`. Deploy jobs have `needs: go` or `needs: web` — they cannot run unless CI passes.
+
+## Database migrations
+
+Migrations run automatically as part of every API deploy (inside `deploy-cloud-run.yml`, before the Cloud Run deploy). All migration SQL uses `IF NOT EXISTS` / `CREATE OR REPLACE` — safe to run every time.
+
+**Dev vs prod Supabase:**
+
+| Environment | Who runs migrations | Database |
+|---|---|---|
+| Local dev | `make db-migrate` (manual) | Local Supabase at `:54322` |
+| Dev cloud (`mbgc-api-dev`) | CI on push to `dev` | `DEV_API_DATABASE_URL` secret → dev Supabase project |
+| Prod cloud (`mbgc-api`) | CI on push to `main` | `API_DATABASE_URL` secret → prod Supabase project |
+
+The API does **not** run migrations on boot — it only connects to the pool. Migrations are a CI concern.
+
+If you need to apply a migration manually (e.g. hotfix, rollback):
+```sh
+# Against prod:
+psql "$API_DATABASE_URL" -f services/api/migrations/NNN_name.up.sql
+
+# Against dev:
+psql "$DEV_API_DATABASE_URL" -f services/api/migrations/NNN_name.up.sql
+```
+
+## Branch protection sync
+
+When you rename a job in `pipeline.yml`, GitHub branch protection still references the old name and will block all PRs. Run:
+
+```sh
+make sync-branch-protection
+```
+
+A Claude hook will remind you automatically whenever `pipeline.yml` is edited.
 
 Supporting workflows (not for day-to-day development):
 
