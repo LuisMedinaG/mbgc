@@ -74,11 +74,13 @@ jobs:
         run: command -v psql || sudo apt-get install -y --no-install-recommends postgresql-client
 
       - name: Backup schema before migration
+        if: ${{ !inputs.skip_migrations }}
         run: pg_dump "$DATABASE_URL" --schema-only --no-owner --no-acl -f /tmp/schema-backup.sql
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - uses: actions/upload-artifact@v4
+        if: ${{ !inputs.skip_migrations }}
         with:
           name: schema-backup-${{ github.sha }}
           path: /tmp/schema-backup.sql
@@ -87,7 +89,7 @@ jobs:
       - name: Run database migrations
         if: ${{ !inputs.skip_migrations }}
         run: |
-          for f in services/api/migrations/*.up.sql; do
+          for f in $(ls services/api/migrations/*.up.sql | sort); do
             echo "→ $f"
             psql "$DATABASE_URL" -f "$f"
           done

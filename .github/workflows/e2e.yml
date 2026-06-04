@@ -10,7 +10,7 @@ on:
       branch:
         description: Branch to test
         required: false
-        default: staging
+        default: dev
       browser:
         description: Browser
         required: false

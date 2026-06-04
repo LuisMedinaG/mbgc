@@ -194,6 +194,7 @@ refactor/*
 - Running `supabase db push` — this writes to the hosted production database
 - New external service integrations or third-party dependencies
 - Schema changes (migrations in `services/api/migrations/`)
+- Using `skip_migrations: true` on a prod deploy — only safe when the new code is schema-compatible with the current DB
 
 **Never:**
 - Push directly to `main` or `dev`

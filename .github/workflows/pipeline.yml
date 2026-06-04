@@ -71,8 +71,8 @@ jobs:
           go build ./services/api/...
       - name: Test
         run: |
-          go test ./pkg/shared/... -coverprofile=coverage-shared.out -covermode=atomic
-          go test ./services/api/... -coverprofile=coverage-api.out -covermode=atomic
+          go test -race ./pkg/shared/... -coverprofile=coverage-shared.out -covermode=atomic
+          go test -race ./services/api/... -coverprofile=coverage-api.out -covermode=atomic
           echo '## Coverage' >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
