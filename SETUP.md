@@ -6,6 +6,7 @@ Single source of truth for getting mbgc running from scratch.
 
 - Go 1.25+, Bun, Docker (for Supabase), Terraform 1.5+
 - Supabase CLI: `brew install supabase/tap/supabase`
+- golang-migrate CLI: `brew install golang-migrate`
 - GitHub CLI: `brew install gh`
 - gcloud CLI (prod only): `brew install --cask google-cloud-sdk`
 

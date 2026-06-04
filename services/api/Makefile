@@ -22,8 +22,8 @@ tidy:
 
 migrate-up:
 	bash -c 'set -a; source .env 2>/dev/null; set +a; \
-	  for f in migrations/*.up.sql; do echo "applying $$f"; psql "$$DATABASE_URL" -f "$$f"; done'
+	  migrate -path migrations -database "$$DATABASE_URL" up'
 
 migrate-down:
 	bash -c 'set -a; source .env 2>/dev/null; set +a; \
-	  for f in $$(ls migrations/*.down.sql | sort -r); do echo "reverting $$f"; psql "$$DATABASE_URL" -f "$$f"; done'
+	  migrate -path migrations -database "$$DATABASE_URL" down 1'
