@@ -83,10 +83,9 @@ make test          # run Go tests
 make lint          # lint Go + web + infra
 
 # services/api Makefile:
-make dev           # go run ./cmd/server  (auto-loads .env)
+make dev           # go run ./cmd/server  (auto-loads .env, runs migrations at startup)
 make test-v        # go test -v -race ./...  ← use before every PR
 make tidy          # go mod tidy
-make migrate-up / migrate-down
 
 # Web (from web/):
 make dev           # Vite dev server
@@ -164,6 +163,8 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 **TypeScript:**
 - Strict mode, no `any`
 - All API calls through `web/src/lib/api.ts` — never raw `fetch()` in components or hooks
+- Server state via TanStack Query (`@tanstack/react-query` v5) — use `useQuery`/`useMutation`; never hand-roll `useState`+`useEffect` for API calls. Query keys in `web/src/lib/queryKeys.ts`, client config in `web/src/lib/queryClient.ts`
+- Hook conventions: `useGames(filters)`, `useGame(id)`, `useCollections()`, `useProfile()` — one hook per domain, exported from `web/src/hooks/`
 
 ## Git Workflow
 

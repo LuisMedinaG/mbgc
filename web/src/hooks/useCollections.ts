@@ -1,46 +1,43 @@
-import { useState, useCallback, useEffect } from 'react'
-import { api, type Collection } from '../lib/api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { api } from '../lib/api'
+import { qk } from '../lib/queryKeys'
 
 export function useCollections() {
-  const [collections, setCollections] = useState<Collection[]>([])
-  const [loading, setLoading] = useState(true)
+  const client = useQueryClient()
 
-  const fetchCollections = useCallback(async () => {
-    try {
-      const data = await api.listCollections()
-      setCollections(data)
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const { data: collections = [], isLoading } = useQuery({
+    queryKey: qk.collections(),
+    queryFn:  api.listCollections,
+  })
 
-  useEffect(() => {
-    fetchCollections()
-  }, [fetchCollections])
+  function invalidate() {
+    client.invalidateQueries({ queryKey: qk.collections() })
+  }
 
-  const createCollection = useCallback(async (name: string, description = '') => {
-    const col = await api.createCollection(name, description)
-    setCollections(prev => [...prev, col])
-    return col
-  }, [])
+  const createMut = useMutation({
+    mutationFn: ({ name, description }: { name: string; description?: string }) =>
+      api.createCollection(name, description),
+    onSuccess: invalidate,
+  })
 
-  const updateCollection = useCallback(async (id: number, name: string, description = '') => {
-    const updated = await api.updateCollection(id, name, description)
-    setCollections(prev => prev.map(c => c.id === id ? { ...c, name: updated.name } : c))
-  }, [])
+  const updateMut = useMutation({
+    mutationFn: ({ id, name, description }: { id: number; name: string; description?: string }) =>
+      api.updateCollection(id, name, description),
+    onSuccess: invalidate,
+  })
 
-  const deleteCollection = useCallback(async (id: number) => {
-    await api.deleteCollection(id)
-    setCollections(prev => prev.filter(c => c.id !== id))
-  }, [])
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => api.deleteCollection(id),
+    onSuccess:  invalidate,
+  })
 
   return {
     collections,
-    loading,
-    createCollection,
-    updateCollection,
-    deleteCollection,
+    loading:          isLoading,
+    createCollection: (name: string, description?: string) =>
+      createMut.mutateAsync({ name, description }),
+    updateCollection: (id: number, name: string, description?: string) =>
+      updateMut.mutateAsync({ id, name, description }),
+    deleteCollection: (id: number) => deleteMut.mutateAsync(id),
   }
 }

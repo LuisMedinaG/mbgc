@@ -10,12 +10,12 @@ PR opened/updated
   └── infra-lint     (terraform fmt + tflint)
 
 Push to dev
-  ├── go ──────────► deploy-api-dev   (migrate dev DB → deploy Cloud Run: mbgc-api-dev)
+  ├── go ──────────► deploy-api-dev   (deploy Cloud Run: mbgc-api-dev; migrations run at startup)
   ├── web            (lint + build, no web deploy on dev)
   └── infra-lint
 
 Push to main
-  ├── go ──────────► deploy-api-prod  (migrate prod DB → deploy Cloud Run: mbgc-api)
+  ├── go ──────────► deploy-api-prod  (deploy Cloud Run: mbgc-api; migrations run at startup)
   ├── web ─────────► deploy-web       (Cloudflare Pages: mbgc-web)
   └── infra-lint
 ```
@@ -49,12 +49,16 @@ psql "$DATABASE_URL" -f schema-backup.sql
 
 ### 3. Emergency skip
 
-If you need to redeploy without touching the DB (e.g. a rollback deploy to an older image):
+If you need to deploy without running migrations (e.g. rollback to an older image that is schema-compatible):
 
-1. Go to **Actions → Pipeline → Run workflow**
-2. Set `skip_migrations: true` in the `deploy-cloud-run.yml` inputs
+Set `SKIP_MIGRATIONS=true` in the Cloud Run service environment variables before deploying:
 
-Or trigger `deploy-cloud-run.yml` directly with `skip_migrations: true`.
+```sh
+gcloud run services update mbgc-api --region=us-central1 \
+  --set-env-vars "SKIP_MIGRATIONS=true"
+```
+
+Remove it after the deploy to re-enable migrations on the next boot.
 
 ---
 
@@ -62,19 +66,19 @@ Or trigger `deploy-cloud-run.yml` directly with `skip_migrations: true`.
 
 | Environment | Who runs migrations | Database |
 |---|---|---|
-| Local dev | `make db-migrate` (manual) | Local Supabase at `:54322` |
-| Dev cloud (`mbgc-api-dev`) | CI on push to `dev` (automatic) | `DEV_API_DATABASE_URL` → dev Supabase project |
-| Prod cloud (`mbgc-api`) | CI on push to `main` (after approval) | `API_DATABASE_URL` → prod Supabase project |
+| Local dev | auto on `make dev` (server startup) or `make db-migrate` (manual) | Local Supabase at `:54322` |
+| Dev cloud (`mbgc-api-dev`) | auto on deploy (server startup via golang-migrate) | `DEV_API_DATABASE_URL` → dev Supabase project |
+| Prod cloud (`mbgc-api`) | auto on deploy (server startup via golang-migrate, after approval) | `API_DATABASE_URL` → prod Supabase project |
 
-The API does **not** run migrations on boot — it only connects to the pool. Migrations are a CI concern.
+The API **runs migrations at startup** via golang-migrate (SQL files embedded in binary, version tracked in `schema_migrations` table). No separate migration step in CI.
 
-If you need to apply a migration manually (e.g. hotfix, rollback):
+If you need to apply a migration manually against a live DB (e.g. hotfix, rollback):
 ```sh
 # Against prod:
-psql "$API_DATABASE_URL" -f services/api/migrations/NNN_name.up.sql
+migrate -path services/api/migrations -database "$API_DATABASE_URL" up
 
 # Against dev:
-psql "$DEV_API_DATABASE_URL" -f services/api/migrations/NNN_name.up.sql
+migrate -path services/api/migrations -database "$DEV_API_DATABASE_URL" up
 ```
 
 ## Branch protection sync

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { api, ApiError } from '../lib/api'
+import { ApiError } from '../lib/api'
+import { useProfile } from '../hooks/useProfile'
 
 type Msg = { ok: boolean; text: string }
 
@@ -15,50 +16,46 @@ function SaveButton({ onClick, disabled, saving, label }: {
 }
 
 export default function ProfilePage() {
-  const [username, setUsername] = useState('')
-  const [bggUsername, setBggUsername] = useState('')
+  // ref: profile.VIEW.2 — displays Supabase username from user_metadata
+  // ref: profile.VIEW.3 — displays configured BGG username (editable)
+  const { profile, setBGGUsername, changePassword } = useProfile()
+
   const [bggInput, setBggInput] = useState('')
-  const [bggSaving, setBggSaving] = useState(false)
   const [bggMsg, setBggMsg] = useState<Msg | null>(null)
 
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
-  const [pwSaving, setPwSaving] = useState(false)
   const [pwMsg, setPwMsg] = useState<Msg | null>(null)
 
-  // ref: profile.VIEW.2 — displays Supabase username from user_metadata
-  // ref: profile.VIEW.3 — displays configured BGG username (editable)
+  // Seed the draft from the loaded profile (once, on first load)
   useEffect(() => {
-    api.getProfile().then(p => {
-      setUsername(p.username)
-      setBggUsername(p.bgg_username ?? '')
-      setBggInput(p.bgg_username ?? '')
-    }).catch(() => {})
-  }, [])
+    if (profile?.bgg_username !== undefined) setBggInput(profile.bgg_username)
+  }, [profile?.bgg_username])
+
+  const savedBgg = profile?.bgg_username ?? ''
 
   async function saveBGG() {
-    setBggSaving(true); setBggMsg(null)
+    setBggMsg(null)
     try {
-      const r = await api.setBGGUsername(bggInput.trim())
-      setBggUsername(r.bgg_username)
+      await setBGGUsername.mutateAsync(bggInput.trim())
       setBggMsg({ ok: true, text: 'Saved' })
     } catch (e) {
       setBggMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Failed to save' })
-    } finally { setBggSaving(false) }
+    }
   }
 
   // ref: profile.CHANGE_PASSWORD.1 — requires current and new password fields
   // ref: profile.CHANGE_PASSWORD.3 — calls Supabase Auth API to update password
   // ref: profile.CHANGE_PASSWORD.4 — shows confirmation on success, error without leaking details
-  async function changePassword() {
-    setPwSaving(true); setPwMsg(null)
+  async function handleChangePassword() {
+    setPwMsg(null)
     try {
-      await api.changePassword(currentPw, newPw)
+      await changePassword.mutateAsync({ currentPassword: currentPw, newPassword: newPw })
       setPwMsg({ ok: true, text: 'Password changed' })
       setCurrentPw(''); setNewPw('')
     } catch (e) {
       setPwMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Failed to change password' })
-    } finally { setPwSaving(false) }
+    }
   }
 
   return (
@@ -69,7 +66,7 @@ export default function ProfilePage() {
         <div className="section-label">Account</div>
         <div>
           <div className="field-label">Username</div>
-          <div className="text-[0.95rem] font-medium text-ink">{username || '—'}</div>
+          <div className="text-[0.95rem] font-medium text-ink">{profile?.username || '—'}</div>
         </div>
       </section>
 
@@ -77,15 +74,26 @@ export default function ProfilePage() {
         <div className="section-label">BoardGameGeek</div>
         <div>
           <label htmlFor="bgg-username" className="field-label">BGG Username</label>
-          <input id="bgg-username" className="form-input" value={bggInput}
+          <input
+            id="bgg-username"
+            className="form-input"
+            value={bggInput}
             onChange={e => { setBggInput(e.target.value); setBggMsg(null) }}
-            placeholder="your BGG username" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+            placeholder="your BGG username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
         </div>
         {bggMsg && (
           <div className={`text-sm ${bggMsg.ok ? 'text-[#059669]' : 'text-[#b91c1c]'}`}>{bggMsg.text}</div>
         )}
-        <SaveButton onClick={saveBGG} disabled={bggSaving || bggInput.trim() === bggUsername}
-          saving={bggSaving} label="Save" />
+        <SaveButton
+          onClick={saveBGG}
+          disabled={setBGGUsername.isPending || bggInput.trim() === savedBgg}
+          saving={setBGGUsername.isPending}
+          label="Save"
+        />
       </section>
 
       <section className="card p-5 flex flex-col gap-3">
@@ -105,8 +113,12 @@ export default function ProfilePage() {
         {pwMsg && (
           <div className={`text-sm ${pwMsg.ok ? 'text-[#059669]' : 'text-[#b91c1c]'}`}>{pwMsg.text}</div>
         )}
-        <SaveButton onClick={changePassword} disabled={pwSaving || !currentPw || !newPw}
-          saving={pwSaving} label="Change Password" />
+        <SaveButton
+          onClick={handleChangePassword}
+          disabled={changePassword.isPending || !currentPw || !newPw}
+          saving={changePassword.isPending}
+          label="Change Password"
+        />
       </section>
     </div>
   )
