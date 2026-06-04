@@ -34,4 +34,5 @@ constraints:
   PERF:
     name: Performance
     requirements:
-      1: Client-side filter results are memoized (useMemo); search is debounced; images use lazy loading with fallback placeholder
+      1: Client-side filter results are memoized (useMemo); images use lazy loading with fallback placeholder
+      2: Search is debounced 300ms via useDebounce — the debounced value drives the TanStack Query key, preventing rapid API re-fetches

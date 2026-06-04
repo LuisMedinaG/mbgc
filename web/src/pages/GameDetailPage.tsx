@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { api, type GameDetail, type Collection } from '../lib/api'
+import { useGame } from '../hooks/useGame'
 import { playersStr, weightClass, weightLabel, imgFallback } from '../utils/gameFormatters'
 import TagList from '../components/TagList'
 import PlayerAidManager from '../components/PlayerAidManager'
@@ -11,76 +11,37 @@ const LANG_DEP = ['', 'No language', 'Some text', 'Moderate', 'Extensive', 'Unpl
 export default function GameDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { game, allCollections, loading, error, saveVibes, deleteGame } = useGame(Number(id ?? 0))
 
-  const [game, setGame] = useState<GameDetail | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [descExpanded, setDescExpanded] = useState(false)
-
-  const [allCollections, setAllCollections] = useState<Collection[]>([])
   const [selectedVibeIds, setSelectedVibeIds] = useState<Set<number>>(new Set())
   const [editingVibes, setEditingVibes] = useState(false)
-  const [savingVibes, setSavingVibes] = useState(false)
-
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
-  // ref: game-detail.DETAIL_VIEW.1 — fetches single game with collections and player aids
-  // ref: game-detail.VIBE_ASSIGN.1 — loads all user collections for checklist UI
+  // ref: game-detail.VIBE_ASSIGN.1 — sync local vibe selection when game data loads
   useEffect(() => {
-    if (!id) return
-    setLoading(true)
-    setError('')
-    api.getGame(Number(id))
-      .then(gameData => {
-        setGame(gameData)
-        setSelectedVibeIds(new Set(gameData.vibeCollectionIds))
-        api.listCollections()
-          .then(setAllCollections)
-          .catch(() => {})
-      })
-      .catch(() => setError('Game not found.'))
-      .finally(() => setLoading(false))
-  }, [id])
+    if (game && !editingVibes) setSelectedVibeIds(new Set(game.vibeCollectionIds))
+  }, [game, editingVibes])
 
   // ref: game-detail.VIBE_ASSIGN.2 — calls POST /api/v1/games/{id}/collections with full ID set
-  // ref: game-detail.VIBE_ASSIGN.3 — UI updates immediately without page reload
+  // ref: game-detail.VIBE_ASSIGN.3 — cache invalidation keeps UI current without page reload
   async function handleSaveVibes() {
-    if (!game) return
-    setSavingVibes(true)
-    try {
-      await api.setGameCollections(game.id, [...selectedVibeIds])
-      const savedNames = allCollections.filter(c => selectedVibeIds.has(c.id)).map(c => c.name)
-      setGame(prev => prev ? { ...prev, vibes: savedNames, vibeCollectionIds: [...selectedVibeIds] } : prev)
-      setEditingVibes(false)
-    } catch {
-      // keep open on failure
-    } finally {
-      setSavingVibes(false)
-    }
+    await saveVibes.mutateAsync([...selectedVibeIds])
+    setEditingVibes(false)
   }
 
-  function toggleVibe(id: number) {
+  function toggleVibe(vid: number) {
     setSelectedVibeIds(prev => {
       const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
+      if (next.has(vid)) next.delete(vid)
+      else next.add(vid)
       return next
     })
   }
 
   // ref: game-detail.DELETE.2 — requires confirmation before executing deletion
-  // ref: game-detail.DELETE.4 — navigates back to collection page on success
   async function handleDelete() {
-    if (!game) return
-    setDeleting(true)
-    try {
-      await api.deleteGame(game.id)
-      navigate('/')
-    } catch {
-      setDeleting(false)
-      setConfirmDelete(false)
-    }
+    await deleteGame.mutateAsync()
   }
 
   if (loading) {
@@ -162,9 +123,7 @@ export default function GameDetailPage() {
       {game.description && (
         <div className="card p-4 mb-3">
           <h2 className="text-[0.85rem] font-bold text-muted uppercase tracking-wider mb-3">About</h2>
-          <p
-            className={`text-[0.875rem] leading-relaxed text-ink ${descExpanded ? '' : 'line-clamp-3'}`}
-          >
+          <p className={`text-[0.875rem] leading-relaxed text-ink ${descExpanded ? '' : 'line-clamp-3'}`}>
             {game.description}
           </p>
           {game.description.length > 200 && (
@@ -196,7 +155,7 @@ export default function GameDetailPage() {
           <h2 className="text-[0.85rem] font-bold text-muted uppercase tracking-wider">Vibes</h2>
           {!editingVibes && (
             <button
-              onClick={() => { setSelectedVibeIds(new Set(game.vibeCollectionIds)); setEditingVibes(true) }}
+              onClick={() => setEditingVibes(true)}
               className="pressable bg-transparent border-none text-[0.82rem] text-accent font-semibold cursor-pointer font-sans py-0"
             >
               Edit
@@ -225,10 +184,10 @@ export default function GameDetailPage() {
             <div className="flex gap-2">
               <button
                 onClick={handleSaveVibes}
-                disabled={savingVibes}
+                disabled={saveVibes.isPending}
                 className="btn btn-primary pressable text-[0.85rem] px-3.5 py-1.5 disabled:opacity-50"
               >
-                {savingVibes ? 'Saving…' : 'Save'}
+                {saveVibes.isPending ? 'Saving…' : 'Save'}
               </button>
               <button
                 onClick={() => setEditingVibes(false)}
@@ -273,10 +232,10 @@ export default function GameDetailPage() {
             <span className="text-[0.875rem] text-ink font-semibold">Delete "{game.name}"?</span>
             <button
               onClick={handleDelete}
-              disabled={deleting}
+              disabled={deleteGame.isPending}
               className="pressable px-3.5 py-1.5 text-[0.85rem] font-semibold rounded-lg bg-[#dc2626] text-white border-none cursor-pointer disabled:opacity-60 font-sans"
             >
-              {deleting ? 'Deleting…' : 'Yes, delete'}
+              {deleteGame.isPending ? 'Deleting…' : 'Yes, delete'}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
