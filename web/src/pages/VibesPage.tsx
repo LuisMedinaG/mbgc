@@ -50,6 +50,7 @@ export default function VibesPage() {
     setDeletingId(null)
   }
 
+  // ref: vibes.CRUD.1 — create collection via POST /api/v1/collections
   async function handleCreate() {
     const name = newName.trim()
     if (!name) return
@@ -71,6 +72,7 @@ export default function VibesPage() {
     setDeletingId(null)
   }
 
+  // ref: vibes.CRUD.3 — rename collection via PUT /api/v1/collections/{id}
   async function saveRename(id: number) {
     const name = editingName.trim()
     if (!name) return
@@ -85,6 +87,7 @@ export default function VibesPage() {
     }
   }
 
+  // ref: vibes.CRUD.4 — delete collection via DELETE /api/v1/collections/{id}
   async function handleDelete(id: number) {
     try {
       await deleteCollection(id)
@@ -95,6 +98,9 @@ export default function VibesPage() {
     }
   }
 
+  // ref: vibes.LIST.4 — clicking a collection pill navigates to filtered game view
+  // ref: vibes.DISCOVER.1 — calls GET /api/v1/discover filtered by collection_id
+  // ref: vibes.DISCOVER.3 — response includes total count matching the filtered query
   function selectCollection(id: number) {
     if (id === selectedId) {
       setSelectedId(null)
@@ -133,7 +139,8 @@ export default function VibesPage() {
         </button>
       </div>
 
-      {/* Collection pills */}
+      {/* Collection pills — ref: vibes.LIST.2 color-coded pills, .3 name + game count */}
+      {/* ref: vibes.CRUD.6 — manage mode toggle for rename/delete */}
       {loadingCollections ? (
         <div className="flex flex-wrap gap-2">
           {Array.from({ length: 6 }).map((_, i) => (

@@ -25,6 +25,8 @@ export default function GameDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // ref: game-detail.DETAIL_VIEW.1 — fetches single game with collections and player aids
+  // ref: game-detail.VIBE_ASSIGN.1 — loads all user collections for checklist UI
   useEffect(() => {
     if (!id) return
     setLoading(true)
@@ -41,6 +43,8 @@ export default function GameDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
+  // ref: game-detail.VIBE_ASSIGN.2 — calls POST /api/v1/games/{id}/collections with full ID set
+  // ref: game-detail.VIBE_ASSIGN.3 — UI updates immediately without page reload
   async function handleSaveVibes() {
     if (!game) return
     setSavingVibes(true)
@@ -65,6 +69,8 @@ export default function GameDetailPage() {
     })
   }
 
+  // ref: game-detail.DELETE.2 — requires confirmation before executing deletion
+  // ref: game-detail.DELETE.4 — navigates back to collection page on success
   async function handleDelete() {
     if (!game) return
     setDeleting(true)
@@ -104,7 +110,7 @@ export default function GameDetailPage() {
 
   return (
     <div className="pb-2">
-      {/* Hero image */}
+      {/* Hero image — ref: game-detail.DETAIL_VIEW.2 — displays hero image at top */}
       <div className="-mx-4 h-[240px] relative overflow-hidden bg-edge">
         <img
           src={game.image || game.thumbnail}
@@ -134,7 +140,7 @@ export default function GameDetailPage() {
         </div>
       </div>
 
-      {/* Stats row */}
+      {/* Stats row — ref: game-detail.DETAIL_VIEW.4 players, .5 playtime, .6 weight */}
       <div className="card grid grid-cols-3 my-4 overflow-hidden">
         {[
           { label: 'Players',    value: playersStr(game), sub: 'count' },
@@ -152,7 +158,7 @@ export default function GameDetailPage() {
         ))}
       </div>
 
-      {/* Description */}
+      {/* Description — ref: game-detail.DETAIL_VIEW.8 */}
       {game.description && (
         <div className="card p-4 mb-3">
           <h2 className="text-[0.85rem] font-bold text-muted uppercase tracking-wider mb-3">About</h2>
@@ -172,7 +178,7 @@ export default function GameDetailPage() {
         </div>
       )}
 
-      {/* Tags */}
+      {/* Tags — ref: game-detail.DETAIL_VIEW.9 — type, category, mechanic chips */}
       {(game.types.length > 0 || game.categories.length > 0 || game.mechanics.length > 0) && (
         <div className="card p-4 mb-3 flex flex-col gap-3">
           <TagList label="Type" tags={game.types} variant="type" />

@@ -63,10 +63,13 @@ export default function CollectionPage() {
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
       </div>
 
+      {/* ref: collection.GAME_LIST.7 — loading skeleton while fetching */}
       {loading && <LoadingSkeleton />}
 
+      {/* ref: collection.GAME_LIST.9 — error message on API failure */}
       {!loading && error && <ErrorMessage message={error} />}
 
+      {/* ref: collection.GAME_LIST.8 — empty state when no games match */}
       {!loading && !error && (
         games.length === 0 ? (
           <EmptyState />

@@ -15,8 +15,8 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-// sub: auth.JWT_VALIDATION.7 — validates aud claim = "authenticated"
-// sub: auth.JWT_VALIDATION.8 — rejects anon/service_role API keys
+// ref: auth.JWT_VALIDATION.7 — validates aud claim = "authenticated"
+// ref: auth.JWT_VALIDATION.8 — rejects anon/service_role API keys
 const supabaseAudience = "authenticated"
 
 type claims struct {

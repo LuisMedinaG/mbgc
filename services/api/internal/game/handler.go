@@ -35,6 +35,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))              // ref: vibes.DISCOVER.1
 }
 
+// ref: auth.MULTI_TENANCY.2 — user identity extracted from context via httpx.UserIDFromContext
 func requireUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
