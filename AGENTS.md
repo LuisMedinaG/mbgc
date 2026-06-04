@@ -83,10 +83,9 @@ make test          # run Go tests
 make lint          # lint Go + web + infra
 
 # services/api Makefile:
-make dev           # go run ./cmd/server  (auto-loads .env)
+make dev           # go run ./cmd/server  (auto-loads .env, runs migrations at startup)
 make test-v        # go test -v -race ./...  ← use before every PR
 make tidy          # go mod tidy
-make migrate-up / migrate-down
 
 # Web (from web/):
 make dev           # Vite dev server
