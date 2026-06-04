@@ -119,10 +119,14 @@ jobs:
   # ── Deploy (push/dispatch only, gated on build success) ───────────────────
 
   # ref: ci-cd.DEPLOY_API.1
+  # environment: production gates this job on manual approval (Settings → Environments → production).
+  # The approval fires BEFORE migrations and deploy run. Required reviewers receive a GitHub notification.
+  # ref: ci-cd.DEPLOY_API.8
   deploy-api-prod:
     name: Deploy API → prod
     needs: go
     if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment: production
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
       service_name: mbgc-api

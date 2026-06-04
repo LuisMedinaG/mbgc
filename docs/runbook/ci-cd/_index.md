@@ -22,17 +22,49 @@ Push to main
 
 All jobs live in `.github/workflows/pipeline.yml`. Deploy jobs have `needs: go` or `needs: web` — they cannot run unless CI passes.
 
-## Database migrations
+## Database protection
 
-Migrations run automatically as part of every API deploy (inside `deploy-cloud-run.yml`, before the Cloud Run deploy). All migration SQL uses `IF NOT EXISTS` / `CREATE OR REPLACE` — safe to run every time.
+Three layers prevent accidental schema changes to prod:
+
+### 1. GitHub Environment approval gate (primary protection)
+
+`deploy-api-prod` is tagged `environment: production`. Before migrations or deploy run, GitHub pauses the job and sends a notification to required reviewers. **One-time setup required:**
+
+1. Go to **Settings → Environments → New environment** → name it `production`
+2. Enable **Required reviewers** → add yourself
+3. Optionally enable **Deployment branch: main only**
+
+After this, every prod deploy waits for your explicit approval in the GitHub Actions UI.
+
+Dev deploys (`deploy-api-dev`) run automatically — dev is a sandbox.
+
+### 2. Schema backup artifact
+
+Before every migration runs, CI captures `pg_dump --schema-only` and uploads it as a GitHub Actions artifact (retained 30 days, named `schema-backup-<sha>`). To restore after a bad migration:
+
+```sh
+# Download the artifact from the Actions run, then:
+psql "$DATABASE_URL" -f schema-backup.sql
+```
+
+### 3. Emergency skip
+
+If you need to redeploy without touching the DB (e.g. a rollback deploy to an older image):
+
+1. Go to **Actions → Pipeline → Run workflow**
+2. Set `skip_migrations: true` in the `deploy-cloud-run.yml` inputs
+
+Or trigger `deploy-cloud-run.yml` directly with `skip_migrations: true`.
+
+---
 
 **Dev vs prod Supabase:**
 
 | Environment | Who runs migrations | Database |
 |---|---|---|
 | Local dev | `make db-migrate` (manual) | Local Supabase at `:54322` |
-| Dev cloud (`mbgc-api-dev`) | CI on push to `dev` | `DEV_API_DATABASE_URL` secret → dev Supabase project |
-| Prod cloud (`mbgc-api`) | CI on push to `main` | `API_DATABASE_URL` secret → prod Supabase project |
+| Dev cloud (`mbgc-api-dev`) | CI on push to `dev` (automatic) | `DEV_API_DATABASE_URL` → dev Supabase project |
+| Prod cloud (`mbgc-api`) | CI on push to `main` (after approval) | `API_DATABASE_URL` → prod Supabase project |
 
 The API does **not** run migrations on boot — it only connects to the pool. Migrations are a CI concern.
 

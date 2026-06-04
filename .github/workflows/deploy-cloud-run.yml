@@ -29,6 +29,11 @@ on:
         required: false
         type: string
         default: .
+      skip_migrations:
+        description: Skip DB migrations (emergency redeploy without schema changes).
+        required: false
+        type: boolean
+        default: false
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -65,15 +70,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install psql
+        run: command -v psql || sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Backup schema before migration
+        run: pg_dump "$DATABASE_URL" --schema-only --no-owner --no-acl -f /tmp/schema-backup.sql
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: schema-backup-${{ github.sha }}
+          path: /tmp/schema-backup.sql
+          retention-days: 30
+
       - name: Run database migrations
+        if: ${{ !inputs.skip_migrations }}
         run: |
-          command -v psql || sudo apt-get install -y --no-install-recommends postgresql-client
           for f in services/api/migrations/*.up.sql; do
             echo "→ $f"
             psql "$DATABASE_URL" -f "$f"
           done
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Migrations skipped
+        if: ${{ inputs.skip_migrations }}
+        run: echo "⚠ Migrations skipped (skip_migrations=true)"
 
       - id: auth
         uses: google-github-actions/auth@v2

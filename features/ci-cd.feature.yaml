@@ -47,6 +47,9 @@ components:
       5: Empty optional secrets (SEED_ADMIN_*) are omitted from --update-env-vars to avoid overwriting existing Cloud Run values
       6: GCP auth uses Workload Identity Federation — no service account key files stored in GitHub
       7: Database migrations run via psql before the Cloud Run deploy on every push — all SQL is idempotent (IF NOT EXISTS / CREATE OR REPLACE)
+      8: Prod deploy job is gated on a GitHub Environment (production) with required reviewer approval before migrations or deploy can run
+      9: Schema backup (pg_dump --schema-only) is captured as a GitHub Actions artifact before every migration (retained 30 days)
+      10: A skip_migrations boolean input allows emergency redeploy without touching the DB
 
   DEPLOY_WEB:
     name: Web deployment
