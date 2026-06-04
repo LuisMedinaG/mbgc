@@ -32,7 +32,7 @@ Single Go API service. Handles JWT validation, profiles, games, collections, and
 | `POST` | `/api/v1/import/sync` | importer.Sync |
 | `POST` | `/api/v1/import/csv/preview` | importer.CSVPreview |
 | `POST` | `/api/v1/import/csv` | importer.CSVImport |
-| `GET` | `/healthz` | inline |
+| `GET` | `/readyz` | inline |
 
 ## Env vars
 

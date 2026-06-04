@@ -32,7 +32,7 @@ services/api  (JWT validation via JWKS + all route handlers)
   /api/v1/games/*        games, collections, player aids
   /api/v1/collections/*  vibes/collections CRUD
   /api/v1/import/*       BGG sync, CSV import
-  /healthz               health check
+  /readyz               health check
 ```
 
 JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.

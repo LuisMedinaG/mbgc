@@ -65,7 +65,7 @@ Or watch in GitHub Actions UI.
 ### 5. Verify health check
 
 ```sh
-curl -s https://api.lumedina.dev/healthz | jq .
+curl -s https://api.lumedina.dev/readyz | jq .
 ```
 
 Expected: `{"status":"ok"}`

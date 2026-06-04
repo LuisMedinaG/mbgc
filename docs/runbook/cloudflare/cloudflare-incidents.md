@@ -210,7 +210,7 @@ Cloudflare DNS can be bypassed by updating your domain registrar to point direct
 4. Verify:
    ```sh
    dig api.lumedina.dev
-   curl https://api.lumedina.dev/healthz
+   curl https://api.lumedina.dev/readyz
    ```
 
 ---

@@ -65,7 +65,7 @@ func main() {
 	profileHandler.RegisterRoutes(mux, authMiddleware)
 	gameHandler.RegisterRoutes(mux, authMiddleware)
 	importHandler.RegisterRoutes(mux, authMiddleware)
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})

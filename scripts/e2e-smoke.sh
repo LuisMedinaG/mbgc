@@ -15,7 +15,7 @@ echo "=== mbgc e2e smoke ==="
 # 1. Health check
 echo ""
 echo "--- Health ---"
-[[ $(curl -sf "$API/healthz" | grep -c '"ok"') -gt 0 ]] && pass "api /healthz" || fail "api /healthz" "$(curl -s "$API/healthz")"
+[[ $(curl -sf "$API/readyz" | grep -c '"ok"') -gt 0 ]] && pass "api /readyz" || fail "api /readyz" "$(curl -s "$API/readyz")"
 
 # 2. Auth gating — unauthenticated requests blocked
 echo ""
@@ -34,7 +34,7 @@ code=$(curl -sk -o /dev/null -w "%{http_code}" -H "Authorization: Bearer fake-to
 # 4. CORS headers present
 echo ""
 echo "--- CORS ---"
-origin=$(curl -sk -I -H "Origin: http://localhost:5173" "$API/healthz" 2>&1 | grep -i "access-control-allow-origin" || echo "")
+origin=$(curl -sk -I -H "Origin: http://localhost:5173" "$API/readyz" 2>&1 | grep -i "access-control-allow-origin" || echo "")
 [[ -n "$origin" ]] && pass "CORS headers present" || fail "CORS headers present" "missing"
 
 echo ""
