@@ -79,7 +79,7 @@ make dev           # start API + web in tmux
 make db-migrate    # apply pending migrations
 make db-reset      # wipe + replay local DB
 make build         # build API + web
-make test          # run Go tests
+make test          # run Go tests (pkg/shared + services/api with -race)
 make lint          # lint Go + web + infra
 
 # services/api Makefile:
@@ -159,6 +159,7 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 - Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
 - Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
 - Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
+- **Testing:** handler tests use `httptest.NewRecorder` + mock store interfaces (no DB needed). Each package defines a `gameStore` / `profileStore` / `importerStore` interface consumed by `Service`. Mocks live in `_test.go` files as structs with function fields. Run `make test-v` before every PR.
 
 **TypeScript:**
 - Strict mode, no `any`
@@ -188,6 +189,7 @@ refactor/*
 - Use `pkg/shared/apierr` sentinels for all error paths
 - Validate JWT in `services/api/internal/jwt/` middleware — never skip or trust forwarded headers from untrusted callers
 - Run `make test-v` before opening a PR
+- Define store interfaces per package — `Service` depends on the interface, not concrete `*Store` (enables `httptest` handler tests without DB)
 
 **Ask first:**
 - Any change to `pkg/shared` exported types (`services/api` depends on it)

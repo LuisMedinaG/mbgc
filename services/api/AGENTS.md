@@ -67,12 +67,23 @@ internal/game/      — games.games, games.collections, games.player_aids tables
 internal/importer/  — importer.rate_limits, importer.sync_log; BGG client
 ```
 
+## Testing
+
+Each package defines a store interface consumed by `Service` (e.g. `gameStore`, `profileStore`, `importerStore`). This enables handler unit tests via `httptest.NewRecorder` + mock store structs — no DB needed. Mocks live in `_test.go` files as structs with function fields.
+
+```sh
+make test-v       # go test -v -race ./...  ← run before every PR
+```
+
+Coverage: auth 78%, importer 72%, game 61%, jwt 60%, profile 59%. CI enforces ≥50% on `services/api`.
+
 ## Boundaries
 
 **Always:**
 - Include `user_id` in every DB query on user-owned data
 - Use `httpx.UserIDFromContext` to get user identity — never read from headers directly
 - Use `pkg/shared/apierr` sentinels for all error paths
+- Define store interfaces in each package for handler testability — `Service` depends on the interface, not concrete `*Store`
 
 **Never:**
 - Bypass BGG rate limiting in `importer.Client` — will get IP banned

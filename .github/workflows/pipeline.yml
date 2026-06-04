@@ -78,6 +78,17 @@ jobs:
           go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
           go tool cover -func=coverage-api.out >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Coverage threshold
+        run: |
+          pct=$(go tool cover -func=coverage-api.out | grep '^total:' | awk '{print $3}' | tr -d '%')
+          echo "services/api coverage: ${pct}%"
+          if [ "$(echo "$pct < 50" | bc -l)" -eq 1 ]; then
+            echo "::error::Coverage ${pct}% is below 50% threshold"
+            exit 1
+          fi
+          go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage-api.out >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
