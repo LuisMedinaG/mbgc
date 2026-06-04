@@ -1,3 +1,9 @@
+# infra.yml — Terraform plan/apply for GCP, Cloudflare, and Supabase infrastructure.
+# Separate from pipeline.yml because it posts plan output as a PR comment.
+#
+# On PR to main (infra/ changes): terraform plan → posts diff as PR comment
+# On push to main (infra/ changes): terraform apply
+# ref: ci-cd.INFRA.1, ci-cd.INFRA.2, ci-cd.INFRA.3, ci-cd.INFRA.4
 name: Infra
 
 on:

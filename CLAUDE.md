@@ -39,11 +39,13 @@ JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
 
 ## CI/CD
 
-- **CI** — `.github/workflows/ci.yml`: build + test + vet, web lint/build, infra lint
-- **Deploy** — `.github/workflows/deploy.yml`: deploys `services/api` on push to `main`
-- **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR, `terraform apply` on merge to `main`
+- **Pipeline** — `.github/workflows/pipeline.yml`: single workflow for all CI + deploy. PR → CI only. Push to dev → CI + deploy API (dev). Push to main → CI + deploy API (prod) + deploy web.
+- **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR to main, `terraform apply` on merge to main (infra/ changes only)
+- **E2E** — `.github/workflows/e2e.yml`: manual Playwright tests (workflow_dispatch)
+- **Reusable** — `.github/workflows/deploy-cloud-run.yml`: Cloud Run build + deploy, called by pipeline.yml
 - **Secrets** — `infra/scripts/bootstrap.sh` provisions infra + syncs secrets to GitHub Actions
 - **Rotation** — `make rotate-secrets` or `infra/scripts/rotate-secrets.sh` to rotate any secret group
+- **Runbook** — `docs/runbook/ci-cd/_index.md`: full secrets list, failure diagnosis, manual deploy steps
 
 ## Infrastructure
 
