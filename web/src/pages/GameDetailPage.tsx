@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGame } from '../hooks/useGame'
 import { playersStr, weightClass, weightLabel, imgFallback } from '../utils/gameFormatters'
@@ -17,11 +17,6 @@ export default function GameDetailPage() {
   const [selectedVibeIds, setSelectedVibeIds] = useState<Set<number>>(new Set())
   const [editingVibes, setEditingVibes] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-
-  // ref: game-detail.VIBE_ASSIGN.1 — sync local vibe selection when game data loads
-  useEffect(() => {
-    if (game && !editingVibes) setSelectedVibeIds(new Set(game.vibeCollectionIds))
-  }, [game, editingVibes])
 
   // ref: game-detail.VIBE_ASSIGN.2 — calls POST /api/v1/games/{id}/collections with full ID set
   // ref: game-detail.VIBE_ASSIGN.3 — cache invalidation keeps UI current without page reload
@@ -155,7 +150,7 @@ export default function GameDetailPage() {
           <h2 className="text-[0.85rem] font-bold text-muted uppercase tracking-wider">Vibes</h2>
           {!editingVibes && (
             <button
-              onClick={() => setEditingVibes(true)}
+              onClick={() => { setSelectedVibeIds(new Set(game?.vibeCollectionIds ?? [])); setEditingVibes(true) }}
               className="pressable bg-transparent border-none text-[0.82rem] text-accent font-semibold cursor-pointer font-sans py-0"
             >
               Edit

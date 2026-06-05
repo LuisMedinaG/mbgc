@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { ApiError } from '../lib/api'
 import { useProfile } from '../hooks/useProfile'
 
@@ -26,11 +26,6 @@ export default function ProfilePage() {
   const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [pwMsg, setPwMsg] = useState<Msg | null>(null)
-
-  // Seed the draft from the loaded profile (once, on first load)
-  useEffect(() => {
-    if (profile?.bgg_username !== undefined) setBggInput(profile.bgg_username)
-  }, [profile?.bgg_username])
 
   const savedBgg = profile?.bgg_username ?? ''
 
