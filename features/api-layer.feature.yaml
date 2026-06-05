@@ -1,29 +1,26 @@
-# api-layer.feature.yaml — Shared API Infrastructure
+# api-layer.feature.yaml — API Infrastructure
 feature:
   name: api-layer
   product: mbgc
-  description: |
-    Shared Go library (pkg/shared) and server configuration.
-    Covers startup requirements and cross-cutting coding conventions.
+  description: Server startup requirements and consistent API response conventions
 
 components:
   CONFIG:
     name: Server configuration
-    description: Environment-variable-driven configuration with required-vs-optional semantics
+    description: Environment-variable-driven configuration with required vs optional semantics
     requirements:
-      1: DATABASE_URL is required — server panics at startup if missing
-      2: SUPABASE_URL is required — server panics at startup if missing
+      1: DATABASE_URL is required; the server refuses to start if absent
+      2: SUPABASE_URL is required; the server refuses to start if absent
       3: PORT defaults to 8080 if not set
-      4: "ALLOWED_ORIGIN defaults to http://localhost:5173 if not set"
-      5: BGG_TOKEN and BGG_COOKIE are optional; importer disables sync if absent
-      6: SYNC_LIMIT_USER defaults to 3; SYNC_LIMIT_ADMIN defaults to 20
+      4: ALLOWED_ORIGIN defaults to http://localhost:5173 if not set
+      5: BGG sync is disabled when BGG credentials are not configured
+      6: Sync rate limits are configurable per role (user and admin)
 
-constraints:
-  CODE:
-    name: Coding conventions
-    description: Non-negotiable patterns enforced across all Go services
+  RESPONSES:
+    name: API response conventions
+    description: All API responses follow a consistent envelope structure
     requirements:
-      1: All Go code uses slog for structured logging — never log.Printf or fmt.Println
-      2: Raw err.Error() is never returned to HTTP clients — only apierr sentinels
-      3: All API responses use WriteJSON/WriteError and the envelope types from pkg/shared
-      4: User identity is always extracted via httpx.UserIDFromContext — never from request headers
+      1: Successful responses wrap data in a shared envelope
+      2: Error responses return a structured error code and human-readable message
+      3: Internal error details are never exposed to API clients
+      4: Database and internal errors are logged server-side but not returned to callers

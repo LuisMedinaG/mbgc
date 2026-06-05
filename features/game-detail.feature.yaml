@@ -2,42 +2,50 @@
 feature:
   name: game-detail
   product: mbgc
-  description: |
-    Individual game detail view showing metadata, player aids,
-    collection assignments (vibes), rulebook URL, and delete action.
+  description: View and manage a single board game from the user's collection
 
 components:
   DETAIL_VIEW:
-    name: Game detail display
-    description: Full game detail page at /games/:id
+    name: Game detail
+    description: Display all metadata for a single game
     requirements:
-      1: Fetches single game from GET /api/v1/games/{id} including collections and player aids
-      2: Renders full game metadata — hero image, name, year, player count, playtime, weight, rating, description (expandable), type/category/mechanic chips, language dependence, recommended player counts
+      1: GET /api/v1/games/{id} returns full game metadata including collections and player aids
+      2: The page displays name, image, year, player count, playtime, weight, rating, and description
+      3: The description is expandable when truncated
+      4: Category, mechanic, and type chips are shown
+      5: Requesting a game the user does not own returns 404
 
   PLAYER_AIDS:
-    name: Player aid image management
-    description: Upload, view, and delete player aid reference images per game
+    name: Player aids
+    description: Reference images attached to a game
     requirements:
-      1: Upload images (PNG, JPEG, GIF, WebP) via POST /api/v1/games/{id}/player-aids; delete via DELETE endpoint; stored on disk in a configurable data directory
-      2: Thumbnails shown in a horizontal strip; clicking opens a full-screen lightbox with arrow key and Escape navigation
-      3: Uploads are size-limited and validated for image MIME type before saving
+      1: Images can be uploaded via POST /api/v1/games/{id}/player-aids
+      2: Images can be deleted individually
+      3: Uploaded files are validated for image type and maximum size before saving
+      4: Images are displayed as thumbnails; clicking opens a full-screen lightbox
+      5: The lightbox supports keyboard navigation (arrows, Escape)
 
   RULES_URL:
-    name: Rulebook URL editor
-    description: Inline editor for storing and validating Google Drive rulebook links
+    name: Rulebook link
+    description: Store a link to the game's rulebook
     requirements:
-      1: Inline edit/save/cancel via PUT /api/v1/games/{id}/rules-url; displays current URL if set; no page navigation
-      2: "Validates URL — must be https://drive.google.com/ or https://docs.google.com/; shows inline error for invalid URLs"
+      1: The rulebook URL can be set and updated inline without navigating away
+      2: Only Google Drive and Google Docs URLs are accepted
+      3: An invalid URL shows an inline error without saving
 
   VIBE_ASSIGN:
-    name: Vibe assignment
-    description: Assign/remove game from collections on the detail page
+    name: Collection assignment
+    description: Assign or remove the game from collections
     requirements:
-      1: Checklist of all user collections with current checkbox state; saving calls POST /api/v1/games/{id}/collections with the full collection ID set; UI reflects changes immediately
+      1: A checklist shows all user collections with their current assignment state
+      2: Saving replaces the full set of collection assignments for the game
+      3: The UI reflects the updated state immediately after saving
 
   DELETE:
     name: Delete game
-    description: Remove a game from the user's collection
+    description: Remove a game from the collection
     requirements:
-      1: DELETE /api/v1/games/{id} with user_id ownership check; requires confirmation before executing
-      2: On success, navigates to the collection page; DB cascade-deletes player aids and collection assignments
+      1: Deleting a game requires explicit user confirmation
+      2: The requesting user must own the game; otherwise 403 is returned
+      3: Deletion removes all associated player aids and collection assignments
+      4: After deletion the user is navigated back to the collection page

@@ -1,38 +1,36 @@
-# collection.feature.yaml — Board Game Collection (Browse & Filter)
+# collection.feature.yaml — Board Game Collection
 feature:
   name: collection
   product: mbgc
-  description: |
-    Main board game collection page with list/grid views,
-    full-text search, and multi-faceted filtering.
+  description: Browse, search, and filter the user's board game collection
 
 components:
-  GAME_LIST:
-    name: Game list/grid display
-    description: Fetches and displays the user's board game collection
+  DISPLAY:
+    name: Collection display
+    description: View the collection as a list or grid
     requirements:
-      1: Fetches games from GET /api/v1/games with pagination (page/limit); backend returns total count
-      2: Supports list view and grid view; view mode persisted in localStorage
-      3: Shows loading skeleton while fetching, empty state when no games match, error message on failure
+      1: The page displays the user's games with pagination
+      2: Games can be shown in list view or grid view
+      3: View mode is persisted across sessions
+      4: The page shows a loading state while fetching
+      5: The page shows an empty state when no games match
 
-  FILTERS:
-    name: Game filters
-    description: Filter by search, category, players, playtime, and weight
+  SEARCH:
+    name: Search and filter
+    description: Narrow the collection by text or game attributes
     requirements:
-      1: Search input debounced at 300ms before triggering API call
-      2: "Dropdowns filter by: category (BGG type/category/mechanic), player count ranges, playtime ranges, weight/complexity"
-      3: Active filters shown as removable chips below the filter bar; removing a chip resets that filter
+      1: A text search filters games by name
+      2: Games can be filtered by category, player count, playtime, and weight
+      3: Active filters are shown as removable chips below the filter bar
+      4: Removing a chip resets that filter
+      5: Search input is debounced before triggering a request
 
   API:
-    name: Backend API
-    description: Server-side game listing and full-text search
+    name: Backend game list API
+    description: Server-side game listing with filtering and pagination
     requirements:
-      1: "GET /api/v1/games accepts search, category, page, limit; results scoped to user_id; returns game metadata with assigned collections"
-      2: Full-text search uses ts_rank with to_tsvector on search_vector; endpoint also returns distinct categories for filter dropdowns
-
-constraints:
-  PERF:
-    name: Performance
-    requirements:
-      1: Client-side filter results are memoized (useMemo); images use lazy loading with fallback placeholder
-      2: Search is debounced 300ms via useDebounce — the debounced value drives the TanStack Query key, preventing rapid API re-fetches
+      1: GET /api/v1/games returns the authenticated user's games
+      2: Accepts search, category, player count, playtime, and weight filter parameters
+      3: Supports page and limit parameters; response includes total count
+      4: Results are scoped to the requesting user's ID
+      5: Full-text search is supported server-side

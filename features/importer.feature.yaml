@@ -2,55 +2,42 @@
 feature:
   name: importer
   product: mbgc
-  description: |
-    Import board games into the user's collection from BoardGameGeek
-    via API sync or CSV file upload.
+  description: Import board games into the collection from BoardGameGeek via API or CSV
 
 components:
   BGG_SYNC:
-    name: BGG API sync
-    description: Pull board game collection from BoardGameGeek by username
+    name: BGG sync
+    description: Pull games directly from the user's BoardGameGeek account
     requirements:
-      1: POST /api/v1/import/sync triggers a sync against the user's BGG collection
-      2: Reads the user's BGG username from their profile before syncing
-      3: Checks BGG availability — disables sync if BGG credentials are not configured
-      4: "Rate limits syncs per user (default: 3/day for regular users, configurable via SYNC_LIMIT_USER)"
-      5: "Admin users have a higher rate limit (default: 20/day, configurable via SYNC_LIMIT_ADMIN)"
-      6: Rate limit resets daily at midnight UTC
-      7: Logs each sync in importer.sync_log with user_id, games_imported, full_refresh flag, and timestamp
-      8: Returns SyncResult with counts of imported, skipped, and failed games
-      9: Supports full refresh mode (admin only) to re-import all games, not just new ones
-      10: Fetches game data from BGG XML API (/xmlapi2/thing) with proper rate limiting
-      11: "Parses BGG XML response extracting: name, description, year, image, thumbnail, players, playtime, categories, mechanics, types, weight, rating"
+      1: POST /api/v1/import/sync fetches the user's BGG collection using their configured BGG username
+      2: Sync is disabled when BGG credentials are not configured on the server
+      3: Regular users are limited to 3 syncs per day
+      4: Admin users are limited to 20 syncs per day
+      5: Rate limits reset daily at midnight UTC
+      6: Each sync is recorded with user, game counts, and timestamp
+      7: The response includes counts of imported, skipped, and failed games
+      8: Admins can trigger a full refresh that re-imports all games, not just new ones
 
   CSV_IMPORT:
-    name: CSV file import
+    name: CSV import
     description: Import games from a BGG-exported CSV file
     requirements:
-      1: "CSV import is a 3-step wizard: upload → preview → import"
-      2: "Step 1: Upload a CSV file via multipart form POST /api/v1/import/csv/preview"
-      3: CSV parser auto-detects the BGG ID column header (objectid, bgg_id, or bggid)
-      4: Preview step returns up to 100 rows showing BGG ID and game name
-      5: Preview marks which games already exist in the user's collection
-      6: "Step 2: User selects which games to import from the preview table"
-      7: "Step 3: POST /api/v1/import/csv with JSON body containing bgg_ids array"
-      8: Import deduplicates — skips games already owned by BGG ID
-      9: Returns import results with counts of imported, skipped, and failed games
-      10: Creates games via game service (GameExistsByBGGID check before create)
+      1: A CSV file is uploaded for preview before import is confirmed
+      2: The preview shows game names and marks which games are already in the collection
+      3: The user selects which games to import from the preview list
+      4: Importing skips games already present in the user's collection
+      5: The response includes counts of imported, skipped, and failed games
 
   GAME_CREATION:
-    name: Game record creation during import
-    description: Creates game records in the database during sync/import
+    name: Game record creation
+    description: How game records are stored on import
     requirements:
-      1: "CreateGame stores all BGG metadata: name, description, year, image, thumbnail, players, playtime, categories, mechanics, types, weight, rating, language_dependence, recommended_players"
-      2: Full-text search vector is generated automatically by database trigger
-      3: Each game is scoped to the importing user's user_id
-      4: Duplicate detection uses unique constraint on (user_id, bgg_id)
+      1: Each imported game is scoped to the importing user's ID
+      2: Importing the same BGG game twice does not create a duplicate
 
 constraints:
   RATE:
-    name: Rate limiting constraints
+    name: Rate limiting
     requirements:
-      1: Rate limits are stored in importer.rate_limits table keyed by user_id
-      2: Rate limit count resets when reset_date is before the current UTC date
-      3: Admin users can bypass rate limits for full refresh operations
+      1: Rate limit state is persisted per user between requests
+      2: Admin users can bypass rate limits for full-refresh operations
