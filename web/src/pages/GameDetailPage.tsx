@@ -34,7 +34,7 @@ export default function GameDetailPage() {
     })
   }
 
-  // ref: game-detail.DELETE.2 — requires confirmation before executing deletion
+  // ref: game-detail.DELETE.1 — requires explicit confirmation before deleting
   async function handleDelete() {
     await deleteGame.mutateAsync()
   }

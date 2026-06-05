@@ -4,7 +4,7 @@ import { qk } from '../lib/queryKeys'
 import { useDebounce } from './useDebounce'
 import type { FilterState } from '../types/game'
 
-// ref: collection.PERF.2 — debounced search query key prevents rapid re-fetches
+// ref: collection.SEARCH.5 — search input debounced 300ms before triggering request
 export function useGames(filters: FilterState) {
   const debouncedSearch = useDebounce(filters.search, 300)
   const effectiveFilters = { ...filters, search: debouncedSearch }

@@ -98,8 +98,7 @@ export default function VibesPage() {
     }
   }
 
-  // ref: vibes.LIST.4 — clicking a collection pill navigates to filtered game view
-  // ref: vibes.DISCOVER.1 — calls GET /api/v1/discover filtered by collection_id
+  // ref: vibes.DISCOVER.1 — GET /api/v1/discover filtered by collection_id
   // ref: vibes.DISCOVER.3 — response includes total count matching the filtered query
   function selectCollection(id: number) {
     if (id === selectedId) {
@@ -139,8 +138,7 @@ export default function VibesPage() {
         </button>
       </div>
 
-      {/* Collection pills — ref: vibes.LIST.2 color-coded pills, .3 name + game count */}
-      {/* ref: vibes.CRUD.6 — manage mode toggle for rename/delete */}
+      {/* ref: vibes.LIST.2 — color-coded pills showing collection name and game count */}
       {loadingCollections ? (
         <div className="flex flex-wrap gap-2">
           {Array.from({ length: 6 }).map((_, i) => (

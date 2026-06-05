@@ -87,7 +87,6 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 	return apierr.ErrNotFound
 }
 
-// ref: game-detail.RULES_URL.2 — stores validated rules URL scoped to user_id
 // ref: auth.MULTI_TENANCY.3 — verifies user_id before updating rules URL
 func (s *Store) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error {
 	tag, err := s.db.Exec(ctx,

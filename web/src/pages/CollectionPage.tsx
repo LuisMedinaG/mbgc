@@ -19,8 +19,8 @@ const EMPTY_FILTERS: FilterState = {
 }
 
 export default function CollectionPage() {
-  // ref: collection.GAME_LIST.1 — full-text search via API
-  // ref: collection.GAME_LIST.2 — list/grid view toggle
+  // ref: collection.SEARCH.1 — text search filters games by name
+  // ref: collection.DISPLAY.2 — games shown in list or grid view
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const { games, total, categories, loading, error } = useGames(filters)
@@ -55,7 +55,7 @@ export default function CollectionPage() {
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
       </div>
 
-      {/* ref: collection.GAME_LIST.3 — loading/error/empty states */}
+      {/* ref: collection.DISPLAY.4 — loading state; collection.DISPLAY.5 — empty state */}
       {loading && <LoadingSkeleton />}
 
       {!loading && error && <ErrorMessage message={error} />}

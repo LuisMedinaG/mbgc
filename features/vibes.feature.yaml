@@ -11,7 +11,6 @@ components:
     requirements:
       1: GET /api/v1/collections returns all collections for the authenticated user
       2: Each collection displays its name, color, and game count
-      3: Collection names are unique per user
 
   CRUD:
     name: Manage collections
@@ -29,7 +28,6 @@ components:
     requirements:
       1: Assigning a game sets the full collection membership for that game
       2: Assigned collections are visible as pills on game list items
-      3: Assignment state is managed from the game detail page
 
   DISCOVER:
     name: Browse by collection

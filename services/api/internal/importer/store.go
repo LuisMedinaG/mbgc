@@ -17,9 +17,8 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
-// ref: importer.RATE.1 — checks importer.rate_limits table keyed by user_id
-// ref: importer.RATE.2 — resets count when reset_date is before current UTC date
-// ref: importer.BGG_SYNC.6 — rate limit resets daily at midnight UTC
+// ref: importer.RATE.1 — checks rate_limits table keyed by user_id
+// ref: importer.BGG_SYNC.5 — rate limit resets daily at midnight UTC
 func (s *Store) CanSync(ctx context.Context, userID string, limit int) (bool, error) {
 	var count int
 	var resetDate time.Time
@@ -49,7 +48,7 @@ func (s *Store) RecordSync(ctx context.Context, userID string) error {
 	return err
 }
 
-// ref: importer.BGG_SYNC.7 — logs each sync in importer.sync_log
+// ref: importer.BGG_SYNC.6 — each sync recorded with user, game counts, and timestamp
 func (s *Store) LogSync(ctx context.Context, userID string, imported int, fullRefresh bool) error {
 	_, err := s.db.Exec(ctx,
 		`INSERT INTO importer.sync_log (user_id, games_imported, full_refresh)
@@ -57,8 +56,8 @@ func (s *Store) LogSync(ctx context.Context, userID string, imported int, fullRe
 	return err
 }
 
-// ref: importer.RATE.3 — admin users bypass rate limits for full refresh
-// ref: importer.BGG_SYNC.5 — admin users have a higher rate limit
+// ref: importer.RATE.2 — admin users bypass rate limits for full-refresh operations
+// ref: importer.BGG_SYNC.4 — admin users have a higher daily sync limit
 func (s *Store) CheckRateLimit(ctx context.Context, userID string, isAdmin bool, limitUser, limitAdmin int) error {
 	limit := limitUser
 	if isAdmin {

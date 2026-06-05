@@ -34,7 +34,7 @@ func NewService(st importerStore, bggClient bggClient, gameSvc gameService) *Ser
 	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc}
 }
 
-// ref: importer.BGG_SYNC.3 — checks BGG availability before syncing
+// ref: importer.BGG_SYNC.2 — sync is disabled when BGG credentials are not configured
 func (s *Service) Sync(ctx context.Context, userID, bggUsername string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
 	if !s.bgg.Available() {
 		return nil, fmt.Errorf("BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)")
@@ -99,8 +99,8 @@ func (s *Service) ParseCSVPreview(r io.Reader) ([]CSVPreviewRow, error) {
 	return rows, nil
 }
 
-// ref: importer.CSV_IMPORT.10 — creates games via game service with GameExistsByBGGID check
-// ref: importer.CSV_IMPORT.8 — deduplicates by BGG ID before creating
+// ref: importer.GAME_CREATION.2 — importing the same BGG game twice does not create a duplicate
+// ref: importer.CSV_IMPORT.4 — importing skips games already present in the collection
 func (s *Service) ImportBGGIDs(ctx context.Context, userID string, bggIDs []int) (*SyncResult, error) {
 	result := &SyncResult{}
 	for _, id := range bggIDs {

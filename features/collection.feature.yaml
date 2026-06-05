@@ -32,5 +32,4 @@ components:
       1: GET /api/v1/games returns the authenticated user's games
       2: Accepts search, category, player count, playtime, and weight filter parameters
       3: Supports page and limit parameters; response includes total count
-      4: Results are scoped to the requesting user's ID
-      5: Full-text search is supported server-side
+      4: Full-text search is supported server-side

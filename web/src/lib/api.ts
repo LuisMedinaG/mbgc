@@ -3,7 +3,7 @@ import type { Game } from '../types/game'
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? '') + '/api/v1'
 
 // ── Token storage ──────────────────────────────────────────────────────────────
-// ref: auth.LOGIN.3 — access/refresh tokens stored in localStorage
+// ref: auth.LOGIN.4 — tokens stored client-side on successful login
 // ref: auth.TOKEN_REFRESH.4 — tokens cleared on auth failure
 const ACCESS_KEY  = 'mbgc_access'
 const REFRESH_KEY = 'mbgc_refresh'
