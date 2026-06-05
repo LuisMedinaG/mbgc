@@ -159,7 +159,7 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 - Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
 - Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
 - Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
-- **Testing:** handler tests use `httptest.NewRecorder` + mock store interfaces (no DB needed). Each package defines a `gameStore` / `profileStore` / `importerStore` interface consumed by `Service`. Mocks live in `_test.go` files as structs with function fields. Run `make test-v` before every PR.
+- **Testing:** see [docs/runbook/testing.md](./docs/runbook/testing.md). Coverage threshold: 50% minimum. Handler tests mock store interfaces (no DB). Run `make test-v` before every PR.
 
 **TypeScript:**
 - Strict mode, no `any`

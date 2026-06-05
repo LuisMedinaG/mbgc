@@ -2,8 +2,9 @@
 
 Common issues and their fixes for the mbgc infrastructure.
 
-## Deployment
+## Guides
 
+- [Testing](testing.md) — patterns, mocking strategies, coverage
 - [Production Deploy](prod-deploy.md) — step-by-step release checklist (migrations → merge → verify)
 
 ## Troubleshooting Categories
