@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -49,6 +50,19 @@ func runMigrations(databaseURL string) error {
 	}
 	defer m.Close()
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		var dirtyErr migrate.ErrDirty
+		if errors.As(err, &dirtyErr) {
+			// Previous startup crashed mid-migration; all SQL uses IF NOT EXISTS / OR REPLACE
+			// so re-running from the dirty version is safe.
+			slog.Warn("dirty migration state detected, resetting and retrying", "version", dirtyErr.Version)
+			if ferr := m.Force(dirtyErr.Version - 1); ferr != nil {
+				return fmt.Errorf("reset dirty migration v%d: %w", dirtyErr.Version, ferr)
+			}
+			if rerr := m.Up(); rerr != nil && rerr != migrate.ErrNoChange {
+				return fmt.Errorf("migrate up after dirty reset: %w", rerr)
+			}
+			return nil
+		}
 		return fmt.Errorf("migrate up: %w", err)
 	}
 	return nil
