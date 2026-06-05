@@ -42,7 +42,7 @@ JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
 - **Pipeline** — `.github/workflows/pipeline.yml`: single workflow for all CI + deploy. PR → CI only. Push to dev → CI + deploy API (dev). Push to main → CI + deploy API (prod, requires manual approval via `production` environment gate) + deploy web. Go tests run with `-race` and `-coverprofile`; coverage artifacts uploaded + per-function summary posted to PR step summary. CI fails if `services/api` coverage drops below 50%.
 - **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR to main (posts plan as PR comment via dynamic path), `terraform apply` on merge to main (infra/ changes only)
 - **E2E** — `.github/workflows/e2e.yml`: manual Playwright tests (workflow_dispatch)
-- **Reusable** — `.github/workflows/deploy-cloud-run.yml`: Cloud Run build + deploy, called by pipeline.yml. Runs DB migrations by default; pass `skip_migrations: true` for emergency redeployments without schema changes. Schema is backed up to a workflow artifact (`schema-backup-<sha>`, 30-day retention) before each migration run.
+- **Reusable** — `.github/workflows/deploy-cloud-run.yml`: Cloud Run build + deploy, called by pipeline.yml. No migration step in CI — migrations run automatically at server startup via golang-migrate (SQL embedded in binary, tracked in `schema_migrations` table).
 - **Secrets** — `infra/scripts/bootstrap.sh` provisions infra + syncs secrets to GitHub Actions
 - **Rotation** — `make rotate-secrets` or `infra/scripts/rotate-secrets.sh` to rotate any secret group
 - **Runbook** — `docs/runbook/ci-cd/_index.md`: full secrets list, failure diagnosis, manual deploy steps

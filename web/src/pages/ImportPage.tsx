@@ -1,17 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type SyncResult } from '../lib/api'
+import { ApiError, type SyncResult } from '../lib/api'
+import { useProfile } from '../hooks/useProfile'
+import { api } from '../lib/api'
 
 export default function ImportPage() {
-  const [bggUsername, setBggUsername] = useState('')
+  const { profile } = useProfile()
+  const bggUsername = profile?.bgg_username ?? ''
+
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [fullRefresh, setFullRefresh] = useState(false)
-
-  useEffect(() => {
-    api.getProfile().then(p => setBggUsername(p.bgg_username ?? '')).catch(() => {})
-  }, [])
 
   async function handleSync() {
     setSyncing(true)

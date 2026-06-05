@@ -118,9 +118,7 @@ export default function GameDetailPage() {
       {game.description && (
         <div className="card p-4 mb-3">
           <h2 className="text-[0.85rem] font-bold text-muted uppercase tracking-wider mb-3">About</h2>
-          <p
-            className={`text-[0.875rem] leading-relaxed text-ink ${descExpanded ? '' : 'line-clamp-3'}`}
-          >
+          <p className={`text-[0.875rem] leading-relaxed text-ink ${descExpanded ? '' : 'line-clamp-3'}`}>
             {game.description}
           </p>
           {game.description.length > 200 && (

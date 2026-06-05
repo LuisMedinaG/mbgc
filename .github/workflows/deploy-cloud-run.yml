@@ -1,9 +1,9 @@
 # deploy-cloud-run.yml — Reusable workflow: build Docker image and deploy to Cloud Run.
 # Called by pipeline.yml (deploy-api-prod / deploy-api-dev jobs). Not triggered directly.
 #
-# Steps: GCP auth via Workload Identity Federation → run DB migrations → docker build + push
-#        to Artifact Registry (tagged with commit SHA) → gcloud run deploy with non-empty env vars.
-# Migrations use raw psql — safe to run every deploy because all SQL is idempotent (IF NOT EXISTS).
+# Steps: GCP auth via Workload Identity Federation → docker build + push to Artifact Registry
+#        (tagged with commit SHA) → gcloud run deploy with non-empty env vars.
+# Migrations run at server startup via golang-migrate (embedded SQL, tracked in schema_migrations).
 # ref: ci-cd.DEPLOY_API.4, ci-cd.DEPLOY_API.5, ci-cd.DEPLOY_API.6, ci-cd.DEPLOY_API.7
 name: Deploy to Cloud Run
 
@@ -29,11 +29,6 @@ on:
         required: false
         type: string
         default: .
-      skip_migrations:
-        description: Skip DB migrations (emergency redeploy without schema changes).
-        required: false
-        type: boolean
-        default: false
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -69,36 +64,6 @@ jobs:
       IMAGE: ${{ inputs.region }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mbgc/${{ inputs.service_name }}:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install psql
-        run: command -v psql || sudo apt-get install -y --no-install-recommends postgresql-client
-
-      - name: Backup schema before migration
-        if: ${{ !inputs.skip_migrations }}
-        run: pg_dump "$DATABASE_URL" --schema-only --no-owner --no-acl -f /tmp/schema-backup.sql
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - uses: actions/upload-artifact@v4
-        if: ${{ !inputs.skip_migrations }}
-        with:
-          name: schema-backup-${{ github.sha }}
-          path: /tmp/schema-backup.sql
-          retention-days: 30
-
-      - name: Run database migrations
-        if: ${{ !inputs.skip_migrations }}
-        run: |
-          for f in $(ls services/api/migrations/*.up.sql | sort); do
-            echo "→ $f"
-            psql "$DATABASE_URL" -f "$f"
-          done
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: Migrations skipped
-        if: ${{ inputs.skip_migrations }}
-        run: echo "⚠ Migrations skipped (skip_migrations=true)"
 
       - id: auth
         uses: google-github-actions/auth@v2

@@ -69,9 +69,16 @@ export default function ProfilePage() {
         <div className="section-label">BoardGameGeek</div>
         <div>
           <label htmlFor="bgg-username" className="field-label">BGG Username</label>
-          <input id="bgg-username" className="form-input" value={bggInput}
+          <input
+            id="bgg-username"
+            className="form-input"
+            value={bggInput}
             onChange={e => { setBggInput(e.target.value); setBggMsg(null) }}
-            placeholder="your BGG username" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
+            placeholder="your BGG username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+          />
         </div>
         {bggMsg && (
           <div className={`text-sm ${bggMsg.ok ? 'text-[#059669]' : 'text-[#b91c1c]'}`}>{bggMsg.text}</div>
