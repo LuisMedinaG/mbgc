@@ -2,3 +2,8 @@ cloudflare_api_token  = "<REDACTED>"
 cloudflare_account_id = "<ACCOUNT_ID>"
 cloudflare_zone_id    = "<ZONE_ID_FOR_lumedina.dev>"
 supabase_access_token = "<REDACTED>"
+
+# Email that receives all monitoring alerts (panic spike, 5xx ratio, auth
+# probe, rate-limit flood). Set the real value in terraform.tfvars (gitignored)
+# or via TF_VAR_alert_email in CI.
+alert_email = "lumedinag@proton.me"

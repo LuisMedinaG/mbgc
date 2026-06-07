@@ -267,3 +267,17 @@ resource "cloudflare_dns_record" "api" {
 
   depends_on = [google_cloud_run_domain_mapping.api]
 }
+
+###############################################################################
+# Monitoring — log-based metrics + alert policies
+###############################################################################
+
+# ref: monitoring.ALERTS.1-4 — 4 alert policies (panic spike, 5xx ratio, auth
+# probe, rate-limit flood). ALERTS.5 (budget) is deferred to a follow-up that
+# needs billing-account-level access.
+module "monitoring" {
+  source = "../../modules/monitoring"
+
+  project_id  = var.gcp_project_id
+  alert_email = var.alert_email
+}
