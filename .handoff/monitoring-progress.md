@@ -22,15 +22,10 @@ re-derive the design — no prior session memory required.
 - **Design rationale:** see chat thread (ask user to paste the design summary
   if needed — it's not in the repo).
 - **Stash state — read this before resuming:**
-  - `stash@{0}` — `wip: pre-monitoring unrelated local changes (round 2)` on `feature/monitoring`
-    (the WIP that was re-stashed during Batch 1 setup; do not `git stash pop`
-    inside this branch — it would re-introduce WIP into the tree)
-  - `stash@{1}` — `wip: pre-monitoring unrelated local changes` on `dev`
-    (the original WIP from before this branch was created)
-  - Both stashes contain overlapping WIP from the prior session. **Recover the
-    WIP by checking out a separate branch and popping stashes there** — never
-    inside `feature/monitoring`. Use `git stash show -p stash@{0} | head` to
-    inspect before popping.
+  - `stash@{0}` — `wip: pre-monitoring unrelated local changes` on `dev`
+    (the original WIP from before this branch was created). Likely redundant
+    with commit `4655688`; safe to drop with `git stash drop stash@{0}` if
+    `git stash show -p stash@{0}` shows only files already in `4655688`.
 
 ---
 
