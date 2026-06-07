@@ -50,6 +50,9 @@ DEV_API_DATABASE_URL="${DEV_API_DATABASE_URL:-}"
 DEV_API_SUPABASE_URL="${DEV_API_SUPABASE_URL:-}"
 DEV_API_SUPABASE_SERVICE_ROLE_KEY="${DEV_API_SUPABASE_SERVICE_ROLE_KEY:-}"
 DEV_API_ALLOWED_ORIGIN="${DEV_API_ALLOWED_ORIGIN:-}"
+DEV_API_SEED_ADMIN_EMAIL="${DEV_API_SEED_ADMIN_EMAIL:-}"
+DEV_API_SEED_ADMIN_PASSWORD="${DEV_API_SEED_ADMIN_PASSWORD:-}"
+DEV_API_SEED_ADMIN_USERNAME="${DEV_API_SEED_ADMIN_USERNAME:-}"
 ENVEOF
   chmod 600 "$INFRA_ENV"
 }
@@ -208,6 +211,15 @@ prompt_value DEV_API_ALLOWED_ORIGIN \
   "Dev ALLOWED_ORIGIN (or * to allow all)" \
   "${DEV_API_ALLOWED_ORIGIN:-}" \
   "*"
+prompt_optional DEV_API_SEED_ADMIN_EMAIL \
+  "Dev admin email (optional — leave blank to skip seeding)" \
+  "${DEV_API_SEED_ADMIN_EMAIL:-}"
+prompt_secret_optional DEV_API_SEED_ADMIN_PASSWORD \
+  "Dev admin password (optional)" \
+  "${DEV_API_SEED_ADMIN_PASSWORD:-}"
+prompt_optional DEV_API_SEED_ADMIN_USERNAME \
+  "Dev admin username (optional display name)" \
+  "${DEV_API_SEED_ADMIN_USERNAME:-}"
 
 # ── Local credential files ─────────────────────────────────────────────────────
 
@@ -252,6 +264,10 @@ sync_secrets "github secrets — dev API (deploy.yml)" \
   DEV_API_SUPABASE_URL              "$DEV_API_SUPABASE_URL" \
   DEV_API_SUPABASE_SERVICE_ROLE_KEY "$DEV_API_SUPABASE_SERVICE_ROLE_KEY" \
   DEV_API_ALLOWED_ORIGIN            "$DEV_API_ALLOWED_ORIGIN"
+sync_secrets_optional "github secrets — dev API seed admin (optional)" \
+  DEV_API_SEED_ADMIN_EMAIL          "$DEV_API_SEED_ADMIN_EMAIL" \
+  DEV_API_SEED_ADMIN_PASSWORD       "$DEV_API_SEED_ADMIN_PASSWORD" \
+  DEV_API_SEED_ADMIN_USERNAME       "$DEV_API_SEED_ADMIN_USERNAME"
 
 # ── Terraform init ─────────────────────────────────────────────────────────────
 
