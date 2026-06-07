@@ -77,6 +77,13 @@ make test-v       # go test -v -race ./...  ← run before every PR
 
 Coverage: auth 78%, importer 72%, game 61%, jwt 60%, profile 59%. CI enforces ≥50% on `services/api`.
 
+## Security middleware
+
+- **Rate limiting:** auth endpoints (login/refresh/logout) use `httpx.RateLimiter(5, 10)` — 5 req/s per IP, burst 10; returns 429.
+- **Body limit:** `httpx.LimitBodySize(1<<20)` applied globally — 1MB cap on all request bodies.
+- **HTTP client:** use `httpx.DefaultClient` (10s timeout) for all outbound calls — never `http.DefaultClient`.
+- **String caps:** user-supplied search/filter strings truncated to 255 chars before use.
+
 ## Boundaries
 
 **Always:**
@@ -84,6 +91,7 @@ Coverage: auth 78%, importer 72%, game 61%, jwt 60%, profile 59%. CI enforces �
 - Use `httpx.UserIDFromContext` to get user identity — never read from headers directly
 - Use `pkg/shared/apierr` sentinels for all error paths
 - Define store interfaces in each package for handler testability — `Service` depends on the interface, not concrete `*Store`
+- Use `httpx.DefaultClient` for outbound HTTP — never `http.DefaultClient`
 
 **Never:**
 - Bypass BGG rate limiting in `importer.Client` — will get IP banned
