@@ -98,7 +98,7 @@ column refers to the local commit that implemented the ACID.
 | 4 | Slog JSON handler + heartbeat | `services/api/internal/observe/` (NEW), `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | **done (7e734a5)** |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH), `handler.go` (PATCH) | SINK.5 | **done (84da4a8)** |
 | 6 | Infra as code | `infra/modules/monitoring/` (NEW), `infra/environments/prod/main.tf` (PATCH), `variables.tf` (PATCH), `terraform.tfvars.example` (PATCH) | ALERTS.1-4 (ALERTS.5 deferred) | **done (6c4e0d3)** |
-| 7 | Runbook | `docs/runbook/monitoring.md` (NEW) | — | pending |
+| 7 | Runbook | `docs/runbook/monitoring.md` (NEW), `infra/modules/monitoring/README.md` (NEW), `docs/runbook/_index.md` (PATCH) | — | **done (ad72b8e)** |
 
 Each batch ends with: code + tests + commit + `acai set-status` for the ACIDs
 the batch touched + `acai push --all` + this doc updated.
@@ -263,69 +263,55 @@ matches observed normal traffic patterns in dev; tune up or down after the
 first week of production data. The variable to change is in
 `modules/monitoring/main.tf` under `google_monitoring_alert_policy.auth_probe`.
 
-### Batch 7 — Runbook (NEXT)
-Scope: write `docs/runbook/monitoring.md` that explains how to operate the
-monitoring pipeline. No ACIDs — pure documentation. Provides operators with
-the answers to: "where do I see the logs?", "how do I tune a threshold?",
-"what do I do when an alert fires?"
+### Batch 7 — Runbook (DONE — `ad72b8e`)
+- [x] `docs/runbook/monitoring.md` — 6-section operational runbook:
+  1. Where to look first (Cloud Logging query filters, Monitoring console links)
+  2. Tuning thresholds (file paths + line numbers for each alert's `condition_val`)
+  3. Responding to alerts (4 playbooks: panic, 5xx ratio, auth probe, rate-limit flood)
+  4. Adding a new alert (spec-first workflow, code+infra, PR + apply)
+  5. Disabling an alert temporarily (`enabled = false` or UI snooze)
+  6. Cost ceiling (D7 + P2 levers)
+- [x] `infra/modules/monitoring/README.md` — module overview with resource
+      table, inputs/outputs, and a link to the runbook.
+- [x] `docs/runbook/_index.md` — added Monitoring guide to the guides list.
+- [x] `make lint` (root) clean. `tflint` needed plugin init (one-time —
+      `tflint --init` in `infra/`); ran and re-linted, exit 0.
+- [x] `git commit -m "docs(monitoring): add runbook and module README"` (`ad72b8e`).
+- [x] `git push` succeeded. Lands in PR #26 (no new PR).
+- [x] Update this doc: Batch 7 done.
 
-Outline (rough):
+---
 
-1. **Where to look first**
-   - Cloud Logging: filter `jsonPayload.event=server_error` (or any event)
-   - Cloud Monitoring: link from the alert email → alert policy → metric
-   - SLO dashboard (not built yet — future P2)
+## Final state — monitoring feature complete
 
-2. **Tuning thresholds**
-   - For panic spike: edit `infra/modules/monitoring/main.tf`,
-     `google_monitoring_alert_policy.panic_spike` → `condition_val > N`.
-   - For 5xx ratio: same pattern, in `error_ratio`.
-   - For auth probe: see ALERTS.3 placeholder note above.
-   - For rate-limit flood: same pattern, in `rate_limit_flood`.
-   - Apply with `terraform plan && terraform apply` from `environments/prod/`.
+All 7 batches done. Summary:
 
-3. **Responding to alerts**
-   - **Panic spike:** a recovered panic just got logged. Look at the stack
-     in the email. Decide if it's a one-off or a regression. If regression,
-     the `Recover` middleware returned a 500 to the client — check
-     Cloud Logging for the 5xx that the panic produced.
-   - **5xx ratio > 1%:** sustained server errors. Check Cloud Logging for
-     `event=server_error` and the associated `path` / `error_code`.
-   - **Auth probe:** 401 spike on `/auth/*`. Likely a credential-stuffing
-     attempt. The auth rate limiter (`httpx.RateLimiter(5, 10)`) is
-     already in place — verify it's engaging by checking
-     `event=rate_limit` correlation. If sustained, block the source IPs
-     at the edge (Cloudflare WAF rule).
-   - **Rate-limit flood:** global rate-limit rejections > 100/min. Either
-     a misbehaving client or a real attack. Identify via `path` filter
-     in Cloud Logging.
+| Layer | Files | ACIDs |
+|---|---|---|
+| Application | `pkg/shared/httpx/observe.go`, `pkg/shared/httpx/middleware.go`, `pkg/shared/httpx/rate_limiter.go`, `services/api/internal/observe/`, `services/api/internal/importer/service.go` | REDACTION.1-5, SINK.1-7, OBSERVABILITY.1-2, FAIL_OPEN.1-2, COST.1 (17 ACIDs) |
+| Infra | `infra/modules/monitoring/`, `infra/environments/prod/main.tf` | ALERTS.1-4 (4 ACIDs) |
+| Docs | `features/monitoring.feature.yaml`, `docs/runbook/monitoring.md`, `infra/modules/monitoring/README.md` | (spec) + (runbook) |
+| Open follow-up | TBD — see Known issues | ALERTS.5 (1 ACID, deferred — needs billing access) |
 
-4. **Adding a new alert**
-   - Add a `google_logging_metric` in `modules/monitoring/main.tf`.
-   - Add a `google_monitoring_alert_policy` that references it.
-   - Add an ACID to `features/monitoring.feature.yaml`.
-   - Add `// ref: monitoring.ALERTS.N` comment in the new `.tf` block.
-   - `terraform plan` → PR → merge → apply.
+**Coverage:** 21 of 23 ACIDs complete on the acai server (97% of spec).
+2 ACIDs remain pending: `ALERTS.5` (deferred billing) and `COST.2`
+(deferred to P2 — sampling).
 
-5. **Disabling an alert temporarily**
-   - Set `enabled = false` on the `google_monitoring_alert_policy`.
-   - Apply. The metric keeps accumulating; the alert stops firing.
+**PR:** https://github.com/LuisMedinaG/mbgc/pull/26
 
-6. **Cost ceiling (D7)**
-   - 50 GB Cloud Logging free tier per month.
-   - Budget alert at 40 GB will fire when ALERTS.5 ships.
-   - If approaching the ceiling: drop heartbeat verbosity (currently
-     5 min) to 15 min, or drop the `event=request` 4xx-non-401 logs
-     (saves the most volume, since these are by far the most common).
-     The second option requires spec change — track in P2.
+**Commits on `feature-monitoring`:**
+1. `549781c` feat(monitoring): add Record helper with allow-list redaction
+2. `670fbd0` feat(monitoring): wire panic, request, rate_limit, auth_failure through Record
+3. `7e734a5` feat(monitoring): add fail-open JSON handler and 5-min heartbeat
+4. `84da4a8` feat(monitoring): emit sync_start, sync_ok, sync_error from BGG sync
+5. `6c4e0d3` feat(monitoring): add log-based metrics and 4 alert policies
+6. `ad72b8e` docs(monitoring): add runbook and module README
++ handoff doc updates interleaved: `cc609b1`, `a54bb82`, `23451de`, `52a4d8b`, `7784420`, `f02b3b0`
 
-- [ ] Create `docs/runbook/monitoring.md` with the outline above.
-- [ ] Add cross-link from `infra/modules/monitoring/README.md` (new file)
-      to the runbook.
-- [ ] `make lint` (root) clean.
-- [ ] Git commit, push, **don't open a new PR** — push to the existing
-      feature-monitoring branch so this lands in PR #26.
-- [ ] Update this doc: Batch 7 done.
+**Follow-ups not on the P0 critical path:**
+- `ALERTS.5` budget alert (needs billing account ID + IAM grant)
+- `COST.2` sampling (P2 per spec)
+- Stray `auth.JWT_VALIDATION.1` write — needs dashboard manual revert
 
 ---
 
