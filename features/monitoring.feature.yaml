@@ -1,0 +1,59 @@
+# monitoring.feature.yaml — Observability & Alerting
+feature:
+  name: monitoring
+  product: mbgc
+  description: Structured observability of HTTP requests, panics, auth probes, rate-limit hits, and BGG sync — queryable in Cloud Logging with alertable metrics in Cloud Monitoring. No PII leaves the service boundary.
+
+components:
+  SINK:
+    name: Structured event sink
+    description: Every monitored event flows through a single helper that enforces a fixed field allow-list and structured logging via slog.
+    requirements:
+      1: "5xx responses emit a structured event with level=error, event=server_error"
+      2: "Recovered panics emit level=error, event=panic, with stack trace"
+      3: "Rate-limit rejections emit level=warn, event=rate_limit"
+      4: "401 responses on /auth/* emit level=warn, event=auth_failure"
+      5: "BGG importer sync start, finish, and failure emit level=info|warn|error"
+      6: "Every event carries request_id, method, path, status, latency_ms, and event name"
+      7: "No field outside the allow-list is ever serialized onto a logged event"
+
+  REDACTION:
+    name: PII and secret redaction
+    description: Defense-in-depth allow-list enforced at the single observation helper. Compliance posture is GDPR-strict by default.
+    requirements:
+      1: "Authorization, Cookie, X-Forwarded-For, and Set-Cookie headers are never read or logged"
+      2: "user_id, username, and client IP are never included in event payloads"
+      3: "BGG_TOKEN, BGG_COOKIE, and SUPABASE_SERVICE_ROLE_KEY are never included"
+      4: "Query strings are dropped; the request path is logged as-is"
+      5: "The allow-list is the single source of truth and is enforced at the observation helper"
+
+  ALERTS:
+    name: Cloud Monitoring alert rules
+    description: Alert policies expressed as code alongside the service.
+    requirements:
+      1: "Panic spike — more than 3 event=panic occurrences in 5 minutes — triggers email"
+      2: "5xx ratio — event=server_error to total response ratio above 1% over 5 minutes — triggers email"
+      3: "Auth probe — event=auth_failure rate on /auth/* above 5x baseline over 1 minute — triggers email"
+      4: "Rate-limit flood — event=rate_limit global rate above 100 per minute sustained 5 minutes — triggers email"
+      5: "Budget alert — Cloud Logging ingestion above 40 GB per month — triggers email"
+
+  OBSERVABILITY:
+    name: Operational visibility
+    description: Detecting when the monitoring system itself is broken.
+    requirements:
+      1: "A meta-warning event is emitted when event emission itself fails"
+      2: "The service emits a periodic heartbeat event every 5 minutes while serving"
+
+constraints:
+  FAIL_OPEN:
+    name: Fail-open contract
+    description: The API must never depend on the monitoring path. A broken or slow monitoring layer must not affect request handling.
+    requirements:
+      1: "A blocked stdout buffer or a returning logger error does not propagate to request handling"
+      2: "If the slog handler returns an error on Emit, the request continues normally"
+  COST:
+    name: Cost ceiling
+    description: Stay under the Cloud Logging free tier of 50 GB per month.
+    requirements:
+      1: "Non-401 4xx responses are logged at level=info, not error severity"
+      2: "Sampling may be introduced later for high-volume routes; it is not part of P0"
