@@ -6,6 +6,7 @@ Common issues and their fixes for the mbgc infrastructure.
 
 - [Testing](testing.md) — patterns, mocking strategies, coverage
 - [Production Deploy](prod-deploy.md) — step-by-step release checklist (migrations → merge → verify)
+- [Monitoring](monitoring.md) — operating the Cloud Logging + Monitoring pipeline (tuning, response playbooks, cost)
 
 ## Troubleshooting Categories
 
