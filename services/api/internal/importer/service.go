@@ -59,7 +59,7 @@ func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool
 	if !s.bgg.Available() {
 		// ref: monitoring.SINK.5 — sync_error at error level for configuration failure
 		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
-		return nil, fmt.Errorf("BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)")
+		return nil, fmt.Errorf("%w: BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)", apierr.ErrInternal)
 	}
 	if err := s.store.CheckRateLimit(ctx, userID, isAdmin, limitUser, limitAdmin); err != nil {
 		// ref: monitoring.SINK.5 — sync_error at warn level for rate-limit (per-handoff, not a server fault)

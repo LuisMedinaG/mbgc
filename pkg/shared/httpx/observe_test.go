@@ -276,6 +276,23 @@ func TestRecord_ForwardsContext(t *testing.T) {
 	}
 }
 
+// ref: monitoring.OBSERVABILITY.3 — kill switch makes Record a no-op.
+// Restores the prior Disabled state in Cleanup so it doesn't leak into
+// other tests in the package.
+func TestRecord_NoOpWhenDisabled(t *testing.T) {
+	prev := Disabled.Load()
+	t.Cleanup(func() { Disabled.Store(prev) })
+	Disabled.Store(true)
+
+	buf := captureSlog(t)
+	r := httptest.NewRequest("GET", "/api/v1/games", nil)
+	Record(r, "should_not_appear", slog.LevelInfo, "key", "value")
+
+	if buf.Len() != 0 {
+		t.Fatalf("expected zero output when Disabled=true, got %q", buf.String())
+	}
+}
+
 type ctxRecorder struct {
 	slog.Handler
 	seen *context.Context

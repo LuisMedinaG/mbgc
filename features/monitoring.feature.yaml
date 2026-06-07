@@ -39,10 +39,11 @@ components:
 
   OBSERVABILITY:
     name: Operational visibility
-    description: Detecting when the monitoring system itself is broken.
+    description: Operational visibility and control over the monitoring system.
     requirements:
       1: "A meta-warning event is emitted when event emission itself fails"
       2: "The service emits a periodic heartbeat event every 5 minutes while serving"
+      3: "A MONITORING_DISABLED env var, when set to true, makes every event emission a no-op so log ingestion can be cut to zero without a rebuild"
 
 constraints:
   FAIL_OPEN:

@@ -75,6 +75,14 @@ func main() {
 	// main so config-load failures are also captured as structured events.
 	slog.SetDefault(slog.New(observe.NewHandler()))
 
+	// ref: monitoring.OBSERVABILITY.3 — kill switch. When set, Record becomes
+	// a no-op and log ingestion from this service drops to zero. Flip on the
+	// next deploy with: gcloud run services update mbgc-api --update-env-vars MONITORING_DISABLED=true
+	if os.Getenv("MONITORING_DISABLED") == "true" {
+		httpx.Disabled.Store(true)
+		slog.Info("monitoring disabled via MONITORING_DISABLED env var")
+	}
+
 	cfg := config.Load()
 
 	// ref: monitoring.OBSERVABILITY.2 — heartbeat goroutine. Cancelled on

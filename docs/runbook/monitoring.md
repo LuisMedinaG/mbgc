@@ -25,7 +25,7 @@ Common filters (paste into the query box):
 | All panics with stacks | `jsonPayload.event="panic"` |
 | All rate-limit rejections | `jsonPayload.event="rate_limit"` |
 | Auth failures on `/auth/*` | `jsonPayload.event="auth_failure"` |
-| BGG sync lifecycle | `jsonPayload.event=~"sync_(start|ok|error)"` |
+| BGG sync lifecycle | `jsonPayload.event=~"sync_(start\|ok\|error)"` |
 | Heartbeat (proves service is alive) | `jsonPayload.event="heartbeat"` |
 | One specific request | `jsonPayload.request_id="<id>"` |
 | All events from one path | `jsonPayload.path="/api/v1/import/sync"` |
@@ -217,7 +217,68 @@ duration. Reverts automatically.
 
 ---
 
-## 6. Cost ceiling (D7)
+## 6. Kill switch — disable monitoring entirely
+
+The `MONITORING_DISABLED` env var drops log ingestion from this service to
+zero. When set to `true`:
+
+- Every `httpx.Record(...)` call is a no-op (the `Record` helper short-circuits
+  on the first instruction).
+- All events stop: `request`, `server_error`, `panic`, `rate_limit`,
+  `auth_failure`, `sync_start/ok/error`, `heartbeat`.
+- The log-based metrics stop accumulating (no events to count), so all four
+  alert policies stop firing.
+- A single one-time `event=info` line "monitoring disabled via
+  MONITORING_DISABLED env var" is emitted at startup so the operator can
+  confirm the flag took effect.
+
+### When to use
+
+- Cost ceiling about to be breached (D7) and you need to stop the bleed
+  before the budget alert (ALERTS.5) is wired up.
+- A noisy log is masking real signal in Cloud Logging.
+- A bug is causing runaway event emission (e.g. a tight retry loop that
+  logs on every attempt).
+
+### How to flip
+
+```sh
+# Disable — service update takes ~5-10 sec, one container restart
+gcloud run services update mbgc-api \
+  --region=us-central1 \
+  --update-env-vars MONITORING_DISABLED=true
+
+# Re-enable
+gcloud run services update mbgc-api \
+  --region=us-central1 \
+  --update-env-vars MONITORING_DISABLED=false
+```
+
+No rebuild, no PR, no Terraform change. The flag is read on every
+`Record` call via an atomic, so the env var is consulted at startup and
+the value stays consistent for the lifetime of the process.
+
+### What you lose
+
+- All alert visibility. If something breaks while disabled, the only
+  signal is user complaints or the next deploy.
+- The heartbeat, so you can't tell from logs whether the service is
+  alive (use the Cloud Run console's "Requests" tab instead).
+- Request/response metrics and latency distributions.
+
+### What you don't lose
+
+- The service itself — requests still work normally. `httpx.Record` is on
+  the observability path only, not the request path. (See
+  `monitoring.FAIL_OPEN.1`.)
+- Existing Cloud Logging data — disabling stops new ingestion, not
+  retention. Old logs are still queryable.
+- Alert policy definitions — they remain in Terraform; re-enabling
+  resumes the metric count from zero.
+
+---
+
+## 7. Cost ceiling (D7)
 
 50 GB Cloud Logging free tier per month. At current emission rates,
 we're well under (heartbeat = 1 event / 5 min = 8.6k events / month;
@@ -245,7 +306,7 @@ touching the code.
 
 ## Reference
 
-- **Spec:** `features/monitoring.feature.yaml` (23 ACIDs)
+- **Spec:** `features/monitoring.feature.yaml` (24 ACIDs)
 - **Code sinks:** `pkg/shared/httpx/observe.go`,
   `services/api/internal/observe/handler.go`
 - **Infra module:** `infra/modules/monitoring/`

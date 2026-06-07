@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"sync/atomic"
 )
 
 // allowedAttrs is the single source of truth for fields that may appear on
@@ -28,6 +29,18 @@ var allowedAttrs = map[string]struct{}{
 	"game_count": {},
 }
 
+// Disabled is a kill switch for the entire monitoring pipeline. When true,
+// Record returns immediately without emitting anything, dropping Cloud
+// Logging ingestion to zero from this service (and starving the log-based
+// metrics, which stops the alert policies from firing).
+//
+// Set once at startup by main() from the MONITORING_DISABLED env var. Read
+// on every Record call via the atomic, so flipping the env var on the next
+// service deploy takes effect without any code change.
+//
+// ref: monitoring.OBSERVABILITY.3
+var Disabled atomic.Bool
+
 // Record emits a structured event through slog. The event is guaranteed to
 // carry request_id, method, path, and event name. Any caller-supplied
 // attribute whose key is not in allowedAttrs is silently dropped.
@@ -38,6 +51,11 @@ var allowedAttrs = map[string]struct{}{
 //
 // ref: monitoring.SINK.6, monitoring.SINK.7, monitoring.REDACTION.1-4
 func Record(r *http.Request, event string, level slog.Level, attrs ...any) {
+	// ref: monitoring.OBSERVABILITY.3 — kill switch short-circuits before any work
+	if Disabled.Load() {
+		return
+	}
+
 	// Caller attrs are filtered first. Anything not in the allow-list is
 	// dropped before it can influence the emitted event.
 	filtered := filterAttrs(attrs)
