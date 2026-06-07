@@ -39,6 +39,7 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 // ref: profile.BGG_USERNAME.1 — set/update/clear BGG username via PUT /api/v1/profile/bgg-username
+// ref: api-layer.CONFIG.7 — cap user-supplied strings at 255 chars before persistence
 func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
@@ -52,6 +53,7 @@ func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
+	body.BGGUsername = httpx.Truncate(body.BGGUsername, 255)
 	if err := h.svc.SetBGGUsername(r.Context(), userID, body.BGGUsername); err != nil {
 		httpx.WriteError(w, err)
 		return

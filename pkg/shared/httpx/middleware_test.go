@@ -332,3 +332,45 @@ func TestClientIP_FallbackToRemoteAddr(t *testing.T) {
 		t.Fatalf("expected 192.0.2.50, got %q", got)
 	}
 }
+
+// ref: api-layer.SEC.8 — Vary: Origin must be set whenever an Origin header is present
+// (allowed or not) so caches don't serve one origin's response to another.
+func TestCORS_SetsVaryOrigin_Allowed(t *testing.T) {
+	mw := CORS([]string{"https://app.example.com"})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Origin", "https://app.example.com")
+	handler.ServeHTTP(w, r)
+
+	if got := w.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("expected Vary=Origin, got %q", got)
+	}
+}
+
+func TestCORS_SetsVaryOrigin_Disallowed(t *testing.T) {
+	mw := CORS([]string{"https://app.example.com"})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("Origin", "https://evil.com")
+	handler.ServeHTTP(w, r)
+
+	if got := w.Header().Get("Vary"); got != "Origin" {
+		t.Fatalf("expected Vary=Origin even for disallowed, got %q", got)
+	}
+}
+
+func TestCORS_NoVaryWhenNoOrigin(t *testing.T) {
+	mw := CORS([]string{"https://app.example.com"})
+	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/", nil))
+
+	if got := w.Header().Get("Vary"); got != "" {
+		t.Fatalf("expected no Vary without Origin, got %q", got)
+	}
+}

@@ -43,6 +43,11 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
+			if origin != "" {
+				// ref: api-layer.SEC.8 — Vary: Origin prevents caches from serving
+				// one origin's ACAO response to another origin.
+				w.Header().Add("Vary", "Origin")
+			}
 			if _, ok := allowed[origin]; ok {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)

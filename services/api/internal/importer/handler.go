@@ -2,6 +2,7 @@ package importer
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
@@ -66,8 +67,9 @@ func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := h.svc.ParseCSVPreview(file)
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusBadRequest,
-			envelope.NewError(apierr.CodeBadRequest, err.Error()))
+		// ref: api-layer.ERR.1 — route dynamic errors through WriteError so the central
+		// sentinel mapping is the only place a message becomes an HTTP response.
+		httpx.WriteError(w, fmt.Errorf("%w: %s", apierr.ErrBadRequest, err.Error()))
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(rows, 1, len(rows), len(rows)))

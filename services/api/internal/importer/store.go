@@ -13,10 +13,24 @@ import (
 
 type Store struct {
 	db *pgxpool.Pool
+	// canSyncRow is overridable for unit tests. Defaults to the real DB query.
+	canSyncRow func(ctx context.Context, userID string) (count int, resetDate time.Time, err error)
 }
 
 func NewStore(db *pgxpool.Pool) *Store {
-	return &Store{db: db}
+	return &Store{db: db, canSyncRow: defaultCanSyncRow(db)}
+}
+
+// defaultCanSyncRow runs the real query against the rate_limits table.
+func defaultCanSyncRow(db *pgxpool.Pool) func(ctx context.Context, userID string) (int, time.Time, error) {
+	return func(ctx context.Context, userID string) (int, time.Time, error) {
+		var count int
+		var resetDate time.Time
+		err := db.QueryRow(ctx,
+			`SELECT count, reset_date FROM importer.rate_limits WHERE user_id = $1`,
+			userID).Scan(&count, &resetDate)
+		return count, resetDate, err
+	}
 }
 
 // ref: importer.RATE.1 — checks rate_limits table keyed by user_id
@@ -24,11 +38,7 @@ func NewStore(db *pgxpool.Pool) *Store {
 // ref: importer.RATE.3 — distinguishes first-sync (ErrNoRows) from real DB failure;
 //   on real failure, fails CLOSED to preserve the daily quota.
 func (s *Store) CanSync(ctx context.Context, userID string, limit int) (bool, error) {
-	var count int
-	var resetDate time.Time
-	err := s.db.QueryRow(ctx,
-		`SELECT count, reset_date FROM importer.rate_limits WHERE user_id = $1`,
-		userID).Scan(&count, &resetDate)
+	count, resetDate, err := s.canSyncRow(ctx, userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return true, nil
 	}
