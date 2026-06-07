@@ -54,13 +54,13 @@ re-derive the design — no prior session memory required.
 
 | ACID | Summary | Batch |
 |---|---|---|
-| `monitoring.SINK.1` | 5xx emits `event=server_error` | 3 |
-| `monitoring.SINK.2` | Recovered panic emits `event=panic` w/ stack | 3 |
-| `monitoring.SINK.3` | Rate-limit emits `event=rate_limit` | 3 |
-| `monitoring.SINK.4` | 401 on `/auth/*` emits `event=auth_failure` | 3 |
+| `monitoring.SINK.1` | 5xx emits `event=server_error` | 3 | **done** |
+| `monitoring.SINK.2` | Recovered panic emits `event=panic` w/ stack | 3 | **done** |
+| `monitoring.SINK.3` | Rate-limit emits `event=rate_limit` | 3 | **done** |
+| `monitoring.SINK.4` | 401 on `/auth/*` emits `event=auth_failure` | 3 | **done** |
 | `monitoring.SINK.5` | BGG sync start/ok/error events | 5 |
-| `monitoring.SINK.6` | Every event carries allow-list fields | 2, 3 |
-| `monitoring.SINK.7` | No field outside allow-list is ever serialized | 2, 3 |
+| `monitoring.SINK.6` | Every event carries allow-list fields | 2, 3 | **done** |
+| `monitoring.SINK.7` | No field outside allow-list is ever serialized | 2, 3 | **done** |
 | `monitoring.REDACTION.1` | Auth/Cookie/XFF/Set-Cookie never read or logged | 2 |
 | `monitoring.REDACTION.2` | user_id, username, client IP never included | 2 |
 | `monitoring.REDACTION.3` | BGG_TOKEN, BGG_COOKIE, SERVICE_ROLE_KEY never included | 2 |
@@ -75,7 +75,7 @@ re-derive the design — no prior session memory required.
 | `monitoring.OBSERVABILITY.2` | Heartbeat every 5 min | 4 |
 | `monitoring.FAIL_OPEN.1` | Blocked stdout/buffer does not propagate to request | 4 |
 | `monitoring.FAIL_OPEN.2` | Handler slog error does not affect request | 4 |
-| `monitoring.COST.1` | Non-401 4xx at info, not error | 3 |
+| `monitoring.COST.1` | Non-401 4xx at info, not error | 3 | **done** |
 | `monitoring.COST.2` | Sampling deferred to P2 | (out of P0) |
 
 ---
@@ -86,7 +86,7 @@ re-derive the design — no prior session memory required.
 |---|---|---|---|---|
 | 1 | Spec only | `features/monitoring.feature.yaml` | — | **done (58da69e)** |
 | 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **done (549781c)** ⚠ status blocked |
-| 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | pending |
+| 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | **done (670fbd0)** |
 | 4 | Slog JSON handler + heartbeat | `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | pending |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH) | SINK.5 | pending |
 | 6 | Infra as code | `infra/monitoring.tf` (NEW) | ALERTS.1-5 | pending |
@@ -117,43 +117,33 @@ the batch touched + `acai push --all` + this doc updated.
       are done. They are correctly registered with code refs.
 - [x] Update this doc: Batch 2 done; advance to Batch 3.
 
-### Batch 3 — Wire into middleware (NEXT)
-Scope: replace the existing `slog.*` calls in `Recover`, `Logger`, `RateLimiter`
-with `httpx.Record(...)` calls. Add a 5xx observation middleware (per D12 — avoid
-touching `WriteError` signature). The `Logger` middleware will choose level
-based on status to satisfy `monitoring.COST.1` (non-401 4xx → info).
-
-- [ ] Patch `pkg/shared/httpx/middleware.go`:
+### Batch 3 — Wire into middleware (DONE — `670fbd0`)
+- [x] Patch `pkg/shared/httpx/middleware.go`:
   - `Recover` — replace `slog.Error("panic recovered", ...)` with
     `Record(r, "panic", slog.LevelError, "value", v, "stack", string(debug.Stack()))`
     — ref `monitoring.SINK.2`.
   - `Logger` — replace `slog.Info("request", ...)` with conditional `Record`:
-    - status >= 500 → `Record(r, "request", slog.LevelError, ...)` (also serves
-      as `monitoring.SINK.1`; the error message is the "event" for alert
-      purposes).
+    - status >= 500 → `Record(r, "server_error", slog.LevelError, ...)` — ref `monitoring.SINK.1`.
     - status == 401 && path starts with `/auth/` → `Record(r, "auth_failure", slog.LevelWarn, ...)` — ref `monitoring.SINK.4`.
     - other 4xx → `Record(r, "request", slog.LevelInfo, ...)` — ref `monitoring.COST.1`.
     - 2xx/3xx → `Record(r, "request", slog.LevelInfo, ...)`.
-  - Add new `ObserveStatus` middleware (the D12 wrapper for 5xx detection) —
-    actually reconsider: `Logger` already sees the status via `statusWriter`.
-    The 5xx observation is naturally inside `Logger`. No separate middleware
-    needed. Decision: skip the new middleware; the 5xx signal flows from
-    `Logger`'s status branch.
-- [ ] Patch `pkg/shared/httpx/rate_limiter.go`:
+  - Decision: skip the new `ObserveStatus` middleware; `Logger` naturally sees 5xx via `statusWriter`. D12 satisfied.
+- [x] Patch `pkg/shared/httpx/rate_limiter.go`:
   - Inside the limiter-rejection branch, before `WriteError`, call
     `Record(r, "rate_limit", slog.LevelWarn)` — ref `monitoring.SINK.3`.
-- [ ] Update existing tests in `middleware_test.go` and `middleware_test.go`:
+- [x] Update existing tests in `middleware_test.go`:
   - `TestRecover_WithPanic` — assert the captured slog has `event=panic`.
-  - `TestLogger` — assert `event=request` and `level=INFO` for 2xx.
-  - Add `TestLogger_5xxEmitsError` and `TestLogger_Auth401EmitsAuthFailure`.
-  - Add `TestRateLimiter_EmitsRateLimitEvent` (use burst=0 to force 429).
-- [ ] Run `make test-v` in services/api and `go test -race` in pkg/shared.
-- [ ] `make tidy`.
-- [ ] `git commit -m "feat(monitoring): route panic, request, rate_limit, auth_failure through Record"`.
-- [ ] `acai push --all`.
-- [ ] Update this doc: Batch 3 done; advance to Batch 4.
+  - `TestLogger` — 2xx/3xx keeps `event=request` at `INFO` level.
+  - Added `TestLogger_5xxEmitsServerError`, `TestLogger_Auth401EmitsAuthFailure`, `TestLogger_4xxNonAuthIsInfo`.
+  - Added `TestRateLimiter_EmitsRateLimitEvent` (burst=0 to force 429).
+- [x] All 46 tests passing (`go test -v -race ./httpx/...` in pkg/shared).
+- [x] `make tidy` clean; `make test-v` green in services/api.
+- [x] `git commit -m "feat(monitoring): wire panic, request, rate_limit, auth_failure through Record"` (`670fbd0`).
+- [x] `git push` succeeded.
+- [ ] `acai push --all` — skipped (needs auth token; same issue as Batch 2).
+- [x] Update this doc: Batch 3 done; advance to Batch 4.
 
-### Verify before next session
+### Batch 4 — Slog JSON handler + heartbeat (NEXT)
 ```sh
 git status                        # clean (WIP should be on a separate branch by now)
 git log --oneline -3              # wiring commit should be HEAD
