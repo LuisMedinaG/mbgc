@@ -135,10 +135,11 @@ func TestRecover_NoPanic(t *testing.T) {
 }
 
 func TestRecover_WithPanic(t *testing.T) {
+	buf := captureSlog(t)
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		panic("test panic")
 	})
-	handler := Recover(inner)
+	handler := Recover(RequestID(inner))
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/", nil)
@@ -156,6 +157,12 @@ func TestRecover_WithPanic(t *testing.T) {
 	}
 	if errObj["code"] != "INTERNAL_ERROR" {
 		t.Fatalf("expected INTERNAL_ERROR, got %s", errObj["code"])
+	}
+
+	// ref: monitoring.SINK.2 — panic event is emitted
+	rec := decodeLine(t, buf)
+	if rec["event"] != "panic" {
+		t.Errorf("expected event=panic, got %v", rec["event"])
 	}
 }
 
@@ -244,6 +251,98 @@ func TestLogger(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+// ref: monitoring.SINK.1 — 5xx emits event=server_error at error level
+func TestLogger_5xxEmitsServerError(t *testing.T) {
+	buf := captureSlog(t)
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	handler := Logger(RequestID(inner))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/v1/games", nil)
+	handler.ServeHTTP(w, r)
+
+	rec := decodeLine(t, buf)
+	if rec["event"] != "server_error" {
+		t.Errorf("expected event=server_error, got %v", rec["event"])
+	}
+	if rec["level"] != "ERROR" {
+		t.Errorf("expected level=ERROR for 5xx, got %v", rec["level"])
+	}
+	if rec["status"] != float64(500) {
+		t.Errorf("expected status=500, got %v", rec["status"])
+	}
+}
+
+// ref: monitoring.SINK.4 — 401 on /auth/* emits event=auth_failure at warn level
+func TestLogger_Auth401EmitsAuthFailure(t *testing.T) {
+	buf := captureSlog(t)
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	handler := Logger(RequestID(inner))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/auth/login", nil)
+	handler.ServeHTTP(w, r)
+
+	rec := decodeLine(t, buf)
+	if rec["event"] != "auth_failure" {
+		t.Errorf("expected event=auth_failure, got %v", rec["event"])
+	}
+	if rec["level"] != "WARN" {
+		t.Errorf("expected level=WARN for auth_failure, got %v", rec["level"])
+	}
+}
+
+// ref: monitoring.COST.1 — non-401 4xx is logged at info level, not error
+func TestLogger_4xxNonAuthIsInfo(t *testing.T) {
+	buf := captureSlog(t)
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	})
+	handler := Logger(RequestID(inner))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/v1/games", nil)
+	handler.ServeHTTP(w, r)
+
+	rec := decodeLine(t, buf)
+	if rec["event"] != "request" {
+		t.Errorf("expected event=request for 4xx, got %v", rec["event"])
+	}
+	if rec["level"] != "INFO" {
+		t.Errorf("expected level=INFO for non-auth 4xx, got %v", rec["level"])
+	}
+}
+
+// ref: monitoring.SINK.3 — rate-limit emits event=rate_limit at warn level
+func TestRateLimiter_EmitsRateLimitEvent(t *testing.T) {
+	buf := captureSlog(t)
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	// burst=0 forces every request to be rejected
+	handler := RateLimiter(1.0, 0)(inner)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/api/v1/games", nil)
+	handler.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w.Code)
+	}
+
+	rec := decodeLine(t, buf)
+	if rec["event"] != "rate_limit" {
+		t.Errorf("expected event=rate_limit, got %v", rec["event"])
+	}
+	if rec["level"] != "WARN" {
+		t.Errorf("expected level=WARN for rate_limit, got %v", rec["level"])
 	}
 }
 
