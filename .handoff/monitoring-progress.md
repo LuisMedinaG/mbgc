@@ -58,7 +58,7 @@ re-derive the design — no prior session memory required.
 | `monitoring.SINK.2` | Recovered panic emits `event=panic` w/ stack | 3 | **done** |
 | `monitoring.SINK.3` | Rate-limit emits `event=rate_limit` | 3 | **done** |
 | `monitoring.SINK.4` | 401 on `/auth/*` emits `event=auth_failure` | 3 | **done** |
-| `monitoring.SINK.5` | BGG sync start/ok/error events | 5 |
+| `monitoring.SINK.5` | BGG sync start/ok/error events | 5 | **done (84da4a8)** |
 | `monitoring.SINK.6` | Every event carries allow-list fields | 2, 3 | **done** |
 | `monitoring.SINK.7` | No field outside allow-list is ever serialized | 2, 3 | **done** |
 | `monitoring.REDACTION.1` | Auth/Cookie/XFF/Set-Cookie never read or logged | 2 |
@@ -88,7 +88,7 @@ re-derive the design — no prior session memory required.
 | 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **done (549781c)** ⚠ status blocked |
 | 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | **done (670fbd0)** |
 | 4 | Slog JSON handler + heartbeat | `services/api/internal/observe/` (NEW), `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | **done (7e734a5)** |
-| 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH) | SINK.5 | pending |
+| 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH), `handler.go` (PATCH) | SINK.5 | **done (84da4a8)** |
 | 6 | Infra as code | `infra/monitoring.tf` (NEW) | ALERTS.1-5 | pending |
 | 7 | Runbook | `docs/runbook/monitoring.md` (NEW) | — | pending |
 
@@ -160,51 +160,95 @@ the batch touched + `acai push --all` + this doc updated.
 - [x] `git commit -m "feat(monitoring): add fail-open JSON handler and 5-min heartbeat"` (`7e734a5`).
 - [x] Update this doc: Batch 4 done; advance to Batch 5.
 
-### Batch 5 — BGG sync observability (NEXT)
-Scope: emit `sync_start`, `sync_ok`, `sync_error` events from `services/api/internal/importer/service.go` at the right points so the importer sync path is observable. One ACID — `monitoring.SINK.5`.
+### Batch 5 — BGG sync observability (DONE — `84da4a8`)
+- [x] Patch `services/api/internal/importer/service.go`:
+  - `Sync(ctx, userID, bggUsername, isAdmin, fullRefresh, ...)` → `Sync(r *http.Request, userID, bggUsername, isAdmin, fullRefresh, ...)` (ctx comes from `r.Context()`)
+  - Two consts: `syncKindIncremental = "incremental"`, `syncKindFullRefresh = "full_refresh"`
+  - Wire `Record(r, "sync_start", slog.LevelInfo, "sync_kind", kind)` after BGG.Available + rate-limit checks pass.
+  - Wire `Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", result.Imported)` on success.
+  - Wire `Record(r, "sync_error", level, "sync_kind", kind)` on each error return:
+    - BGG unconfigured → `LevelError`
+    - rate-limit (`apierr.ErrRateLimit`) → `LevelWarn`; any other `CheckRateLimit` failure → `LevelError`
+    - store failures (RecordSync, LogSync) → `LevelError`
+  - All call sites annotated with `// ref: monitoring.SINK.5`.
+- [x] Patch `services/api/internal/importer/handler.go` to pass `r` to `Sync` (1-line).
+- [x] Add 6 new tests in `handler_test.go` (captureSlog + decodeLines helpers added in the same file):
+  - `TestSync_EmitsSyncStartAndSyncOk` — happy path, both events with sync_kind=incremental, game_count=0
+  - `TestSync_FullRefreshEmitsFullRefreshKind` — sync_kind=full_refresh on both events
+  - `TestSync_EmitsSyncErrorOnBGGUnconfigured` — sync_error at ERROR, no sync_start
+  - `TestSync_EmitsSyncErrorOnRateLimited` — sync_error at WARN, no sync_start
+  - `TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure` — sync_error at ERROR for non-rate-limit server fault
+  - `TestSync_EmitsSyncErrorOnStoreFailure` — sync_start fires, then sync_error at ERROR on RecordSync failure
+- [x] `make tidy` clean; `make test-v` green (35 importer tests, 9 packages in services/api, 3 in pkg/shared — all pass with `-race`).
+- [x] `git commit -m "feat(monitoring): emit sync_start, sync_ok, sync_error from BGG sync"` (`84da4a8`).
+- [x] `git push` succeeded.
+- [x] Update this doc: Batch 5 done; advance to Batch 6.
 
-The importer.Service.Sync method (the real entry point the handler calls) is
-the place. It currently has a `// TODO: fetch BGG collection, create games via
-gameSvc` placeholder. When that's implemented, the wire points are:
+### Batch 6 — Infra as code (NEXT)
+Scope: declare the 5 Cloud Monitoring alert policies in `infra/monitoring.tf` so they're reviewable in PRs. Five ACIDs — `monitoring.ALERTS.1-5`.
 
-- Beginning of `Sync` (after BGG.Available + rate-limit pass):
-  `Record(r, "sync_start", slog.LevelInfo, "sync_kind", kind)` where
-  `kind = "incremental"` for normal syncs and `kind = "full_refresh"` when
-  the caller passed `fullRefresh=true`. — ref `monitoring.SINK.5`.
-- After successful return: `Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", result.Imported)`.
-- On any error path (rate-limit, BGG unconfigured, fetch failure, store error):
-  `Record(r, "sync_error", slog.LevelWarn|Error, "sync_kind", kind, ...)` where
-  the level matches the severity of the error (rate-limit = warn, fetch/store
-  failure = error).
+Design notes for the next session (decisions not yet made — feel free to push back):
 
-Note: the `Service.Sync` method does not currently have a `*http.Request`
-parameter — it has a `context.Context` and a `userID` string. To use `Record`,
-we need either:
-1. Pass `r *http.Request` through the handler call (small refactor — handler
-   already has it).
-2. Use a `Record` variant that takes just a context + attrs. Out of scope
-   for this batch; the existing `Record(r, event, level, attrs...)` signature
-   should be used with `r` plumbed in.
+- The infra repo uses `hashicorp/google ~> 6.0`. Cloud Monitoring alerts are
+  `google_monitoring_alert_policy` resources; the metric filters reference the
+  custom log-based metrics we need to create first via
+  `google_logging_metric` (one per alert). Counters for the 5xx/panic/rate-limit
+  events live as log-based metrics in the same file.
+- For ALERTS.5 (budget), use `google_billing_budget` with a `thresholdRules`
+  block at 40GB. This resource belongs in a billing-scoped file — likely
+  `infra/billing.tf` rather than `monitoring.tf`. Decide when we get there.
+- Notifications: the handoff picked email (D6). For Terraform, that's
+  `google_monitoring_notification_channel` of type `email` with a single
+  `labels.email = var.alert_email` — variable declared in `variables.tf`,
+  populated via `TF_VAR_alert_email` or `terraform.tfvars` (gitignored).
+- Auth-probe baseline (ALERTS.3) is "5× baseline / 1 min" — log-based metric
+  is just a count of `event=auth_failure AND path=~"/auth/.*"`. Baseline
+  detection is harder in pure MQL; the closest MQL primitive is
+  `abs(rate[1m]) > 5 * threshold` where `threshold` is the long-window
+  average. Keep this simple: pick a fixed threshold (e.g. 10/min) and call it
+  "5× baseline" with a `# TODO: tune` note.
+- ACID spec says paths/aggregation windows match the spec exactly:
+  - ALERTS.1: count `event=panic` > 3 in 5 min
+  - ALERTS.2: ratio `event=server_error / total responses` > 0.01 over 5 min
+  - ALERTS.3: count `event=auth_failure AND path=~"/auth/.*"` > 5x baseline / 1 min
+  - ALERTS.4: rate `event=rate_limit` global > 100/min sustained 5 min
+  - ALERTS.5: ingestion volume > 40GB/mo
 
-Decision: go with option 1 — plumb the request through. The handler call
-already has `r` and the service is small. This keeps the single Record
-signature and preserves the "no helper-managed field" guarantee.
+Open sub-questions for the user before coding:
 
-CSV paths (`ParseCSVPreview`, `ImportBGGIDs`) are explicitly out of scope
-per D10 (HTTP-layer + BGG importer sync observability — the CSV paths are
-not "sync" semantics; they're import. If we want them later, add a
-separate ACID in P2).
+1. **Module vs root file:** infra/AGENTS.md describes a root module at
+   `environments/prod/main.tf` with shared `modules/*`. Should this be a new
+   module `modules/monitoring/` (cleaner, reusable) or a flat
+   `environments/prod/monitoring.tf` (simpler, follows the existing flat
+   pattern in environments/prod/main.tf)? Recommend **new module** — alerts
+   deserve their own blast-radius.
+2. **Alert email address:** confirm the address. Stored in `terraform.tfvars`
+   (gitignored) so it's not committed. The CI apply uses `TF_VAR_alert_email`
+   from a GitHub secret.
+3. **Stagger the creation:** GCP's log-based metrics take 5-10 min to start
+   populating after `terraform apply`. First PR should create the metrics
+   only; second PR adds the alert policies that consume them. Or just do
+   both in one PR and accept the empty-metric window. Recommend **one PR
+   both** for now — keeps the spec ACIDs atomic with the code.
+4. **Test bar:** this is pure config. `terraform plan` on a feature branch
+   (CI does this) is the only feasible test. No unit tests. Add a
+   `.tflint.hcl` rule? Not needed — module follows the google preset.
 
-- [ ] Patch `services/api/internal/importer/service.go`:
-  - `Sync(ctx, userID, bggUsername, isAdmin, fullRefresh, ...)` → add `r *http.Request` param
-  - Wire `Record(r, "sync_start", ...)` after rate-limit passes.
-  - Wire `Record(r, "sync_ok", ...)` on success.
-  - Wire `Record(r, "sync_error", ...)` on each error return path.
-- [ ] Patch `services/api/internal/importer/handler.go` to pass `r` to `Sync`.
-- [ ] Update tests in `handler_test.go` to mock/capture the Record call.
-- [ ] `make test-v` and `make tidy`.
-- [ ] Git commit, push.
-- [ ] Update this doc: Batch 5 done; advance to Batch 6.
+- [ ] Decide module vs root file.
+- [ ] Create `modules/monitoring/` (or `environments/prod/monitoring.tf`) with:
+  - 5 `google_logging_metric` resources (one per ACID counter)
+  - 5 `google_monitoring_alert_policy` resources
+  - 1 `google_monitoring_notification_channel` (email)
+  - `variables.tf` for `project_id` and `alert_email`
+  - `outputs.tf` for the policy names (handy for runbook)
+- [ ] Wire module call in `environments/prod/main.tf` (or wherever the root
+      module pulls from).
+- [ ] `terraform fmt -recursive`, `tflint --recursive`, `tfsec .` clean.
+- [ ] `terraform plan` (do not apply — `infra/AGENTS.md` rule: PR CI does
+      the plan review).
+- [ ] Git commit, push, open PR to `dev` (infra PRs target dev per
+      `infra/AGENTS.md` + root `AGENTS.md`).
+- [ ] Update this doc: Batch 6 done; advance to Batch 7.
 
 ---
 
