@@ -23,14 +23,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))          // ref: game-detail.DETAIL_VIEW.1
 	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))    // ref: game-detail.DELETE.1
 	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections))) // ref: vibes.ASSIGN.1
-	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))        // ref: game-detail.RULES_URL.1
-	mux.Handle("POST /api/v1/games/{id}/player-aids", auth(http.HandlerFunc(h.UploadPlayerAid)))    // ref: game-detail.PLAYER_AIDS.1
-	mux.Handle("DELETE /api/v1/games/{id}/player-aids/{aid_id}", auth(http.HandlerFunc(h.DeletePlayerAid))) // ref: game-detail.PLAYER_AIDS.2
 	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))    // ref: vibes.LIST.1
 	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))  // ref: vibes.CRUD.1
 	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))  // ref: vibes.CRUD.3
 	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection))) // ref: vibes.CRUD.4
-	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))              // ref: vibes.DISCOVER.1
 }
 
 // ref: auth.MULTI_TENANCY.2 — user identity extracted from context via httpx.UserIDFromContext
@@ -48,10 +44,10 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := GameFilter{
-		Search:   truncate(r.URL.Query().Get("search"), 255),
-		Category: truncate(r.URL.Query().Get("category"), 255),
-		Page:     queryInt(r, "page", 1),
-		Limit:    queryInt(r, "limit", 20),
+		Search:   httpx.Truncate(r.URL.Query().Get("search"), 255),
+		Category: httpx.Truncate(r.URL.Query().Get("category"), 255),
+		Page:     httpx.QueryInt(r, "page", 1),
+		Limit:    httpx.QueryInt(r, "limit", 20),
 	}
 	games, total, err := h.svc.ListGames(r.Context(), userID, f)
 	if err != nil {
@@ -119,26 +115,6 @@ func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *Handler) BulkCollections(w http.ResponseWriter, r *http.Request) {
-	// TODO: add multiple games to multiple collections at once
-	httpx.WriteError(w, apierr.ErrBadRequest)
-}
-
-func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
-	// TODO: validate Google Drive URL, update DB
-	httpx.WriteError(w, apierr.ErrBadRequest)
-}
-
-func (h *Handler) UploadPlayerAid(w http.ResponseWriter, r *http.Request) {
-	// TODO: parse multipart, validate mime type, save file, insert DB record
-	httpx.WriteError(w, apierr.ErrBadRequest)
-}
-
-func (h *Handler) DeletePlayerAid(w http.ResponseWriter, r *http.Request) {
-	// TODO: delete DB record + file
-	httpx.WriteError(w, apierr.ErrBadRequest)
 }
 
 func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
@@ -215,29 +191,4 @@ func (h *Handler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
-	// TODO: filter games within a specific collection
-	httpx.WriteError(w, apierr.ErrBadRequest)
-}
-
-func queryInt(r *http.Request, key string, fallback int) int {
-	v := r.URL.Query().Get(key)
-	if v == "" {
-		return fallback
-	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		return fallback
-	}
-	return n
-}
-
-// ref: api-layer.SEC.7 — caps string length to prevent abuse
-func truncate(s string, max int) string {
-	if len(s) > max {
-		return s[:max]
-	}
-	return s
 }

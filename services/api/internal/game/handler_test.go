@@ -470,25 +470,25 @@ func TestDeleteCollection_NotFound(t *testing.T) {
 	}
 }
 
-// --- queryInt ---
+// --- httpx.QueryInt ---
 
 func TestQueryInt_Default(t *testing.T) {
 	r := httptest.NewRequest("GET", "/", nil)
-	if v := queryInt(r, "page", 1); v != 1 {
+	if v := httpx.QueryInt(r, "page", 1); v != 1 {
 		t.Fatalf("expected 1, got %d", v)
 	}
 }
 
 func TestQueryInt_Parsed(t *testing.T) {
 	r := httptest.NewRequest("GET", "/?page=5", nil)
-	if v := queryInt(r, "page", 1); v != 5 {
+	if v := httpx.QueryInt(r, "page", 1); v != 5 {
 		t.Fatalf("expected 5, got %d", v)
 	}
 }
 
 func TestQueryInt_Invalid(t *testing.T) {
 	r := httptest.NewRequest("GET", "/?page=abc", nil)
-	if v := queryInt(r, "page", 1); v != 1 {
+	if v := httpx.QueryInt(r, "page", 1); v != 1 {
 		t.Fatalf("expected fallback 1, got %d", v)
 	}
 }
