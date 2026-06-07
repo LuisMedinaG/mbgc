@@ -15,13 +15,22 @@ re-derive the design — no prior session memory required.
 
 ## Branch & base
 
-- **Branch:** `feature/monitoring`
-- **Branched from:** `dev` @ `e1df162` (clean tip — pre-existing WIP stashed
-  as `wip: pre-monitoring unrelated local changes` to keep branches pure;
-  pop that stash on a separate branch when resuming that work).
-- **Spec:** [`features/monitoring.feature.yaml`](../features/monitoring.feature.yaml)
+- **Branch:** `feature/monitoring` (HEAD: `58da69e`)
+- **Branched from:** `dev` @ `e1df162`
+- **Spec:** [`features/monitoring.feature.yaml`](../features/monitoring.feature.yaml) — pushed to acai server
+- **Acai impl:** `mbgc/feature/monitoring` (8 ACIDs registered, all `pending`)
 - **Design rationale:** see chat thread (ask user to paste the design summary
   if needed — it's not in the repo).
+- **Stash state — read this before resuming:**
+  - `stash@{0}` — `wip: pre-monitoring unrelated local changes (round 2)` on `feature/monitoring`
+    (the WIP that was re-stashed during Batch 1 setup; do not `git stash pop`
+    inside this branch — it would re-introduce WIP into the tree)
+  - `stash@{1}` — `wip: pre-monitoring unrelated local changes` on `dev`
+    (the original WIP from before this branch was created)
+  - Both stashes contain overlapping WIP from the prior session. **Recover the
+    WIP by checking out a separate branch and popping stashes there** — never
+    inside `feature/monitoring`. Use `git stash show -p stash@{0} | head` to
+    inspect before popping.
 
 ---
 
@@ -80,8 +89,8 @@ re-derive the design — no prior session memory required.
 
 | # | Batch | Files touched | ACIDs | Status |
 |---|---|---|---|---|
-| 1 | Spec only | `features/monitoring.feature.yaml` | — | **in progress** |
-| 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | pending |
+| 1 | Spec only | `features/monitoring.feature.yaml` | — | **done (58da69e)** |
+| 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **next** |
 | 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | pending |
 | 4 | Slog JSON handler + heartbeat | `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | pending |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH) | SINK.5 | pending |
@@ -95,18 +104,56 @@ the batch touched + `acai push --all` + this doc updated.
 
 ## Resume from here — current batch
 
-### Batch 1 — Spec (in progress)
-- [ ] Write `features/monitoring.feature.yaml` mirroring `auth.feature.yaml` style
-- [ ] `npx @acai.sh/cli push --all` (registers feature + ACIDs on the server)
-- [ ] `git add features/monitoring.feature.yaml && git commit -m "feat(monitoring): add spec with ACIDs"`
-- [ ] No `acai set-status` yet — no ACIDs are completed, only registered
-- [ ] Update this doc: mark Batch 1 done, mark Batch 2 "in progress"
+### Batch 1 — Spec (DONE)
+- [x] Write `features/monitoring.feature.yaml` mirroring `auth.feature.yaml` style
+- [x] `npx @acai.sh/cli push --all` (registers feature + ACIDs on the server)
+- [x] `git commit -m "feat(monitoring): add spec and progress tracker"`
+- [x] No `acai set-status` — no ACIDs completed, only registered
+- [x] Update this doc: Batch 1 done, Batch 2 next
+
+### Batch 2 — Redaction core (NEXT)
+Scope: pure helper + tests. No wiring into middleware yet. The helper is the
+contract the rest of the design depends on, so this is the most important batch
+to get right.
+
+- [ ] Create `pkg/shared/httpx/observe.go` with:
+  - `Record(r *http.Request, event string, level slog.Level, attrs ...any)` —
+    emits via `slog.Log(ctx, level, event, ...)` after filtering attrs through
+    the allow-list. Always includes `request_id`, `method`, `path` from the
+    request. Never reads `Authorization`, `Cookie`, `X-Forwarded-For`,
+    `Set-Cookie`, query string, or body. The function signature does not
+    accept a header map or body, so redaction is enforced by API shape.
+  - `allowedAttrs` package-level map (D11/D13 defaults: no `user_id`, no IP).
+  - `// ref: monitoring.REDACTION.5` on the allow-list declaration.
+  - `// ref: monitoring.SINK.6` on the helper signature.
+- [ ] Create `pkg/shared/httpx/observe_test.go` with tests (D8 — unit only):
+  - `TestRecord_DropsDisallowedKeys` — pass `api_key=…`, `cookie=…`; assert
+    they do not appear in the captured slog output.
+  - `TestRecord_IncludesRequestIDMethodPath` — assert required fields are
+    always present.
+  - `TestRecord_AllowsKnownOptionalKeys` — `error_code`, `stack`, `sync_kind`,
+    `game_count`, `latency_ms`, `status` pass through.
+  - `TestRecord_NilRequestSafe` — guard against nil r (defensive; panic site
+    tests will exercise this).
+  - `TestRecord_RespectsSlogLevel` — `error` vs `warn` vs `info` levels flow
+    to the handler's `Enabled` check.
+- [ ] Run `make test-v` from `services/api/` to verify (the test file is in
+  pkg/shared, but `go.work` lets services/api see it; the existing test target
+  picks it up).
+- [ ] `make tidy` in `services/api/`.
+- [ ] `git commit -m "feat(monitoring): add Record helper with allow-list"`
+- [ ] `acai set-status` for the 7 ACIDs Batch 2 completes:
+  `monitoring.SINK.6, SINK.7, REDACTION.1, REDACTION.2, REDACTION.3,
+  REDACTION.4, REDACTION.5`
+- [ ] `acai push --all`
+- [ ] Update this doc: Batch 2 done; advance to Batch 3.
 
 ### Verify before next session
 ```sh
-git status                        # should be clean
-git log --oneline -3              # spec commit should be HEAD
-npx @acai.sh/cli feature monitoring --json --include-refs   # ACIDs visible
+git status                        # working tree: only WIP from prior session, no new changes
+git log --oneline -3              # helper commit should be HEAD
+npx @acai.sh/cli feature monitoring --json --include-refs   # ACIDs visible, some marked done
+cd pkg/shared && go test -v -race ./httpx/...               # tests pass
 ```
 
 ---
