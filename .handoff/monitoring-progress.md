@@ -85,7 +85,7 @@ re-derive the design — no prior session memory required.
 | # | Batch | Files touched | ACIDs | Status |
 |---|---|---|---|---|
 | 1 | Spec only | `features/monitoring.feature.yaml` | — | **done (58da69e)** |
-| 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **next** |
+| 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **done (549781c)** ⚠ status blocked |
 | 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | pending |
 | 4 | Slog JSON handler + heartbeat | `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | pending |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH) | SINK.5 | pending |
@@ -106,50 +106,90 @@ the batch touched + `acai push --all` + this doc updated.
 - [x] No `acai set-status` — no ACIDs completed, only registered
 - [x] Update this doc: Batch 1 done, Batch 2 next
 
-### Batch 2 — Redaction core (NEXT)
-Scope: pure helper + tests. No wiring into middleware yet. The helper is the
-contract the rest of the design depends on, so this is the most important batch
-to get right.
+### Batch 2 — Redaction core (DONE — `549781c`)
+- [x] `pkg/shared/httpx/observe.go` — `Record(r, event, level, attrs...)` with allow-list
+- [x] `pkg/shared/httpx/observe_test.go` — 11 tests, all passing
+- [x] `make test-v` in services/api and `go test -race` in pkg/shared both green
+- [x] `make tidy` clean
+- [x] `acai push --all` — refs registered (33 total on monitoring feature, up from 23)
+- [ ] **⚠ `acai set-status` BLOCKED** by a CLI bug (see Known issues below). All 7
+      ACIDs in this batch are `status: null` on the server even though code+tests
+      are done. They are correctly registered with code refs.
+- [x] Update this doc: Batch 2 done; advance to Batch 3.
 
-- [ ] Create `pkg/shared/httpx/observe.go` with:
-  - `Record(r *http.Request, event string, level slog.Level, attrs ...any)` —
-    emits via `slog.Log(ctx, level, event, ...)` after filtering attrs through
-    the allow-list. Always includes `request_id`, `method`, `path` from the
-    request. Never reads `Authorization`, `Cookie`, `X-Forwarded-For`,
-    `Set-Cookie`, query string, or body. The function signature does not
-    accept a header map or body, so redaction is enforced by API shape.
-  - `allowedAttrs` package-level map (D11/D13 defaults: no `user_id`, no IP).
-  - `// ref: monitoring.REDACTION.5` on the allow-list declaration.
-  - `// ref: monitoring.SINK.6` on the helper signature.
-- [ ] Create `pkg/shared/httpx/observe_test.go` with tests (D8 — unit only):
-  - `TestRecord_DropsDisallowedKeys` — pass `api_key=…`, `cookie=…`; assert
-    they do not appear in the captured slog output.
-  - `TestRecord_IncludesRequestIDMethodPath` — assert required fields are
-    always present.
-  - `TestRecord_AllowsKnownOptionalKeys` — `error_code`, `stack`, `sync_kind`,
-    `game_count`, `latency_ms`, `status` pass through.
-  - `TestRecord_NilRequestSafe` — guard against nil r (defensive; panic site
-    tests will exercise this).
-  - `TestRecord_RespectsSlogLevel` — `error` vs `warn` vs `info` levels flow
-    to the handler's `Enabled` check.
-- [ ] Run `make test-v` from `services/api/` to verify (the test file is in
-  pkg/shared, but `go.work` lets services/api see it; the existing test target
-  picks it up).
-- [ ] `make tidy` in `services/api/`.
-- [ ] `git commit -m "feat(monitoring): add Record helper with allow-list"`
-- [ ] `acai set-status` for the 7 ACIDs Batch 2 completes:
-  `monitoring.SINK.6, SINK.7, REDACTION.1, REDACTION.2, REDACTION.3,
-  REDACTION.4, REDACTION.5`
-- [ ] `acai push --all`
-- [ ] Update this doc: Batch 2 done; advance to Batch 3.
+### Batch 3 — Wire into middleware (NEXT)
+Scope: replace the existing `slog.*` calls in `Recover`, `Logger`, `RateLimiter`
+with `httpx.Record(...)` calls. Add a 5xx observation middleware (per D12 — avoid
+touching `WriteError` signature). The `Logger` middleware will choose level
+based on status to satisfy `monitoring.COST.1` (non-401 4xx → info).
+
+- [ ] Patch `pkg/shared/httpx/middleware.go`:
+  - `Recover` — replace `slog.Error("panic recovered", ...)` with
+    `Record(r, "panic", slog.LevelError, "value", v, "stack", string(debug.Stack()))`
+    — ref `monitoring.SINK.2`.
+  - `Logger` — replace `slog.Info("request", ...)` with conditional `Record`:
+    - status >= 500 → `Record(r, "request", slog.LevelError, ...)` (also serves
+      as `monitoring.SINK.1`; the error message is the "event" for alert
+      purposes).
+    - status == 401 && path starts with `/auth/` → `Record(r, "auth_failure", slog.LevelWarn, ...)` — ref `monitoring.SINK.4`.
+    - other 4xx → `Record(r, "request", slog.LevelInfo, ...)` — ref `monitoring.COST.1`.
+    - 2xx/3xx → `Record(r, "request", slog.LevelInfo, ...)`.
+  - Add new `ObserveStatus` middleware (the D12 wrapper for 5xx detection) —
+    actually reconsider: `Logger` already sees the status via `statusWriter`.
+    The 5xx observation is naturally inside `Logger`. No separate middleware
+    needed. Decision: skip the new middleware; the 5xx signal flows from
+    `Logger`'s status branch.
+- [ ] Patch `pkg/shared/httpx/rate_limiter.go`:
+  - Inside the limiter-rejection branch, before `WriteError`, call
+    `Record(r, "rate_limit", slog.LevelWarn)` — ref `monitoring.SINK.3`.
+- [ ] Update existing tests in `middleware_test.go` and `middleware_test.go`:
+  - `TestRecover_WithPanic` — assert the captured slog has `event=panic`.
+  - `TestLogger` — assert `event=request` and `level=INFO` for 2xx.
+  - Add `TestLogger_5xxEmitsError` and `TestLogger_Auth401EmitsAuthFailure`.
+  - Add `TestRateLimiter_EmitsRateLimitEvent` (use burst=0 to force 429).
+- [ ] Run `make test-v` in services/api and `go test -race` in pkg/shared.
+- [ ] `make tidy`.
+- [ ] `git commit -m "feat(monitoring): route panic, request, rate_limit, auth_failure through Record"`.
+- [ ] `acai push --all`.
+- [ ] Update this doc: Batch 3 done; advance to Batch 4.
 
 ### Verify before next session
 ```sh
-git status                        # working tree: only WIP from prior session, no new changes
-git log --oneline -3              # helper commit should be HEAD
-npx @acai.sh/cli feature monitoring --json --include-refs   # ACIDs visible, some marked done
-cd pkg/shared && go test -v -race ./httpx/...               # tests pass
+git status                        # clean (WIP should be on a separate branch by now)
+git log --oneline -3              # wiring commit should be HEAD
+cd pkg/shared && go test -v -race ./httpx/...   # all tests pass
+npx @acai.sh/cli feature monitoring --json --include-refs   # ~50+ refs visible
 ```
+
+---
+
+## Known issues
+
+### `acai set-status` CLI bug with slash in branch name
+The acai CLI's `--impl` parser treats `<x>/<y>` as a `<product>/<implementation>`
+namespace selector. Since the branch name is `feature/monitoring` (with a slash),
+the CLI parses it as `product=feature, impl=monitoring`, which does not match
+the actual server-side implementation_name. As a result, all `acai set-status`
+calls from this branch fail with either:
+- "Conflicting product selectors" (when `--product mbgc --impl feature/monitoring` is used)
+- "Resource not found" (when `--impl mbgc/feature/monitoring` is used)
+- "Missing product selector" (when no product is specified and `--impl` is treated as a name)
+
+**Impact:** ACID status updates (pending → completed) are blocked. The ACIDs
+themselves, the spec, and the code refs are correctly registered via
+`acai push --all`. The code, tests, and commits are the source of truth.
+
+**Workarounds:**
+1. Set status manually on the dashboard at https://app.acai.sh once all batches
+   are complete.
+2. Rename the branch from `feature/monitoring` to `feature-monitoring` (dash) and
+   re-push. This requires updating this doc and re-running the worktree.
+3. Use the acai HTTP API directly (the public path is not currently documented;
+   direct curl to `https://app.acai.sh/api/*` returns 404).
+
+**Status (Batch 2):** 7 ACIDs pending on the server, code+tests complete locally.
+This will accumulate across all batches; a single dashboard sweep at the end is
+the cleanest fix.
 
 ---
 
