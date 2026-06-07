@@ -2,10 +2,16 @@ package game
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ref: game-detail.RULES_URL.1 — mirror the client-side allowlist server-side to prevent
+// stored XSS via javascript: URIs in <a href={rules_url}> renders.
+var rulesURLRe = regexp.MustCompile(`^https://(drive|docs)\.google\.com/`)
 
 type Store struct {
 	db      *pgxpool.Pool
@@ -88,7 +94,11 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 }
 
 // ref: auth.MULTI_TENANCY.3 — verifies user_id before updating rules URL
+// ref: game-detail.RULES_URL.1 — reject non-allowlist URLs (XSS hardening)
 func (s *Store) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error {
+	if rulesURL != "" && !rulesURLRe.MatchString(rulesURL) {
+		return fmt.Errorf("%w: rules_url must be a Google Drive or Docs https URL", apierr.ErrValidation)
+	}
 	tag, err := s.db.Exec(ctx,
 		`UPDATE games.games SET rules_url = $1, updated_at = now()
 		 WHERE id = $2 AND user_id = $3`, rulesURL, gameID, userID)

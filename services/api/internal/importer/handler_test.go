@@ -271,6 +271,21 @@ func TestCSVImport_EmptyIDs(t *testing.T) {
 	}
 }
 
+// ref: importer.CSV_IMPORT.6 — reject batches > 100 to prevent amplification DoS.
+func TestCSVImport_RejectsOversizedBatch(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	ids := make([]int, 0, 101)
+	for i := 0; i < 101; i++ {
+		ids = append(ids, i+1)
+	}
+	body, _ := json.Marshal(map[string]any{"bgg_ids": ids})
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", string(body), false))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for 101 ids, got %d", w.Code)
+	}
+}
+
 func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) {

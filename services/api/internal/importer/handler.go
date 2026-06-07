@@ -76,6 +76,10 @@ func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 // ref: importer.CSV_IMPORT.3 — user selects which games to import from the preview list
 // ref: importer.CSV_IMPORT.4 — importing skips games already in the collection
 // ref: importer.CSV_IMPORT.5 — response includes counts of imported, skipped, and failed games
+// ref: importer.CSV_IMPORT.6 — cap batch to match preview (100) — prevents 1MB body of ints
+// triggering thousands of DB round-trips in a single request (amplification DoS).
+const maxImportBatch = 100
+
 func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
@@ -85,7 +89,8 @@ func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		BGGIDs []int `json:"bgg_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.BGGIDs) == 0 {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil ||
+		len(body.BGGIDs) == 0 || len(body.BGGIDs) > maxImportBatch {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}

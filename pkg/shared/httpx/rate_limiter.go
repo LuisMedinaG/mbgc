@@ -1,7 +1,9 @@
 package httpx
 
 import (
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,23 +60,18 @@ func RateLimiter(ratePerSec float64, burst int) func(http.Handler) http.Handler 
 	}
 }
 
-// clientIP extracts the client IP, respecting X-Forwarded-For when behind a proxy.
+// clientIP extracts the client IP, trusting only the rightmost X-Forwarded-For entry.
+// ref: api-layer.SEC.5 — rightmost XFF is appended by the trusted edge (GFE / Cloud Run);
+// leftmost entries are client-spoofable and must not be used to key the per-IP bucket.
 func clientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the leftmost (original client) IP.
-		for i := 0; i < len(xff); i++ {
-			if xff[i] == ',' {
-				return xff[:i]
-			}
+		if i := strings.LastIndex(xff, ","); i >= 0 {
+			return strings.TrimSpace(xff[i+1:])
 		}
-		return xff
+		return strings.TrimSpace(xff)
 	}
-	// Fall back to RemoteAddr; strip port.
-	addr := r.RemoteAddr
-	for i := len(addr) - 1; i >= 0; i-- {
-		if addr[i] == ':' {
-			return addr[:i]
-		}
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
 	}
-	return addr
+	return r.RemoteAddr
 }

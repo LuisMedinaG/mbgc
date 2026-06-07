@@ -43,11 +43,21 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// ref: collection.API.1 — clamp page/limit to safe bounds; attacker-controlled ?limit=1000000
+	// would otherwise cause expensive full scans and unbounded memory in the response envelope.
+	page := httpx.QueryInt(r, "page", 1)
+	if page < 1 {
+		page = 1
+	}
+	limit := httpx.QueryInt(r, "limit", 20)
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
 	f := GameFilter{
 		Search:   httpx.Truncate(r.URL.Query().Get("search"), 255),
 		Category: httpx.Truncate(r.URL.Query().Get("category"), 255),
-		Page:     httpx.QueryInt(r, "page", 1),
-		Limit:    httpx.QueryInt(r, "limit", 20),
+		Page:     page,
+		Limit:    limit,
 	}
 	games, total, err := h.svc.ListGames(r.Context(), userID, f)
 	if err != nil {

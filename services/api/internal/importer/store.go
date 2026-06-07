@@ -2,8 +2,10 @@ package importer
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
@@ -19,14 +21,19 @@ func NewStore(db *pgxpool.Pool) *Store {
 
 // ref: importer.RATE.1 — checks rate_limits table keyed by user_id
 // ref: importer.BGG_SYNC.5 — rate limit resets daily at midnight UTC
+// ref: importer.RATE.3 — distinguishes first-sync (ErrNoRows) from real DB failure;
+//   on real failure, fails CLOSED to preserve the daily quota.
 func (s *Store) CanSync(ctx context.Context, userID string, limit int) (bool, error) {
 	var count int
 	var resetDate time.Time
 	err := s.db.QueryRow(ctx,
 		`SELECT count, reset_date FROM importer.rate_limits WHERE user_id = $1`,
 		userID).Scan(&count, &resetDate)
-	if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) {
 		return true, nil
+	}
+	if err != nil {
+		return false, err
 	}
 	if resetDate.Before(truncateToDay(time.Now())) {
 		return true, nil

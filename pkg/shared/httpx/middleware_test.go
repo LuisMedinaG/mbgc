@@ -307,3 +307,28 @@ func TestWriteError_AllSentinels(t *testing.T) {
 		})
 	}
 }
+
+// ref: api-layer.SEC.5 — rightmost XFF is the trusted edge entry; left entries are spoofable.
+func TestClientIP_RightmostXFF(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("X-Forwarded-For", "1.2.3.4, 10.0.0.1")
+	if got := clientIP(r); got != "10.0.0.1" {
+		t.Fatalf("expected rightmost trusted entry, got %q", got)
+	}
+}
+
+func TestClientIP_XFFSingleEntry(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.Header.Set("X-Forwarded-For", "203.0.113.7")
+	if got := clientIP(r); got != "203.0.113.7" {
+		t.Fatalf("expected 203.0.113.7, got %q", got)
+	}
+}
+
+func TestClientIP_FallbackToRemoteAddr(t *testing.T) {
+	r := httptest.NewRequest("GET", "/", nil)
+	r.RemoteAddr = "192.0.2.50:54321"
+	if got := clientIP(r); got != "192.0.2.50" {
+		t.Fatalf("expected 192.0.2.50, got %q", got)
+	}
+}

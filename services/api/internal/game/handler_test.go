@@ -125,6 +125,31 @@ func TestListGames_StoreError(t *testing.T) {
 	}
 }
 
+// ref: collection.API.1 — page/limit must be clamped to safe bounds before hitting the store.
+func TestListGames_ClampsPageAndLimit(t *testing.T) {
+	var got GameFilter
+	store := &mockGameStore{
+		listGamesFn: func(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
+			got = f
+			return nil, 0, nil
+		},
+	}
+	h := NewHandler(NewService(store))
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("GET", "/api/v1/games?page=-5&limit=99999", "")
+	h.ListGames(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if got.Page != 1 {
+		t.Fatalf("expected page clamped to 1, got %d", got.Page)
+	}
+	if got.Limit != 20 {
+		t.Fatalf("expected limit clamped to 20, got %d", got.Limit)
+	}
+}
+
 // --- GetGame ---
 
 func TestGetGame_Unauthenticated(t *testing.T) {
