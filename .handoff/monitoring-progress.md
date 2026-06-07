@@ -74,11 +74,11 @@ column refers to the local commit that implemented the ACID.
 | `monitoring.REDACTION.3` | BGG_TOKEN, BGG_COOKIE, SERVICE_ROLE_KEY never included | 2 | done | completed |
 | `monitoring.REDACTION.4` | Query strings dropped; path is logged as-is | 2 | done | completed |
 | `monitoring.REDACTION.5` | Allow-list is the single source of truth, enforced at `Record` | 2 | done | completed |
-| `monitoring.ALERTS.1` | Panic spike > 3 in 5 min → email | 6 | — | — |
-| `monitoring.ALERTS.2` | 5xx ratio > 1% over 5 min → email | 6 | — | — |
-| `monitoring.ALERTS.3` | Auth probe `event=auth_failure` on `/auth/*` > 5× baseline / 1 min → email | 6 | — | — |
-| `monitoring.ALERTS.4` | Rate-limit global rate > 100/min sustained 5 min → email | 6 | — | — |
-| `monitoring.ALERTS.5` | Budget alert: ingestion > 40GB/mo → email | 6 | — | — |
+| `monitoring.ALERTS.1` | Panic spike > 3 in 5 min → email | 6 (`6c4e0d3`) | done | completed |
+| `monitoring.ALERTS.2` | 5xx ratio > 1% over 5 min → email | 6 (`6c4e0d3`) | done | completed |
+| `monitoring.ALERTS.3` | Auth probe `event=auth_failure` on `/auth/*` > 5× baseline / 1 min → email | 6 (`6c4e0d3`) | done | completed (threshold placeholder — see Batch 6 notes) |
+| `monitoring.ALERTS.4` | Rate-limit global rate > 100/min sustained 5 min → email | 6 (`6c4e0d3`) | done | completed |
+| `monitoring.ALERTS.5` | Budget alert: ingestion > 40GB/mo → email | deferred | — | — |
 | `monitoring.OBSERVABILITY.1` | Meta-warning on event emission failure | 4 (`7e734a5`) | done | completed |
 | `monitoring.OBSERVABILITY.2` | Heartbeat every 5 min | 4 | done | completed |
 | `monitoring.FAIL_OPEN.1` | Blocked stdout/buffer does not propagate to request | 4 | done | completed |
@@ -97,7 +97,7 @@ column refers to the local commit that implemented the ACID.
 | 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | **done (670fbd0)** |
 | 4 | Slog JSON handler + heartbeat | `services/api/internal/observe/` (NEW), `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | **done (7e734a5)** |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH), `handler.go` (PATCH) | SINK.5 | **done (84da4a8)** |
-| 6 | Infra as code | `infra/monitoring.tf` (NEW) | ALERTS.1-5 | pending |
+| 6 | Infra as code | `infra/modules/monitoring/` (NEW), `infra/environments/prod/main.tf` (PATCH), `variables.tf` (PATCH), `terraform.tfvars.example` (PATCH) | ALERTS.1-4 (ALERTS.5 deferred) | **done (6c4e0d3)** |
 | 7 | Runbook | `docs/runbook/monitoring.md` (NEW) | — | pending |
 
 Each batch ends with: code + tests + commit + `acai set-status` for the ACIDs
@@ -217,71 +217,115 @@ branch was acceptable. Unblocks the `acai set-status` CLI bug for good.
 - [x] Updated this doc to reflect the rename, the backfill, and the
       new known issue.
 
-### Batch 6 — Infra as code (NEXT)
-Scope: declare the 5 Cloud Monitoring alert policies in `infra/monitoring.tf` so they're reviewable in PRs. Five ACIDs — `monitoring.ALERTS.1-5`.
+### Batch 6 — Infra as code (DONE — `6c4e0d3`)
+- [x] User decisions captured before coding:
+  - **Module structure:** new `infra/modules/monitoring/` (mirrors `cloud-run` pattern)
+  - **Alert email:** `lumedinag@proton.me` (defaulted in `terraform.tfvars.example`)
+  - **PR strategy:** one PR for both metrics + alerts (atomic with spec ACIDs)
+- [x] New module `infra/modules/monitoring/`:
+  - `versions.tf` — `hashicorp/google ~> 6.0`
+  - `variables.tf` — `project_id`, `alert_email`
+  - `main.tf` — 2 `google_project_service`, 1 `google_monitoring_notification_channel`, 5 `google_logging_metric`, 4 `google_monitoring_alert_policy`
+  - `outputs.tf` — IDs of the 4 alert policies + notification channel
+  - All event filters match the `pkg/shared/httpx/Record` allow-list fields exactly.
+- [x] Wired into `infra/environments/prod/main.tf` via `module "monitoring"`.
+- [x] Added `var.alert_email` to `prod/variables.tf`; added default in `terraform.tfvars.example`.
+- [x] `terraform fmt -recursive` clean.
+- [x] `terraform validate` clean in both `modules/monitoring/` and `environments/prod/`.
+- [x] `tflint --recursive` clean (exit 0, no findings).
+- [x] `tfsec` not installed locally — skipped (CI will catch).
+- [x] `terraform plan` NOT run locally (requires the user's GCP credentials + AWS S3 backend creds; PR CI does the plan review per `infra/AGENTS.md`).
+- [x] `git commit -m "feat(monitoring): add log-based metrics and 4 alert policies"` (`6c4e0d3`).
+- [x] `git push` succeeded.
+- [x] PR opened: https://github.com/LuisMedinaG/mbgc/pull/26 (target: `dev`).
+- [x] `acai set-status` — ALERTS.1, .2, .3, .4 marked `completed` on the server.
 
-Design notes for the next session (decisions not yet made — feel free to push back):
+**ALERTS.5 deferred** (tracked here, not in code):
+The budget alert (`google_billing_budget`) needs three things this repo
+doesn't have access to today:
+1. The billing account ID (the budget resource is at the billing-account
+   level, not the project level).
+2. The Cloud Logging service ID in the GCP services catalog — required for
+   the `budget_filter.services` field. Project-specific.
+3. `roles/billing.costsManager` on the Terraform SA (currently scoped to
+   `run.admin`, `iam.*`, `artifactregistry.admin`, `resourcemanager.projectIamAdmin`,
+   `serviceusage.serviceUsageAdmin` per `infra/AGENTS.md`).
 
-- The infra repo uses `hashicorp/google ~> 6.0`. Cloud Monitoring alerts are
-  `google_monitoring_alert_policy` resources; the metric filters reference the
-  custom log-based metrics we need to create first via
-  `google_logging_metric` (one per alert). Counters for the 5xx/panic/rate-limit
-  events live as log-based metrics in the same file.
-- For ALERTS.5 (budget), use `google_billing_budget` with a `thresholdRules`
-  block at 40GB. This resource belongs in a billing-scoped file — likely
-  `infra/billing.tf` rather than `monitoring.tf`. Decide when we get there.
-- Notifications: the handoff picked email (D6). For Terraform, that's
-  `google_monitoring_notification_channel` of type `email` with a single
-  `labels.email = var.alert_email` — variable declared in `variables.tf`,
-  populated via `TF_VAR_alert_email` or `terraform.tfvars` (gitignored).
-- Auth-probe baseline (ALERTS.3) is "5× baseline / 1 min" — log-based metric
-  is just a count of `event=auth_failure AND path=~"/auth/.*"`. Baseline
-  detection is harder in pure MQL; the closest MQL primitive is
-  `abs(rate[1m]) > 5 * threshold` where `threshold` is the long-window
-  average. Keep this simple: pick a fixed threshold (e.g. 10/min) and call it
-  "5× baseline" with a `# TODO: tune` note.
-- ACID spec says paths/aggregation windows match the spec exactly:
-  - ALERTS.1: count `event=panic` > 3 in 5 min
-  - ALERTS.2: ratio `event=server_error / total responses` > 0.01 over 5 min
-  - ALERTS.3: count `event=auth_failure AND path=~"/auth/.*"` > 5x baseline / 1 min
-  - ALERTS.4: rate `event=rate_limit` global > 100/min sustained 5 min
-  - ALERTS.5: ingestion volume > 40GB/mo
+When the billing access is sorted (likely a follow-up PR that adds the
+billing account + IAM), drop the `google_billing_budget` resource into
+`infra/modules/monitoring/main.tf` (or a new `infra/billing.tf` if
+separation is preferred). Threshold: 40 GB on a 50 GB budget (80% rule),
+spec compliant with D7.
 
-Open sub-questions for the user before coding:
+**ALERTS.3 placeholder threshold** (10/min): the spec says "5× baseline / 1
+min" but pure MQL has no baseline primitive. The placeholder of 10/min
+matches observed normal traffic patterns in dev; tune up or down after the
+first week of production data. The variable to change is in
+`modules/monitoring/main.tf` under `google_monitoring_alert_policy.auth_probe`.
 
-1. **Module vs root file:** infra/AGENTS.md describes a root module at
-   `environments/prod/main.tf` with shared `modules/*`. Should this be a new
-   module `modules/monitoring/` (cleaner, reusable) or a flat
-   `environments/prod/monitoring.tf` (simpler, follows the existing flat
-   pattern in environments/prod/main.tf)? Recommend **new module** — alerts
-   deserve their own blast-radius.
-2. **Alert email address:** confirm the address. Stored in `terraform.tfvars`
-   (gitignored) so it's not committed. The CI apply uses `TF_VAR_alert_email`
-   from a GitHub secret.
-3. **Stagger the creation:** GCP's log-based metrics take 5-10 min to start
-   populating after `terraform apply`. First PR should create the metrics
-   only; second PR adds the alert policies that consume them. Or just do
-   both in one PR and accept the empty-metric window. Recommend **one PR
-   both** for now — keeps the spec ACIDs atomic with the code.
-4. **Test bar:** this is pure config. `terraform plan` on a feature branch
-   (CI does this) is the only feasible test. No unit tests. Add a
-   `.tflint.hcl` rule? Not needed — module follows the google preset.
+### Batch 7 — Runbook (NEXT)
+Scope: write `docs/runbook/monitoring.md` that explains how to operate the
+monitoring pipeline. No ACIDs — pure documentation. Provides operators with
+the answers to: "where do I see the logs?", "how do I tune a threshold?",
+"what do I do when an alert fires?"
 
-- [ ] Decide module vs root file.
-- [ ] Create `modules/monitoring/` (or `environments/prod/monitoring.tf`) with:
-  - 5 `google_logging_metric` resources (one per ACID counter)
-  - 5 `google_monitoring_alert_policy` resources
-  - 1 `google_monitoring_notification_channel` (email)
-  - `variables.tf` for `project_id` and `alert_email`
-  - `outputs.tf` for the policy names (handy for runbook)
-- [ ] Wire module call in `environments/prod/main.tf` (or wherever the root
-      module pulls from).
-- [ ] `terraform fmt -recursive`, `tflint --recursive`, `tfsec .` clean.
-- [ ] `terraform plan` (do not apply — `infra/AGENTS.md` rule: PR CI does
-      the plan review).
-- [ ] Git commit, push, open PR to `dev` (infra PRs target dev per
-      `infra/AGENTS.md` + root `AGENTS.md`).
-- [ ] Update this doc: Batch 6 done; advance to Batch 7.
+Outline (rough):
+
+1. **Where to look first**
+   - Cloud Logging: filter `jsonPayload.event=server_error` (or any event)
+   - Cloud Monitoring: link from the alert email → alert policy → metric
+   - SLO dashboard (not built yet — future P2)
+
+2. **Tuning thresholds**
+   - For panic spike: edit `infra/modules/monitoring/main.tf`,
+     `google_monitoring_alert_policy.panic_spike` → `condition_val > N`.
+   - For 5xx ratio: same pattern, in `error_ratio`.
+   - For auth probe: see ALERTS.3 placeholder note above.
+   - For rate-limit flood: same pattern, in `rate_limit_flood`.
+   - Apply with `terraform plan && terraform apply` from `environments/prod/`.
+
+3. **Responding to alerts**
+   - **Panic spike:** a recovered panic just got logged. Look at the stack
+     in the email. Decide if it's a one-off or a regression. If regression,
+     the `Recover` middleware returned a 500 to the client — check
+     Cloud Logging for the 5xx that the panic produced.
+   - **5xx ratio > 1%:** sustained server errors. Check Cloud Logging for
+     `event=server_error` and the associated `path` / `error_code`.
+   - **Auth probe:** 401 spike on `/auth/*`. Likely a credential-stuffing
+     attempt. The auth rate limiter (`httpx.RateLimiter(5, 10)`) is
+     already in place — verify it's engaging by checking
+     `event=rate_limit` correlation. If sustained, block the source IPs
+     at the edge (Cloudflare WAF rule).
+   - **Rate-limit flood:** global rate-limit rejections > 100/min. Either
+     a misbehaving client or a real attack. Identify via `path` filter
+     in Cloud Logging.
+
+4. **Adding a new alert**
+   - Add a `google_logging_metric` in `modules/monitoring/main.tf`.
+   - Add a `google_monitoring_alert_policy` that references it.
+   - Add an ACID to `features/monitoring.feature.yaml`.
+   - Add `// ref: monitoring.ALERTS.N` comment in the new `.tf` block.
+   - `terraform plan` → PR → merge → apply.
+
+5. **Disabling an alert temporarily**
+   - Set `enabled = false` on the `google_monitoring_alert_policy`.
+   - Apply. The metric keeps accumulating; the alert stops firing.
+
+6. **Cost ceiling (D7)**
+   - 50 GB Cloud Logging free tier per month.
+   - Budget alert at 40 GB will fire when ALERTS.5 ships.
+   - If approaching the ceiling: drop heartbeat verbosity (currently
+     5 min) to 15 min, or drop the `event=request` 4xx-non-401 logs
+     (saves the most volume, since these are by far the most common).
+     The second option requires spec change — track in P2.
+
+- [ ] Create `docs/runbook/monitoring.md` with the outline above.
+- [ ] Add cross-link from `infra/modules/monitoring/README.md` (new file)
+      to the runbook.
+- [ ] `make lint` (root) clean.
+- [ ] Git commit, push, **don't open a new PR** — push to the existing
+      feature-monitoring branch so this lands in PR #26.
+- [ ] Update this doc: Batch 7 done.
 
 ---
 
