@@ -43,7 +43,7 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 
 	bggUsername := httpx.UsernameFromContext(r.Context())
 
-	result, err := h.svc.Sync(r.Context(), userID, bggUsername, isAdmin, fullRefresh, h.syncLimitUser, h.syncLimitAdmin)
+	result, err := h.svc.Sync(r, userID, bggUsername, isAdmin, fullRefresh, h.syncLimitUser, h.syncLimitAdmin)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return

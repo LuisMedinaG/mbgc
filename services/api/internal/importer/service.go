@@ -3,10 +3,16 @@ package importer
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
 type importerStore interface {
@@ -34,22 +40,54 @@ func NewService(st importerStore, bggClient bggClient, gameSvc gameService) *Ser
 	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc}
 }
 
+// syncKind is the value of the sync_kind attribute on a sync_* event.
+// Values are intentionally coarse: incremental vs full_refresh.
+const (
+	syncKindIncremental = "incremental"
+	syncKindFullRefresh = "full_refresh"
+)
+
 // ref: importer.BGG_SYNC.2 — sync is disabled when BGG credentials are not configured
-func (s *Service) Sync(ctx context.Context, userID, bggUsername string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
+// ref: monitoring.SINK.5 — emits sync_start, sync_ok, or sync_error across the lifetime of a sync
+func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
+	ctx := r.Context()
+	kind := syncKindIncremental
+	if fullRefresh {
+		kind = syncKindFullRefresh
+	}
+
 	if !s.bgg.Available() {
+		// ref: monitoring.SINK.5 — sync_error at error level for configuration failure
+		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
 		return nil, fmt.Errorf("BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)")
 	}
 	if err := s.store.CheckRateLimit(ctx, userID, isAdmin, limitUser, limitAdmin); err != nil {
+		// ref: monitoring.SINK.5 — sync_error at warn level for rate-limit (per-handoff, not a server fault)
+		level := slog.LevelWarn
+		if !errors.Is(err, apierr.ErrRateLimit) {
+			level = slog.LevelError
+		}
+		httpx.Record(r, "sync_error", level, "sync_kind", kind)
 		return nil, err
 	}
+
+	// ref: monitoring.SINK.5 — sync_start fires once the early-rejection checks have passed
+	httpx.Record(r, "sync_start", slog.LevelInfo, "sync_kind", kind)
+
 	// TODO: fetch BGG collection, create games via gameSvc
 	result := &SyncResult{}
 	if err := s.store.RecordSync(ctx, userID); err != nil {
+		// ref: monitoring.SINK.5 — sync_error at error level for store-layer failure
+		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
 		return nil, err
 	}
 	if err := s.store.LogSync(ctx, userID, result.Imported, fullRefresh); err != nil {
+		// ref: monitoring.SINK.5 — sync_error at error level for store-layer failure
+		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
 		return nil, err
 	}
+	// ref: monitoring.SINK.5 — sync_ok with imported game count
+	httpx.Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", result.Imported)
 	return result, nil
 }
 
