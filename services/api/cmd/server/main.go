@@ -143,6 +143,8 @@ func main() {
 			httpx.Recover,
 			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
 			httpx.LimitBodySize(1 << 20),
+			// ref: api-layer.SEC.7 — rejects wrong Content-Type on body-bearing requests (CSRF text/plain bypass)
+			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
 			// ref: auth.MIDDLEWARE.5 — CORS validates origin

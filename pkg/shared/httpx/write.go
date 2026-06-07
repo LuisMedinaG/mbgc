@@ -38,6 +38,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		status, code, msg = http.StatusTooManyRequests, apierr.CodeRateLimit, err.Error()
 	case errors.Is(err, apierr.ErrBadRequest):
 		status, code, msg = http.StatusBadRequest, apierr.CodeBadRequest, err.Error()
+	case errors.Is(err, apierr.ErrUnsupportedMediaType):
+		status, code, msg = http.StatusUnsupportedMediaType, apierr.CodeUnsupportedMediaType, err.Error()
 	case errors.Is(err, apierr.ErrValidation):
 		status, code, msg = http.StatusUnprocessableEntity, apierr.CodeValidation, err.Error()
 	default:
