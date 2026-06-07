@@ -3,7 +3,7 @@
 This doc is the **single source of truth** for resuming the monitoring work
 between sessions. Each new session should:
 
-1. `git checkout feature/monitoring` (verify clean tree)
+1. `git checkout feature-monitoring` (verify clean tree)
 2. Read this file top-to-bottom
 3. Pick up the **Next batch** at the bottom
 4. Update this file at the end of the session
@@ -15,10 +15,15 @@ re-derive the design — no prior session memory required.
 
 ## Branch & base
 
-- **Branch:** `feature/monitoring` (HEAD: `58da69e`)
+- **Branch:** `feature-monitoring` (HEAD: `52a4d8b`)
 - **Branched from:** `dev` @ `e1df162`
 - **Spec:** [`features/monitoring.feature.yaml`](../features/monitoring.feature.yaml) — pushed to acai server
-- **Acai impl:** `mbgc/feature/monitoring` (8 ACIDs registered, all `pending`)
+- **Acai impl:** `mbgc/feature-monitoring` (23 ACIDs registered, 17 marked `completed`, 5 pending, 1 deferred)
+- **Acai impl history:**
+  - Old impl `mbgc/feature/monitoring` (slash-name) still exists on the server from
+    pre-rename pushes — orphaned, no branch tracking. Safe to ignore or delete
+    via the acai dashboard. Carries 25 unknown-product refs (cosmetic noise).
+  - All current work tracks the new `mbgc/feature-monitoring` impl.
 - **Design rationale:** see chat thread (ask user to paste the design summary
   if needed — it's not in the repo).
 - **Stash state — read this before resuming:**
@@ -52,31 +57,34 @@ re-derive the design — no prior session memory required.
 
 ## ACID map (from spec)
 
-| ACID | Summary | Batch |
-|---|---|---|
-| `monitoring.SINK.1` | 5xx emits `event=server_error` | 3 | **done** |
-| `monitoring.SINK.2` | Recovered panic emits `event=panic` w/ stack | 3 | **done** |
-| `monitoring.SINK.3` | Rate-limit emits `event=rate_limit` | 3 | **done** |
-| `monitoring.SINK.4` | 401 on `/auth/*` emits `event=auth_failure` | 3 | **done** |
-| `monitoring.SINK.5` | BGG sync start/ok/error events | 5 | **done (84da4a8)** |
-| `monitoring.SINK.6` | Every event carries allow-list fields | 2, 3 | **done** |
-| `monitoring.SINK.7` | No field outside allow-list is ever serialized | 2, 3 | **done** |
-| `monitoring.REDACTION.1` | Auth/Cookie/XFF/Set-Cookie never read or logged | 2 |
-| `monitoring.REDACTION.2` | user_id, username, client IP never included | 2 |
-| `monitoring.REDACTION.3` | BGG_TOKEN, BGG_COOKIE, SERVICE_ROLE_KEY never included | 2 |
-| `monitoring.REDACTION.4` | Query strings dropped; path is logged as-is | 2 |
-| `monitoring.REDACTION.5` | Allow-list is the single source of truth, enforced at `Record` | 2 |
-| `monitoring.ALERTS.1` | Panic spike > 3 in 5 min → email | 6 |
-| `monitoring.ALERTS.2` | 5xx ratio > 1% over 5 min → email | 6 |
-| `monitoring.ALERTS.3` | Auth probe `event=auth_failure` on `/auth/*` > 5× baseline / 1 min → email | 6 |
-| `monitoring.ALERTS.4` | Rate-limit global rate > 100/min sustained 5 min → email | 6 |
-| `monitoring.ALERTS.5` | Budget alert: ingestion > 40GB/mo → email | 6 |
-| `monitoring.OBSERVABILITY.1` | Meta-warning on event emission failure | 4 | **done** |
-| `monitoring.OBSERVABILITY.2` | Heartbeat every 5 min | 4 | **done** |
-| `monitoring.FAIL_OPEN.1` | Blocked stdout/buffer does not propagate to request | 4 | **done** |
-| `monitoring.FAIL_OPEN.2` | Handler slog error does not affect request | 4 | **done** |
-| `monitoring.COST.1` | Non-401 4xx at info, not error | 3 | **done** |
-| `monitoring.COST.2` | Sampling deferred to P2 | (out of P0) |
+Local status (code+tests done) and server status (acai). The batch
+column refers to the local commit that implemented the ACID.
+
+| ACID | Summary | Batch | Local | Server |
+|---|---|---|---|---|
+| `monitoring.SINK.1` | 5xx emits `event=server_error` | 3 (`670fbd0`) | done | completed |
+| `monitoring.SINK.2` | Recovered panic emits `event=panic` w/ stack | 3 (`670fbd0`) | done | completed |
+| `monitoring.SINK.3` | Rate-limit emits `event=rate_limit` | 3 (`670fbd0`) | done | completed |
+| `monitoring.SINK.4` | 401 on `/auth/*` emits `event=auth_failure` | 3 (`670fbd0`) | done | completed |
+| `monitoring.SINK.5` | BGG sync start/ok/error events | 5 (`84da4a8`) | done | completed |
+| `monitoring.SINK.6` | Every event carries allow-list fields | 2 (`549781c`), 3 | done | completed |
+| `monitoring.SINK.7` | No field outside allow-list is ever serialized | 2, 3 | done | completed |
+| `monitoring.REDACTION.1` | Auth/Cookie/XFF/Set-Cookie never read or logged | 2 | done | completed |
+| `monitoring.REDACTION.2` | user_id, username, client IP never included | 2 | done | completed |
+| `monitoring.REDACTION.3` | BGG_TOKEN, BGG_COOKIE, SERVICE_ROLE_KEY never included | 2 | done | completed |
+| `monitoring.REDACTION.4` | Query strings dropped; path is logged as-is | 2 | done | completed |
+| `monitoring.REDACTION.5` | Allow-list is the single source of truth, enforced at `Record` | 2 | done | completed |
+| `monitoring.ALERTS.1` | Panic spike > 3 in 5 min → email | 6 | — | — |
+| `monitoring.ALERTS.2` | 5xx ratio > 1% over 5 min → email | 6 | — | — |
+| `monitoring.ALERTS.3` | Auth probe `event=auth_failure` on `/auth/*` > 5× baseline / 1 min → email | 6 | — | — |
+| `monitoring.ALERTS.4` | Rate-limit global rate > 100/min sustained 5 min → email | 6 | — | — |
+| `monitoring.ALERTS.5` | Budget alert: ingestion > 40GB/mo → email | 6 | — | — |
+| `monitoring.OBSERVABILITY.1` | Meta-warning on event emission failure | 4 (`7e734a5`) | done | completed |
+| `monitoring.OBSERVABILITY.2` | Heartbeat every 5 min | 4 | done | completed |
+| `monitoring.FAIL_OPEN.1` | Blocked stdout/buffer does not propagate to request | 4 | done | completed |
+| `monitoring.FAIL_OPEN.2` | Handler slog error does not affect request | 4 | done | completed |
+| `monitoring.COST.1` | Non-401 4xx at info, not error | 3 | done | completed |
+| `monitoring.COST.2` | Sampling deferred to P2 | (out of P0) | — | — |
 
 ---
 
@@ -85,7 +93,7 @@ re-derive the design — no prior session memory required.
 | # | Batch | Files touched | ACIDs | Status |
 |---|---|---|---|---|
 | 1 | Spec only | `features/monitoring.feature.yaml` | — | **done (58da69e)** |
-| 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **done (549781c)** ⚠ status blocked |
+| 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **done (549781c)** |
 | 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | **done (670fbd0)** |
 | 4 | Slog JSON handler + heartbeat | `services/api/internal/observe/` (NEW), `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | **done (7e734a5)** |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH), `handler.go` (PATCH) | SINK.5 | **done (84da4a8)** |
@@ -112,9 +120,9 @@ the batch touched + `acai push --all` + this doc updated.
 - [x] `make test-v` in services/api and `go test -race` in pkg/shared both green
 - [x] `make tidy` clean
 - [x] `acai push --all` — refs registered (33 total on monitoring feature, up from 23)
-- [ ] **⚠ `acai set-status` BLOCKED** by a CLI bug (see Known issues below). All 7
-      ACIDs in this batch are `status: null` on the server even though code+tests
-      are done. They are correctly registered with code refs.
+- [x] `acai set-status` — retroactively backfilled in post-Batch 5 followup after
+      the branch rename unblocked the CLI. All 7 ACIDs now `status: completed`
+      on `mbgc/feature-monitoring`.
 - [x] Update this doc: Batch 2 done; advance to Batch 3.
 
 ### Batch 3 — Wire into middleware (DONE — `670fbd0`)
@@ -140,7 +148,8 @@ the batch touched + `acai push --all` + this doc updated.
 - [x] `make tidy` clean; `make test-v` green in services/api.
 - [x] `git commit -m "feat(monitoring): wire panic, request, rate_limit, auth_failure through Record"` (`670fbd0`).
 - [x] `git push` succeeded.
-- [ ] `acai push --all` — skipped (needs auth token; same issue as Batch 2).
+- [x] `acai push --all` — retroactively run from renamed branch in post-Batch 5
+      followup. SINK.1-4 and COST.1 now `status: completed` on `mbgc/feature-monitoring`.
 - [x] Update this doc: Batch 3 done; advance to Batch 4.
 
 ### Batch 4 — Slog JSON handler + heartbeat (DONE — `7e734a5`)
@@ -183,6 +192,30 @@ the batch touched + `acai push --all` + this doc updated.
 - [x] `git commit -m "feat(monitoring): emit sync_start, sync_ok, sync_error from BGG sync"` (`84da4a8`).
 - [x] `git push` succeeded.
 - [x] Update this doc: Batch 5 done; advance to Batch 6.
+
+### Post-Batch 5 followup — branch rename + acai backfill
+Done in the same session as Batch 5, after the user confirmed renaming the
+branch was acceptable. Unblocks the `acai set-status` CLI bug for good.
+
+- [x] Renamed branch `feature/monitoring` → `feature-monitoring` (dash).
+      Local: `git branch -m feature/monitoring feature-monitoring`. Remote:
+      `git push origin :feature/monitoring feature-monitoring`.
+- [x] Set upstream: `git branch --set-upstream-to=origin/feature-monitoring`.
+- [x] `acai push --all` from the renamed branch — created new impl
+      `mbgc/feature-monitoring` (191 refs, 8 created). The old
+      `mbgc/feature/monitoring` impl is orphaned (no branch tracking) and
+      carries 25 unknown-product refs (cosmetic noise — see Known issues).
+- [x] `acai set-status` of all 17 done ACIDs as `completed` on the new impl:
+      REDACTION.1-5, SINK.1-7, OBSERVABILITY.1-2, FAIL_OPEN.1-2, COST.1.
+      Server confirmed: `STATES_WRITTEN = 17` for feature=monitoring.
+- [x] Side effect: a test write accidentally marked `auth.JWT_VALIDATION.1` as
+      `completed` on the new impl. The CLI rejects `status: pending` (only
+      `completed` and `accepted` are valid), so this single-ACID misfire on
+      the auth feature needs to be cleared via the acai dashboard
+      (https://app.acai.sh) — there is no CLI revert path. Flagged in Known
+      issues below.
+- [x] Updated this doc to reflect the rename, the backfill, and the
+      new known issue.
 
 ### Batch 6 — Infra as code (NEXT)
 Scope: declare the 5 Cloud Monitoring alert policies in `infra/monitoring.tf` so they're reviewable in PRs. Five ACIDs — `monitoring.ALERTS.1-5`.
@@ -254,31 +287,36 @@ Open sub-questions for the user before coding:
 
 ## Known issues
 
-### `acai set-status` CLI bug with slash in branch name
-The acai CLI's `--impl` parser treats `<x>/<y>` as a `<product>/<implementation>`
-namespace selector. Since the branch name is `feature/monitoring` (with a slash),
-the CLI parses it as `product=feature, impl=monitoring`, which does not match
-the actual server-side implementation_name. As a result, all `acai set-status`
-calls from this branch fail with either:
-- "Conflicting product selectors" (when `--product mbgc --impl feature/monitoring` is used)
-- "Resource not found" (when `--impl mbgc/feature/monitoring` is used)
-- "Missing product selector" (when no product is specified and `--impl` is treated as a name)
+### ✅ RESOLVED: `acai set-status` CLI bug with slash in branch name
+The acai CLI's `--impl` parser treated `<x>/<y>` as a `<product>/<implementation>`
+namespace selector. Since the original branch was `feature/monitoring` (with a
+slash), the CLI parsed it as `product=feature, impl=monitoring` and rejected
+all set-status calls with one of:
+- "Conflicting product selectors" (when `--product mbgc --impl feature/monitoring`)
+- "Resource not found" (when `--impl mbgc/feature/monitoring`)
+- "Missing product selector" (when `--impl` had no slash and no `--product`)
 
-**Impact:** ACID status updates (pending → completed) are blocked. The ACIDs
-themselves, the spec, and the code refs are correctly registered via
-`acai push --all`. The code, tests, and commits are the source of truth.
+**Resolution:** Branch renamed `feature/monitoring` → `feature-monitoring` (dash)
+in the post-Batch 5 followup. The new impl `mbgc/feature-monitoring` is now
+the working one. All 17 completed monitoring ACIDs were backfilled in a single
+`acai set-status` call. Going forward, every batch should end with the
+standard set-status + push --all cycle.
 
-**Workarounds:**
-1. Set status manually on the dashboard at https://app.acai.sh once all batches
-   are complete.
-2. Rename the branch from `feature/monitoring` to `feature-monitoring` (dash) and
-   re-push. This requires updating this doc and re-running the worktree.
-3. Use the acai HTTP API directly (the public path is not currently documented;
-   direct curl to `https://app.acai.sh/api/*` returns 404).
+**Not cleaned up (cosmetic):** The old `mbgc/feature/monitoring` impl is still
+on the server (orphaned, no branch tracking) with 25 unknown-product refs.
+Safe to delete from the acai dashboard; not blocking any work.
 
-**Status (Batch 2):** 7 ACIDs pending on the server, code+tests complete locally.
-This will accumulate across all batches; a single dashboard sweep at the end is
-the cleanest fix.
+### Stray `auth.JWT_VALIDATION.1` write to `status: completed`
+During the post-Batch 5 followup, a test write of the `acai set-status` command
+inadvertently marked `auth.JWT_VALIDATION.1` as `completed` on the new
+`mbgc/feature-monitoring` impl. The CLI only accepts `status: completed` or
+`status: accepted` (no `pending`, no `null`), so the misfire cannot be reverted
+from the command line.
+
+**To clean up:** Go to https://app.acai.sh → mbgc → feature-monitoring → auth
+feature → `auth.JWT_VALIDATION.1` → clear the status. If the ACID is in fact
+fully implemented on the branch, leave it; otherwise reset to pending. One
+ACID on an unrelated feature — not blocking, but visible on the dashboard.
 
 ---
 
