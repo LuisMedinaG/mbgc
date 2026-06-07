@@ -71,10 +71,10 @@ re-derive the design — no prior session memory required.
 | `monitoring.ALERTS.3` | Auth probe `event=auth_failure` on `/auth/*` > 5× baseline / 1 min → email | 6 |
 | `monitoring.ALERTS.4` | Rate-limit global rate > 100/min sustained 5 min → email | 6 |
 | `monitoring.ALERTS.5` | Budget alert: ingestion > 40GB/mo → email | 6 |
-| `monitoring.OBSERVABILITY.1` | Meta-warning on event emission failure | 4 |
-| `monitoring.OBSERVABILITY.2` | Heartbeat every 5 min | 4 |
-| `monitoring.FAIL_OPEN.1` | Blocked stdout/buffer does not propagate to request | 4 |
-| `monitoring.FAIL_OPEN.2` | Handler slog error does not affect request | 4 |
+| `monitoring.OBSERVABILITY.1` | Meta-warning on event emission failure | 4 | **done** |
+| `monitoring.OBSERVABILITY.2` | Heartbeat every 5 min | 4 | **done** |
+| `monitoring.FAIL_OPEN.1` | Blocked stdout/buffer does not propagate to request | 4 | **done** |
+| `monitoring.FAIL_OPEN.2` | Handler slog error does not affect request | 4 | **done** |
 | `monitoring.COST.1` | Non-401 4xx at info, not error | 3 | **done** |
 | `monitoring.COST.2` | Sampling deferred to P2 | (out of P0) |
 
@@ -87,7 +87,7 @@ re-derive the design — no prior session memory required.
 | 1 | Spec only | `features/monitoring.feature.yaml` | — | **done (58da69e)** |
 | 2 | Redaction core | `pkg/shared/httpx/observe.go`, `observe_test.go` (NEW) | SINK.6, SINK.7, REDACTION.1-5 | **done (549781c)** ⚠ status blocked |
 | 3 | Wire into middleware | `pkg/shared/httpx/middleware.go`, `rate_limiter.go` (PATCH) | SINK.1-4, SINK.6-7, COST.1 | **done (670fbd0)** |
-| 4 | Slog JSON handler + heartbeat | `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | pending |
+| 4 | Slog JSON handler + heartbeat | `services/api/internal/observe/` (NEW), `services/api/cmd/server/main.go` (PATCH) | OBSERVABILITY.1-2, FAIL_OPEN.1-2 | **done (7e734a5)** |
 | 5 | BGG sync observability | `services/api/internal/importer/service.go` (PATCH) | SINK.5 | pending |
 | 6 | Infra as code | `infra/monitoring.tf` (NEW) | ALERTS.1-5 | pending |
 | 7 | Runbook | `docs/runbook/monitoring.md` (NEW) | — | pending |
@@ -143,13 +143,68 @@ the batch touched + `acai push --all` + this doc updated.
 - [ ] `acai push --all` — skipped (needs auth token; same issue as Batch 2).
 - [x] Update this doc: Batch 3 done; advance to Batch 4.
 
-### Batch 4 — Slog JSON handler + heartbeat (NEXT)
-```sh
-git status                        # clean (WIP should be on a separate branch by now)
-git log --oneline -3              # wiring commit should be HEAD
-cd pkg/shared && go test -v -race ./httpx/...   # all tests pass
-npx @acai.sh/cli feature monitoring --json --include-refs   # ~50+ refs visible
-```
+### Batch 4 — Slog JSON handler + heartbeat (DONE — `7e734a5`)
+- [x] New package `services/api/internal/observe/` with:
+  - `NewHandler()` — returns a fail-open JSON slog handler. Primary writes to stdout; on error, emits `event=meta_warning` to stderr and returns nil. — ref `monitoring.OBSERVABILITY.1`, `monitoring.FAIL_OPEN.1`, `monitoring.FAIL_OPEN.2`.
+  - `Heartbeat(ctx, interval)` — goroutine that emits `event=heartbeat` immediately and every `interval` until ctx is cancelled. — ref `monitoring.OBSERVABILITY.2`.
+  - 5 tests, all passing:
+    - `TestFailOpenHandler_PrimaryFailureReturnsNil`
+    - `TestFailOpenHandler_EmitsMetaWarningOnPrimaryFailure`
+    - `TestFailOpenHandler_NoMetaOnPrimarySuccess`
+    - `TestFailOpenHandler_MetaFailureAlsoReturnsNil` (meta sink also failing)
+    - `TestHeartbeat_EmitsOnTick` (initial + ticks + ctx-cancel stop)
+- [x] Patch `services/api/cmd/server/main.go`:
+  - First line of `main()`: `slog.SetDefault(slog.New(observe.NewHandler()))` — so even config-load failures are captured.
+  - Heartbeat goroutine started right after, with 5-min interval, cancelled on shutdown.
+- [x] `make tidy` clean; `make test-v` green in services/api.
+- [x] `git commit -m "feat(monitoring): add fail-open JSON handler and 5-min heartbeat"` (`7e734a5`).
+- [x] Update this doc: Batch 4 done; advance to Batch 5.
+
+### Batch 5 — BGG sync observability (NEXT)
+Scope: emit `sync_start`, `sync_ok`, `sync_error` events from `services/api/internal/importer/service.go` at the right points so the importer sync path is observable. One ACID — `monitoring.SINK.5`.
+
+The importer.Service.Sync method (the real entry point the handler calls) is
+the place. It currently has a `// TODO: fetch BGG collection, create games via
+gameSvc` placeholder. When that's implemented, the wire points are:
+
+- Beginning of `Sync` (after BGG.Available + rate-limit pass):
+  `Record(r, "sync_start", slog.LevelInfo, "sync_kind", kind)` where
+  `kind = "incremental"` for normal syncs and `kind = "full_refresh"` when
+  the caller passed `fullRefresh=true`. — ref `monitoring.SINK.5`.
+- After successful return: `Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", result.Imported)`.
+- On any error path (rate-limit, BGG unconfigured, fetch failure, store error):
+  `Record(r, "sync_error", slog.LevelWarn|Error, "sync_kind", kind, ...)` where
+  the level matches the severity of the error (rate-limit = warn, fetch/store
+  failure = error).
+
+Note: the `Service.Sync` method does not currently have a `*http.Request`
+parameter — it has a `context.Context` and a `userID` string. To use `Record`,
+we need either:
+1. Pass `r *http.Request` through the handler call (small refactor — handler
+   already has it).
+2. Use a `Record` variant that takes just a context + attrs. Out of scope
+   for this batch; the existing `Record(r, event, level, attrs...)` signature
+   should be used with `r` plumbed in.
+
+Decision: go with option 1 — plumb the request through. The handler call
+already has `r` and the service is small. This keeps the single Record
+signature and preserves the "no helper-managed field" guarantee.
+
+CSV paths (`ParseCSVPreview`, `ImportBGGIDs`) are explicitly out of scope
+per D10 (HTTP-layer + BGG importer sync observability — the CSV paths are
+not "sync" semantics; they're import. If we want them later, add a
+separate ACID in P2).
+
+- [ ] Patch `services/api/internal/importer/service.go`:
+  - `Sync(ctx, userID, bggUsername, isAdmin, fullRefresh, ...)` → add `r *http.Request` param
+  - Wire `Record(r, "sync_start", ...)` after rate-limit passes.
+  - Wire `Record(r, "sync_ok", ...)` on success.
+  - Wire `Record(r, "sync_error", ...)` on each error return path.
+- [ ] Patch `services/api/internal/importer/handler.go` to pass `r` to `Sync`.
+- [ ] Update tests in `handler_test.go` to mock/capture the Record call.
+- [ ] `make test-v` and `make tidy`.
+- [ ] Git commit, push.
+- [ ] Update this doc: Batch 5 done; advance to Batch 6.
 
 ---
 
