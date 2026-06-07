@@ -2,70 +2,50 @@
 feature:
   name: game-detail
   product: mbgc
-  description: |
-    Individual game detail view showing metadata, player aids,
-    collection assignments (vibes), rulebook URL, and delete action.
+  description: View and manage a single board game from the user's collection
 
 components:
   DETAIL_VIEW:
-    name: Game detail display
-    description: Full game detail page at /games/:id
+    name: Game detail
+    description: Display all metadata for a single game
     requirements:
-      1: Fetches single game from GET /api/v1/games/{id} with collections and player aids
-      2: Displays hero image (large) at top of page
-      3: Shows game name, year published
-      4: Shows player count range (e.g. "2-4 players")
-      5: Shows playtime in minutes
-      6: Shows BGG complexity weight with label (light/medium/heavy)
-      7: Shows BGG average rating as star rating
-      8: Shows game description text
-      9: Renders type, category, and mechanic tags as colored chips
-      10: Shows language dependence level if available
-      11: Shows recommended player counts if available
+      1: GET /api/v1/games/{id} returns full game metadata including collections and player aids
+      2: The page displays name, image, year, player count, playtime, weight, rating, and description
+      3: The description is expandable when truncated
+      4: Category, mechanic, and type chips are shown
+      5: Requesting a game the user does not own returns 404
 
   PLAYER_AIDS:
-    name: Player aid image management
-    description: Upload, view, and delete player aid reference images per game
+    name: Player aids
+    description: Reference images attached to a game
     requirements:
-      1: Upload player aid images (PNG, JPEG, GIF, WebP) via POST /api/v1/games/{id}/player-aids
-      2: Each aid has a filename and optional text label
-      3: Displays player aid thumbnails in a horizontal strip below game details
-      4: Clicking a thumbnail opens a full-screen lightbox viewer
-      5: Lightbox supports keyboard navigation (left/right arrows, escape to close)
-      6: Delete a player aid via DELETE /api/v1/games/{id}/player-aids/{aid_id}
-      7: Player aid images are stored on disk in a configurable data directory
+      1: Images can be uploaded via POST /api/v1/games/{id}/player-aids
+      2: Images can be deleted individually
+      3: Uploaded files are validated for image type and maximum size before saving
+      4: Images are displayed as thumbnails; clicking opens a full-screen lightbox
+      5: The lightbox supports keyboard navigation (arrows, Escape)
 
   RULES_URL:
-    name: Rulebook URL editor
-    description: Inline editor for storing and validating Google Drive rulebook links
+    name: Rulebook link
+    description: Store a link to the game's rulebook
     requirements:
-      1: Displays the current rulebook URL if set
-      2: Inline editing via PUT /api/v1/games/{id}/rules-url
-      3: "Validates URL — must be https://drive.google.com/ or https://docs.google.com/"
-      4: Shows edit/save/cancel states inline without page navigation
-      5: Shows validation error for non-Google Drive/Docs URLs
+      1: The rulebook URL can be set and updated inline without navigating away
+      2: Only Google Drive and Google Docs URLs are accepted
+      3: An invalid URL shows an inline error without saving
 
   VIBE_ASSIGN:
-    name: Collection assignment on game detail
-    description: Assign/remove game from collections (vibes) on the detail page
+    name: Collection assignment
+    description: Assign or remove the game from collections
     requirements:
-      1: Shows a checklist of all user collections with checkbox state per game
-      2: On check/uncheck, calls POST /api/v1/games/{id}/collections with full collection ID set
-      3: Changes are reflected immediately in the UI without page reload
+      1: A checklist shows all user collections with their current assignment state
+      2: Saving replaces the full set of collection assignments for the game
+      3: The UI reflects the updated state immediately after saving
 
   DELETE:
     name: Delete game
-    description: Remove a game from the user's collection
+    description: Remove a game from the collection
     requirements:
-      1: DELETE /api/v1/games/{id} removes the game
-      2: Requires confirmation before executing deletion
-      3: Verifies user_id matches the game owner before deletion
-      4: On success, navigates back to collection page
-      5: Deleted game's player aids and collection assignments are cascade-deleted by DB
-
-constraints:
-  STORAGE:
-    name: Storage constraints
-    requirements:
-      1: Player aid uploads must be limited to a reasonable max file size
-      2: Uploaded files must be validated for image content type
+      1: Deleting a game requires explicit user confirmation
+      2: The requesting user must own the game; otherwise 403 is returned
+      3: Deletion removes all associated player aids and collection assignments
+      4: After deletion the user is navigated back to the collection page

@@ -7,20 +7,34 @@ import (
 	"io"
 	"strconv"
 	"strings"
-
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 )
 
-type Service struct {
-	store      *Store
-	bgg        *Client
-	gameSvc    *game.Service
+type importerStore interface {
+	CheckRateLimit(ctx context.Context, userID string, isAdmin bool, limitUser, limitAdmin int) error
+	RecordSync(ctx context.Context, userID string) error
+	LogSync(ctx context.Context, userID string, imported int, fullRefresh bool) error
 }
 
-func NewService(st *Store, bggClient *Client, gameSvc *game.Service) *Service {
+type bggClient interface {
+	Available() bool
+}
+
+type gameService interface {
+	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
+	CreateGame(ctx context.Context, userID string, bggID int) (int64, error)
+}
+
+type Service struct {
+	store   importerStore
+	bgg     bggClient
+	gameSvc gameService
+}
+
+func NewService(st importerStore, bggClient bggClient, gameSvc gameService) *Service {
 	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc}
 }
 
+// ref: importer.BGG_SYNC.2 — sync is disabled when BGG credentials are not configured
 func (s *Service) Sync(ctx context.Context, userID, bggUsername string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
 	if !s.bgg.Available() {
 		return nil, fmt.Errorf("BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)")
@@ -85,6 +99,8 @@ func (s *Service) ParseCSVPreview(r io.Reader) ([]CSVPreviewRow, error) {
 	return rows, nil
 }
 
+// ref: importer.GAME_CREATION.2 — importing the same BGG game twice does not create a duplicate
+// ref: importer.CSV_IMPORT.4 — importing skips games already present in the collection
 func (s *Service) ImportBGGIDs(ctx context.Context, userID string, bggIDs []int) (*SyncResult, error) {
 	result := &SyncResult{}
 	for _, id := range bggIDs {

@@ -1,3 +1,10 @@
+# deploy-cloud-run.yml — Reusable workflow: build Docker image and deploy to Cloud Run.
+# Called by pipeline.yml (deploy-api-prod / deploy-api-dev jobs). Not triggered directly.
+#
+# Steps: GCP auth via Workload Identity Federation → docker build + push to Artifact Registry
+#        (tagged with commit SHA) → gcloud run deploy with non-empty env vars.
+# Migrations run at server startup via golang-migrate (embedded SQL, tracked in schema_migrations).
+# ref: ci-cd.DEPLOY_API.4, ci-cd.DEPLOY_API.5, ci-cd.DEPLOY_API.6, ci-cd.DEPLOY_API.7
 name: Deploy to Cloud Run
 
 on:

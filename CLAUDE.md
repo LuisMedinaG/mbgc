@@ -32,18 +32,20 @@ services/api  (JWT validation via JWKS + all route handlers)
   /api/v1/games/*        games, collections, player aids
   /api/v1/collections/*  vibes/collections CRUD
   /api/v1/import/*       BGG sync, CSV import
-  /healthz               health check
+  /readyz               health check
 ```
 
 JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
 
 ## CI/CD
 
-- **CI** — `.github/workflows/ci.yml`: build + test + vet, web lint/build, infra lint
-- **Deploy** — `.github/workflows/deploy.yml`: deploys `services/api` on push to `main`
-- **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR, `terraform apply` on merge to `main`
+- **Pipeline** — `.github/workflows/pipeline.yml`: single workflow for all CI + deploy. PR → CI only. Push to dev → CI + deploy API (dev). Push to main → CI + deploy API (prod, requires manual approval via `production` environment gate) + deploy web. Go tests run with `-race` and `-coverprofile`; coverage artifacts uploaded + per-function summary posted to PR step summary. CI fails if `services/api` coverage drops below 50%.
+- **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR to main (posts plan as PR comment via dynamic path), `terraform apply` on merge to main (infra/ changes only)
+- **E2E** — `.github/workflows/e2e.yml`: manual Playwright tests (workflow_dispatch)
+- **Reusable** — `.github/workflows/deploy-cloud-run.yml`: Cloud Run build + deploy, called by pipeline.yml. No migration step in CI — migrations run automatically at server startup via golang-migrate (SQL embedded in binary, tracked in `schema_migrations` table).
 - **Secrets** — `infra/scripts/bootstrap.sh` provisions infra + syncs secrets to GitHub Actions
 - **Rotation** — `make rotate-secrets` or `infra/scripts/rotate-secrets.sh` to rotate any secret group
+- **Runbook** — `docs/runbook/ci-cd/_index.md`: full secrets list, failure diagnosis, manual deploy steps
 
 ## Infrastructure
 

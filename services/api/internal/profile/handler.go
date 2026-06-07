@@ -38,7 +38,7 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, envelope.New(profile))
 }
 
-// ref: profile.BGG_USERNAME.4 — scoped to authenticated user via JWT user_id
+// ref: profile.BGG_USERNAME.1 — set/update/clear BGG username via PUT /api/v1/profile/bgg-username
 func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {

@@ -12,7 +12,6 @@ import (
 )
 
 // Chain applies middlewares to h in order — first middleware is outermost.
-// ref: api-layer.HTTPX.3 — composes middleware handlers in order
 //
 //	httpx.Chain(router, httpx.Logger, httpx.RequestID, httpx.Recover)
 //	// executes: Logger → RequestID → Recover → router
@@ -24,7 +23,6 @@ func Chain(h http.Handler, mw ...func(http.Handler) http.Handler) http.Handler {
 }
 
 // SecurityHeaders adds standard security response headers.
-// ref: api-layer.HTTPX.4 — nosniff, DENY framing, CSP
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -37,7 +35,6 @@ func SecurityHeaders(next http.Handler) http.Handler {
 }
 
 // CORS applies CORS headers for the given list of allowed origins.
-// ref: api-layer.HTTPX.5 — validates allowed origins, handles OPTIONS
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	allowed := make(map[string]struct{}, len(allowedOrigins))
 	for _, o := range allowedOrigins {
@@ -63,7 +60,6 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 }
 
 // Recover catches panics, logs the stack trace, and returns 500.
-// ref: api-layer.HTTPX.6 — catches panics, logs via slog, returns 500
 func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
@@ -81,7 +77,6 @@ func Recover(next http.Handler) http.Handler {
 }
 
 // RequestID injects a unique request ID into context and the X-Request-ID response header.
-// ref: api-layer.HTTPX.7 — generates and attaches UUID to each request
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-ID")
@@ -94,7 +89,6 @@ func RequestID(next http.Handler) http.Handler {
 }
 
 // Logger logs method, path, status, and latency via slog structured logging.
-// ref: api-layer.HTTPX.8 — logs method, path, status, latency via slog
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -110,18 +104,6 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// TrustGatewayHeaders reads X-User-ID, X-Username, and X-Is-Admin headers
-// injected by the gateway and populates the request context.
-// Apply this middleware on all routes inside internal services.
-func TrustGatewayHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if userID := r.Header.Get("X-User-ID"); userID != "" {
-			isAdmin := r.Header.Get("X-Is-Admin") == "true"
-			r = r.WithContext(SetGatewayUser(r.Context(), userID, r.Header.Get("X-Username"), isAdmin))
-		}
-		next.ServeHTTP(w, r)
-	})
-}
 
 // statusWriter captures the HTTP status code written by a handler.
 type statusWriter struct {

@@ -14,7 +14,7 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 |---|---|
 | `envelope` | `Response[T]`, `ListResponse[T]`, `ErrorResponse` — JSON wire types + constructors |
 | `apierr` | Sentinel errors (`ErrNotFound`, `ErrDuplicate`, …) + machine-readable codes + `Is*` helpers |
-| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`) + `WriteJSON` / `WriteError` + context accessors |
+| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`, `RateLimiter`, `LimitBodySize`) + `WriteJSON` / `WriteError` + context accessors + `DefaultClient` |
 
 ## Wire format
 
@@ -46,7 +46,10 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 
 - Never expose raw errors (DB, OS, network) to API consumers — wrap with a sentinel.
 - Use `errors.Is` / `apierr.Is*` helpers for sentinel checks; wrap with `fmt.Errorf("%w", ...)` to add context.
-- Middleware chain order for `services/api`: `Logger → RequestID → Recover → SecurityHeaders → CORS → router` (auth middleware wraps individual routes, not the global chain).
+- Middleware chain order for `services/api`: `Logger → RequestID → Recover → SecurityHeaders → CORS → LimitBodySize → router` (auth middleware wraps individual routes, not the global chain).
+- `httpx.DefaultClient` — `*http.Client` with 10s timeout. Use instead of `http.DefaultClient` for all outbound HTTP calls.
+- `httpx.RateLimiter(ratePerSec, burst)` — per-IP token bucket; returns 429 via `apierr.ErrRateLimit`. Background cleanup every 5 min.
+- `httpx.LimitBodySize(maxBytes)` — wraps `http.MaxBytesReader`; applied globally at 1MB.
 
 ## Updating this module
 

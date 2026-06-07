@@ -1,0 +1,376 @@
+package importer
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
+	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+)
+
+type mockImporterStore struct {
+	checkRateLimitFn func(ctx context.Context, userID string, isAdmin bool, limitUser, limitAdmin int) error
+	recordSyncFn     func(ctx context.Context, userID string) error
+	logSyncFn        func(ctx context.Context, userID string, imported int, fullRefresh bool) error
+}
+
+func (m *mockImporterStore) CheckRateLimit(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+	return m.checkRateLimitFn(ctx, userID, isAdmin, lu, la)
+}
+func (m *mockImporterStore) RecordSync(ctx context.Context, userID string) error {
+	return m.recordSyncFn(ctx, userID)
+}
+func (m *mockImporterStore) LogSync(ctx context.Context, userID string, imported int, fullRefresh bool) error {
+	return m.logSyncFn(ctx, userID, imported, fullRefresh)
+}
+
+type mockBGGClient struct{ available bool }
+
+func (m *mockBGGClient) Available() bool { return m.available }
+
+type mockGameService struct {
+	gameExistsFn func(ctx context.Context, userID string, bggID int) (bool, error)
+	createGameFn func(ctx context.Context, userID string, bggID int) (int64, error)
+}
+
+func (m *mockGameService) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
+	return m.gameExistsFn(ctx, userID, bggID)
+}
+func (m *mockGameService) CreateGame(ctx context.Context, userID string, bggID int) (int64, error) {
+	return m.createGameFn(ctx, userID, bggID)
+}
+
+func okStore() *mockImporterStore {
+	return &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string) error { return nil },
+		logSyncFn:        func(ctx context.Context, userID string, imported int, fullRefresh bool) error { return nil },
+	}
+}
+
+func authReq(method, path, body string, isAdmin bool) *http.Request {
+	r := httptest.NewRequest(method, path, strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "bgguser", isAdmin)
+	return r.WithContext(ctx)
+}
+
+func mkHandler(store importerStore, bgg bggClient, gs gameService) *Handler {
+	return NewHandler(NewService(store, bgg, gs), 3, 20)
+}
+
+func TestSync_Unauthenticated(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, httptest.NewRequest("POST", "/api/v1/import/sync", nil))
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestSync_BGGNotConfigured(t *testing.T) {
+	h := mkHandler(okStore(), &mockBGGClient{available: false}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+func TestSync_RateLimited(t *testing.T) {
+	store := &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+			return apierr.ErrRateLimit
+		},
+		recordSyncFn: func(ctx context.Context, userID string) error { return nil },
+		logSyncFn:    func(ctx context.Context, userID string, imported int, fullRefresh bool) error { return nil },
+	}
+	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w.Code)
+	}
+}
+
+func TestSync_Success(t *testing.T) {
+	h := mkHandler(okStore(), &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.Response[SyncResult]
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+}
+
+func TestSync_FullRefreshNonAdmin(t *testing.T) {
+	var got bool
+	store := &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string) error { return nil },
+		logSyncFn: func(ctx context.Context, userID string, imported int, fr bool) error {
+			got = fr
+			return nil
+		},
+	}
+	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync?full_refresh=true", "", false))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if got {
+		t.Fatal("non-admin must not trigger full_refresh")
+	}
+}
+
+func TestSync_FullRefreshAdmin(t *testing.T) {
+	var got bool
+	store := &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string) error { return nil },
+		logSyncFn: func(ctx context.Context, userID string, imported int, fr bool) error {
+			got = fr
+			return nil
+		},
+	}
+	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync?full_refresh=true", "", true))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if !got {
+		t.Fatal("admin must trigger full_refresh")
+	}
+}
+
+func multipartCSV(t *testing.T, content string) *http.Request {
+	t.Helper()
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	part, _ := w.CreateFormFile("csv_file", "test.csv")
+	io.WriteString(part, content)
+	w.Close()
+	r := httptest.NewRequest("POST", "/api/v1/import/csv/preview", &buf)
+	r.Header.Set("Content-Type", w.FormDataContentType())
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "bgguser", false)
+	return r.WithContext(ctx)
+}
+
+func TestCSVPreview_NoFile(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/v1/import/csv/preview", strings.NewReader("x"))
+	r.Header.Set("Content-Type", "application/json")
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "bgguser", false)
+	h.CSVPreview(w, r.WithContext(ctx))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestCSVPreview_ValidCSV(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVPreview(w, multipartCSV(t, "objectid,objectname\n174430,Gloomhaven\n167791,Terraforming Mars\n"))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.ListResponse[CSVPreviewRow]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Data) != 2 || resp.Data[0].BGGID != 174430 || resp.Data[0].Name != "Gloomhaven" {
+		t.Fatalf("unexpected: %+v", resp)
+	}
+}
+
+func TestCSVPreview_MissingObjectIDColumn(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVPreview(w, multipartCSV(t, "name,year\nGloomhaven,2017\n"))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestCSVPreview_AltColumnNames(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVPreview(w, multipartCSV(t, "bgg_id,name\n12345,TestGame\n"))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.ListResponse[CSVPreviewRow]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Data) != 1 || resp.Data[0].BGGID != 12345 {
+		t.Fatalf("unexpected: %+v", resp)
+	}
+}
+
+func TestCSVPreview_EmptyCSV(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVPreview(w, multipartCSV(t, ""))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestCSVPreview_SkipsInvalidRows(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVPreview(w, multipartCSV(t, "objectid,name\n174430,Gloomhaven\nnotanumber,Bad\n167791,TM\n"))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.ListResponse[CSVPreviewRow]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if len(resp.Data) != 2 {
+		t.Fatalf("expected 2 valid rows, got %d", len(resp.Data))
+	}
+}
+
+func TestCSVImport_Unauthenticated(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/v1/import/csv", strings.NewReader(`{"bgg_ids":[1]}`))
+	r.Header.Set("Content-Type", "application/json")
+	h.CSVImport(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestCSVImport_InvalidBody(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", "bad", false))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestCSVImport_EmptyIDs(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[]}`, false))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// ref: importer.CSV_IMPORT.6 — reject batches > 100 to prevent amplification DoS.
+func TestCSVImport_RejectsOversizedBatch(t *testing.T) {
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
+	w := httptest.NewRecorder()
+	ids := make([]int, 0, 101)
+	for i := 0; i < 101; i++ {
+		ids = append(ids, i+1)
+	}
+	body, _ := json.Marshal(map[string]any{"bgg_ids": ids})
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", string(body), false))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for 101 ids, got %d", w.Code)
+	}
+}
+
+func TestCSVImport_DeduplicatesExisting(t *testing.T) {
+	gs := &mockGameService{
+		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) {
+			return bggID == 174430, nil
+		},
+		createGameFn: func(ctx context.Context, userID string, bggID int) (int64, error) {
+			return int64(bggID), nil
+		},
+	}
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, gs)
+	w := httptest.NewRecorder()
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[174430,167791]}`, false))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.Response[SyncResult]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Data.Imported != 1 || resp.Data.Skipped != 1 {
+		t.Fatalf("expected 1 imported + 1 skipped, got %+v", resp.Data)
+	}
+}
+
+func TestCSVImport_AllNew(t *testing.T) {
+	gs := &mockGameService{
+		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
+		createGameFn: func(ctx context.Context, userID string, bggID int) (int64, error) { return int64(bggID), nil },
+	}
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, gs)
+	w := httptest.NewRecorder()
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[1,2,3]}`, false))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.Response[SyncResult]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Data.Imported != 3 {
+		t.Fatalf("expected 3 imported, got %d", resp.Data.Imported)
+	}
+}
+
+func TestCSVImport_CreateFails(t *testing.T) {
+	gs := &mockGameService{
+		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
+		createGameFn: func(ctx context.Context, userID string, bggID int) (int64, error) { return 0, apierr.ErrInternal },
+	}
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, gs)
+	w := httptest.NewRecorder()
+	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[1,2]}`, false))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp envelope.Response[SyncResult]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Data.Imported != 0 || len(resp.Data.Failed) != 2 {
+		t.Fatalf("expected 0 imported + 2 failed, got %+v", resp.Data)
+	}
+}
+
+func TestNewClient_NilWhenEmpty(t *testing.T) {
+	if c := NewClient("", ""); c != nil {
+		t.Fatal("expected nil")
+	}
+}
+
+func TestNewClient_AvailableWithToken(t *testing.T) {
+	c := NewClient("tok", "")
+	if c == nil || !c.Available() {
+		t.Fatal("expected available")
+	}
+}
+
+func TestNewClient_AvailableWithCookie(t *testing.T) {
+	c := NewClient("", "cookie")
+	if c == nil || !c.Available() {
+		t.Fatal("expected available")
+	}
+}
+
+func TestTruncateToDay(t *testing.T) {
+	in := time.Date(2025, 6, 4, 15, 30, 45, 123, time.UTC)
+	out := truncateToDay(in)
+	if out.Hour() != 0 || out.Minute() != 0 || out.Second() != 0 || out.Nanosecond() != 0 {
+		t.Fatalf("expected zeroed time parts, got %v", out)
+	}
+	if out.Year() != 2025 || out.Month() != 6 || out.Day() != 4 {
+		t.Fatalf("expected same date, got %v", out)
+	}
+}

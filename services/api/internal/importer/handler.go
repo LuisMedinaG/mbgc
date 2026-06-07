@@ -28,9 +28,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 	mux.Handle("POST /api/v1/import/csv", auth(http.HandlerFunc(h.CSVImport)))
 }
 
-// ref: importer.BGG_SYNC.9 — admin-only full refresh mode
-// ref: importer.BGG_SYNC.4 — rate-limited syncs per user
-// ref: importer.BGG_SYNC.8 — returns SyncResult with counts
+// ref: importer.BGG_SYNC.8 — admins can trigger a full refresh
+// ref: importer.BGG_SYNC.3 — rate-limited per user
+// ref: importer.BGG_SYNC.7 — response includes imported, skipped, failed counts
 func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
@@ -50,9 +50,8 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, envelope.New(result))
 }
 
-// ref: importer.CSV_IMPORT.2 — multipart form upload
-// ref: importer.CSV_IMPORT.3 — auto-detects BGG ID column header
-// ref: importer.CSV_IMPORT.4 — returns up to 100 preview rows
+// ref: importer.CSV_IMPORT.1 — CSV file uploaded for preview before import is confirmed
+// ref: importer.CSV_IMPORT.2 — preview shows game names and marks already-owned games
 func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
@@ -74,9 +73,13 @@ func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(rows, 1, len(rows), len(rows)))
 }
 
-// ref: importer.CSV_IMPORT.7 — JSON body with bgg_ids array
-// ref: importer.CSV_IMPORT.8 — deduplicates by BGG ID
-// ref: importer.CSV_IMPORT.9 — returns import count results
+// ref: importer.CSV_IMPORT.3 — user selects which games to import from the preview list
+// ref: importer.CSV_IMPORT.4 — importing skips games already in the collection
+// ref: importer.CSV_IMPORT.5 — response includes counts of imported, skipped, and failed games
+// ref: importer.CSV_IMPORT.6 — cap batch to match preview (100) — prevents 1MB body of ints
+// triggering thousands of DB round-trips in a single request (amplification DoS).
+const maxImportBatch = 100
+
 func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.UserIDFromContext(r.Context())
 	if !ok {
@@ -86,7 +89,8 @@ func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		BGGIDs []int `json:"bgg_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.BGGIDs) == 0 {
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil ||
+		len(body.BGGIDs) == 0 || len(body.BGGIDs) > maxImportBatch {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}

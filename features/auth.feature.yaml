@@ -2,69 +2,60 @@
 feature:
   name: auth
   product: mbgc
-  description: |
-    Supabase-based authentication with JWT verification.
-    Covers login, token management, JWT validation middleware,
-    and multi-tenancy enforcement.
+  description: Supabase-based authentication with JWT verification and multi-tenancy enforcement
 
 components:
-  LOGIN:
-    name: Login page
-    description: Username/password login form that authenticates against Supabase
-    requirements:
-      1: Shows a username and password input form at /login
-      2: Calls Supabase Auth signIn to authenticate the user
-      3: On success, stores access and refresh tokens in localStorage
-      4: On success, redirects the user to the collection page (/)
-      5: On failure, displays an inline error message without leaking user existence
-
   JWT_VALIDATION:
-    name: JWT validation middleware
-    description: Validates Supabase-issued JWTs on every API request
+    name: JWT validation
+    description: Every API request must carry a valid Supabase-issued JWT
     requirements:
-      1: Fetches JWKS from ${SUPABASE_URL}/auth/v1/.well-known/jwks.json at boot
-      2: Auto-refreshes JWKS via keyfunc/v3 when keys rotate
-      3: Validates JWT signature using ES256/RS256 public keys
-      4: Accepts legacy HS256 tokens only if SUPABASE_JWT_SECRET is configured
-      5: Validates exp claim — rejects expired tokens
-      6: Validates iss claim — must equal ${SUPABASE_URL}/auth/v1
-      7: Validates aud claim — must equal "authenticated"
-      8: Rejects anon and service_role API keys (only authenticated JWTs accepted)
-      9: Extracts user identity (sub, username, is_admin) and sets in request context
-      10: Returns 401 with apierr.ErrUnauthorized for any validation failure
-
-  TOKEN_REFRESH:
-    name: Client-side token refresh
-    description: Automatic token refresh on 401 responses in web client
-    requirements:
-      1: On 401 response, uses stored refresh token to request a new access token
-      2: Retries the original request with the new access token
-      3: Coalesces concurrent refresh attempts to avoid duplicate refresh calls
-      4: On refresh failure (401 from refresh), clears tokens and redirects to /login
+      1: All protected routes reject requests with a missing or malformed Authorization header with 401
+      2: The server validates the JWT signature against Supabase JWKS on every request
+      3: Expired tokens are rejected with 401
+      4: Tokens with an invalid issuer or audience are rejected with 401
+      5: Unauthenticated API keys (anon, service_role) are rejected with 401
+      6: JWKS keys are refreshed automatically when keys rotate
 
   MULTI_TENANCY:
-    name: Multi-tenancy enforcement
-    description: All user-owned data queries include user_id
+    name: Data isolation
+    description: Each user can only access their own data
     requirements:
-      1: Every query on user-owned data includes a WHERE user_id = $1 clause
-      2: User identity is extracted from request context via httpx.UserIDFromContext
-      3: Endpoints that mutate data verify user_id from JWT matches resource owner
+      1: Every query on user-owned data is scoped by the authenticated user's ID
+      2: Mutating a resource owned by another user returns 403
+      3: User identity is derived from the validated JWT, never from request headers
+
+  LOGIN:
+    name: Login
+    description: Email and password login flow
+    requirements:
+      1: The login page accepts email and password
+      2: Successful login redirects the user to their collection
+      3: Failed login shows an error without revealing whether the email exists
+      4: Tokens are stored client-side on successful login
+
+  TOKEN_REFRESH:
+    name: Token refresh
+    description: Seamless token renewal without user interruption
+    requirements:
+      1: A 401 response automatically triggers a token refresh attempt
+      2: The original request is retried after a successful refresh
+      3: Concurrent refresh attempts are coalesced into a single request
+      4: If refresh fails, stored tokens are cleared and the user is redirected to login
 
   MIDDLEWARE:
-    name: Global middleware chain
-    description: HTTP middleware applied to all API routes
+    name: HTTP middleware
+    description: Cross-cutting concerns applied to all API requests
     requirements:
-      1: Logger middleware logs method, path, status, and latency via slog
-      2: RequestID middleware attaches a unique UUID to every request
-      3: Recover middleware catches panics and returns 500 via apierr.ErrInternal
-      4: SecurityHeaders sets X-Content-Type-Options, X-Frame-Options, and CSP
-      5: CORS middleware validates origin against ALLOWED_ORIGIN
-      6: JWT auth middleware is applied per-route (not globally)
+      1: Every request is logged with method, path, status, and latency
+      2: Every request receives a unique request ID
+      3: Unhandled panics return 500 without leaking internal details
+      4: CORS is enforced against the configured allowed origin
+      5: Security headers are set on every response
 
 constraints:
   SEC:
     name: Security constraints
     requirements:
-      1: Access tokens must NOT be sent as URL query parameters
-      2: Tokens stored in localStorage must be cleared on logout and on auth failure
-      3: Server must not trust X-User-ID/X-Username/X-Is-Admin headers from external callers
+      1: Access tokens must never appear in URL query parameters
+      2: All tokens are cleared from client storage on logout and on auth failure
+      3: The server ignores user identity headers (X-User-ID, X-Username, X-Is-Admin) from callers

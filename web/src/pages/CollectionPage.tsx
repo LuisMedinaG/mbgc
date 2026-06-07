@@ -19,27 +19,19 @@ const EMPTY_FILTERS: FilterState = {
 }
 
 export default function CollectionPage() {
-  // ref: collection.GAME_LIST.2 — full-text search support
-  // ref: collection.GAME_LIST.3 — list/grid view toggle
+  // ref: collection.SEARCH.1 — text search filters games by name
+  // ref: collection.DISPLAY.2 — games shown in list or grid view
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
-  const { games, total, categories, loading, error, fetchGames } = useGames()
+  const { games, total, categories, loading, error } = useGames(filters)
 
   const updateFilter = useCallback((key: keyof FilterState, value: string) => {
-    setFilters(prev => {
-      const next = { ...prev, [key]: value }
-      fetchGames(next)
-      return next
-    })
-  }, [fetchGames])
+    setFilters(prev => ({ ...prev, [key]: value }))
+  }, [])
 
   const removeFilter = useCallback((key: keyof FilterState) => {
-    setFilters(prev => {
-      const next = { ...prev, [key]: '' }
-      fetchGames(next)
-      return next
-    })
-  }, [fetchGames])
+    setFilters(prev => ({ ...prev, [key]: '' }))
+  }, [])
 
   return (
     <div className="flex flex-col gap-3">
@@ -63,10 +55,12 @@ export default function CollectionPage() {
         <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
       </div>
 
+      {/* ref: collection.DISPLAY.4 — loading state; collection.DISPLAY.5 — empty state */}
       {loading && <LoadingSkeleton />}
 
       {!loading && error && <ErrorMessage message={error} />}
 
+      {/**/}
       {!loading && !error && (
         games.length === 0 ? (
           <EmptyState />

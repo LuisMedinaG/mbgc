@@ -1,52 +1,32 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
-import { api, type GamesListResponse } from '../lib/api'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '../lib/api'
+import { qk } from '../lib/queryKeys'
+import { useDebounce } from './useDebounce'
 import type { FilterState } from '../types/game'
 
-export function useGames() {
-  const [games, setGames] = useState<GamesListResponse['data']>([])
-  const [total, setTotal] = useState(0)
-  const [categories, setCategories] = useState<string[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+// ref: collection.SEARCH.5 — search input debounced 300ms before triggering request
+export function useGames(filters: FilterState) {
+  const debouncedSearch = useDebounce(filters.search, 300)
+  const effectiveFilters = { ...filters, search: debouncedSearch }
 
-  const fetchGames = useCallback(async (filters: FilterState, immediate = false) => {
-    if (!immediate && filters.search) {
-      if (debounceRef.current) clearTimeout(debounceRef.current)
-      debounceRef.current = setTimeout(() => fetchGames(filters, true), 300)
-      return
-    }
+  const { data, isLoading, isError } = useQuery({
+    queryKey: qk.games(effectiveFilters),
+    queryFn: () => api.listGames({
+      q:        effectiveFilters.search   || undefined,
+      category: effectiveFilters.category || undefined,
+      players:  effectiveFilters.players  || undefined,
+      playtime: effectiveFilters.playtime || undefined,
+      weight:   effectiveFilters.weight   || undefined,
+      limit:    50,
+      page:     1,
+    }),
+  })
 
-    setError('')
-    try {
-      const res = await api.listGames({
-        q: filters.search || undefined,
-        category: filters.category || undefined,
-        players: filters.players || undefined,
-        playtime: filters.playtime || undefined,
-        weight: filters.weight || undefined,
-        limit: 50,
-        page: 1,
-      })
-      setGames(res.data)
-      setTotal(res.total)
-      if (res.categories.length > 0) setCategories(res.categories)
-    } catch {
-      setError('Failed to load games.')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchGames({
-      search: '',
-      category: '',
-      players: '',
-      playtime: '',
-      weight: '',
-    }, true)
-  }, [fetchGames])
-
-  return { games, total, categories, loading, error, fetchGames }
+  return {
+    games:      data?.data       ?? [],
+    total:      data?.total      ?? 0,
+    categories: data?.categories ?? [],
+    loading:    isLoading,
+    error:      isError ? 'Failed to load games.' : '',
+  }
 }

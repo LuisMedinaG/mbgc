@@ -5,7 +5,7 @@ React 19 + TypeScript strict + Tailwind v4 + Vite. Deployed to Cloudflare Pages;
 ## Stack
 
 - **Language:** TypeScript (strict mode — no `any`)
-- **Framework:** React 19 + react-router-dom + Tailwind v4 (CSS-first, no `tailwind.config.js`)
+- **Framework:** React 19 + react-router-dom + TanStack Query v5 + Tailwind v4 (CSS-first, no `tailwind.config.js`)
 - **Build:** Vite + `@tailwindcss/vite`
 - **Deploy:** Cloudflare Pages — push to `main` auto-deploys; every PR gets a preview deploy
 - **Env var:** `VITE_API_BASE_URL` — API base URL (empty in dev — Vite proxies `/api/*` to `:8080`)
@@ -29,7 +29,9 @@ bun run test:e2e     # Playwright — requires full backend stack running
 ## Patterns
 
 - All API calls through `src/lib/api.ts` — never raw `fetch()` in components or hooks; all methods are typed
-- Auth: access token stored in memory (not localStorage); refresh token in `httpOnly` cookie
+- **Server state via TanStack Query** — all data fetching uses `useQuery`/`useMutation` from `@tanstack/react-query`. Query keys are in `src/lib/queryKeys.ts`; client config in `src/lib/queryClient.ts` (30s staleTime, 1 retry, no refetch-on-focus)
+- Hook conventions: `useGames(filters)` for the collection list (debounces search via `useDebounce`), `useGame(id)` for detail page, `useCollections()` for CRUD, `useProfile()` for profile + mutations. Never reach into the query cache from components — use the hooks.
+- Auth: access token stored in localStorage; refresh token in localStorage (see `api.ts` `tokens`)
 - Tailwind v4 CSS-first config (no `tailwind.config.js`) — custom design tokens in `src/index.css`
 - Routing via react-router-dom — never `window.location` redirects
 

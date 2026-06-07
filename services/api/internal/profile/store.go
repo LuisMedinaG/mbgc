@@ -18,6 +18,9 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
+// ref: auth.MULTI_TENANCY.1 — every query on user-owned data scoped by user_id
+// ref: auth.MULTI_TENANCY.2 — user identity from request context via httpx.UserIDFromContext
+// ref: profile.ADMIN.1 — is_admin stored in profile.users table
 func (s *Store) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var p Profile
 	err := s.db.QueryRow(ctx,

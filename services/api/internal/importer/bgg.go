@@ -1,6 +1,10 @@
 package importer
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+)
 
 // Client wraps the BGG API. Nil is valid — callers must check Available().
 type Client struct {
@@ -14,7 +18,7 @@ func NewClient(token, cookie string) *Client {
 	if token == "" && cookie == "" {
 		return nil
 	}
-	return &Client{httpClient: &http.Client{}, token: token, cookie: cookie}
+	return &Client{httpClient: httpx.DefaultClient, token: token, cookie: cookie}
 }
 
 // Available reports whether BGG credentials are configured.

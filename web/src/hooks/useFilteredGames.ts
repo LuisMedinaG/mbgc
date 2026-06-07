@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { Game, FilterState } from '../types/game'
 
+// ref: collection.PERF.1 — memoized to avoid re-computation on every render
 export function useFilteredGames(games: Game[], filters: FilterState): Game[] {
   return useMemo(() => {
     return games.filter(g => {
@@ -16,7 +17,7 @@ export function useFilteredGames(games: Game[], filters: FilterState): Game[] {
         return false
       }
 
-      // Players filter — mirrors Go filter.go logic
+      // ref: collection.FILTERS.3 — player count range filter
       if (filters.players) {
         switch (filters.players) {
           case '1':     if (g.minPlayers > 1) return false; break
@@ -28,7 +29,7 @@ export function useFilteredGames(games: Game[], filters: FilterState): Game[] {
         }
       }
 
-      // Playtime filter
+      // ref: collection.FILTERS.4 — playtime range filter
       if (filters.playtime) {
         switch (filters.playtime) {
           case 'short':  if (g.playTime >= 30) return false; break
@@ -37,7 +38,7 @@ export function useFilteredGames(games: Game[], filters: FilterState): Game[] {
         }
       }
 
-      // Weight/complexity filter
+      // ref: collection.FILTERS.5 — weight/complexity filter
       if (filters.weight) {
         switch (filters.weight) {
           case 'light':  if (g.weight === 0 || g.weight >= 2.0) return false; break

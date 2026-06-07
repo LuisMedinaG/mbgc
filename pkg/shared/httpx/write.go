@@ -11,7 +11,6 @@ import (
 )
 
 // WriteJSON serializes v as JSON with the given HTTP status code.
-// ref: api-layer.HTTPX.1 — WriteJSON sets content-type and writes response
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -22,7 +21,6 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 
 // WriteError maps a sentinel error to the correct HTTP status and error envelope.
 // Unknown errors become 500 and are logged server-side — internal details are never leaked.
-// ref: api-layer.HTTPX.2 — maps sentinels to HTTP status codes
 func WriteError(w http.ResponseWriter, err error) {
 	var status int
 	var code, msg string
@@ -40,6 +38,8 @@ func WriteError(w http.ResponseWriter, err error) {
 		status, code, msg = http.StatusTooManyRequests, apierr.CodeRateLimit, err.Error()
 	case errors.Is(err, apierr.ErrBadRequest):
 		status, code, msg = http.StatusBadRequest, apierr.CodeBadRequest, err.Error()
+	case errors.Is(err, apierr.ErrUnsupportedMediaType):
+		status, code, msg = http.StatusUnsupportedMediaType, apierr.CodeUnsupportedMediaType, err.Error()
 	case errors.Is(err, apierr.ErrValidation):
 		status, code, msg = http.StatusUnprocessableEntity, apierr.CodeValidation, err.Error()
 	default:

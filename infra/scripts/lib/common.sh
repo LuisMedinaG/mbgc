@@ -63,10 +63,51 @@ prompt_secret() {
 
 # ── GitHub secrets ─────────────────────────────────────────────────────────────
 
+# prompt_optional VAR "Description" env_val
+#   Like prompt_value but allows empty input (Enter = skip).
+prompt_optional() {
+  _var="$1" _desc="$2" _env_val="${3:-}"
+  if [ -n "$_env_val" ]; then
+    eval "${_var}=\"\${_env_val}\""
+    printf '  ✓ %s\n' "$_desc"
+    return
+  fi
+  printf '  %s (Enter to skip): ' "$_desc"
+  read -r _input
+  eval "${_var}=\"\${_input}\""
+}
+
+# prompt_secret_optional VAR "Description" env_val
+#   Like prompt_secret but allows empty input (Enter = skip).
+prompt_secret_optional() {
+  _var="$1" _desc="$2" _env_val="${3:-}"
+  if [ -n "$_env_val" ]; then
+    eval "${_var}=\"\${_env_val}\""
+    printf '  ✓ %s\n' "$_desc"
+    return
+  fi
+  printf '  %s (Enter to skip): ' "$_desc"
+  trap 'stty echo 2>/dev/null; printf "\n"; exit 1' INT
+  stty -echo 2>/dev/null || true
+  read -r _input
+  stty echo 2>/dev/null || true
+  trap - INT
+  printf '\n'
+  eval "${_var}=\"\${_input}\""
+}
+
+# ── GitHub secrets ─────────────────────────────────────────────────────────────
+
 # set_gh_secret NAME value  (requires $REPO set by caller)
 set_gh_secret() {
   printf '%s' "$2" | gh secret set "$1" --repo "$REPO"
   printf '  ✓ %s\n' "$1"
+}
+
+# set_gh_secret_if_set NAME value — skips empty values (for optional secrets)
+set_gh_secret_if_set() {
+  [ -n "$2" ] || { printf '  – %s (skipped — empty)\n' "$1"; return; }
+  set_gh_secret "$1" "$2"
 }
 
 # sync_secrets "label" NAME value [NAME value ...]
@@ -75,6 +116,16 @@ sync_secrets() {
   printf '\n── %s ──\n' "$_label"
   while [ $# -ge 2 ]; do
     set_gh_secret "$1" "$2"
+    shift 2
+  done
+}
+
+# sync_secrets_optional "label" NAME value [NAME value ...] — skips empty values
+sync_secrets_optional() {
+  _label="$1"; shift
+  printf '\n── %s ──\n' "$_label"
+  while [ $# -ge 2 ]; do
+    set_gh_secret_if_set "$1" "$2"
     shift 2
   done
 }

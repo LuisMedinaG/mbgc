@@ -13,7 +13,6 @@ const (
 )
 
 // SetGatewayUser stores the user identity injected by the gateway into ctx.
-// Internal services call this inside TrustGatewayHeaders middleware.
 func SetGatewayUser(ctx context.Context, userID, username string, isAdmin bool) context.Context {
 	ctx = context.WithValue(ctx, ctxUserID, userID)
 	ctx = context.WithValue(ctx, ctxUsername, username)
@@ -22,7 +21,6 @@ func SetGatewayUser(ctx context.Context, userID, username string, isAdmin bool) 
 }
 
 // UserIDFromContext returns the Supabase user UUID injected by the gateway.
-// Returns ("", false) if not set — use this to guard authenticated handlers.
 func UserIDFromContext(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(ctxUserID).(string)
 	return v, ok && v != ""

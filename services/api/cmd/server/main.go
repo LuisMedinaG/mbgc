@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -9,7 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/auth"
@@ -19,10 +26,57 @@ import (
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
+	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
 )
+
+func runMigrations(databaseURL string) error {
+	db, err := sql.Open("pgx", databaseURL)
+	if err != nil {
+		return fmt.Errorf("open db for migrations: %w", err)
+	}
+	defer db.Close()
+
+	src, err := iofs.New(migrations.FS, ".")
+	if err != nil {
+		return fmt.Errorf("migration source: %w", err)
+	}
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("migration driver: %w", err)
+	}
+	m, err := migrate.NewWithInstance("iofs", src, "postgres", driver)
+	if err != nil {
+		return fmt.Errorf("migrate init: %w", err)
+	}
+	defer m.Close()
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		var dirtyErr migrate.ErrDirty
+		if errors.As(err, &dirtyErr) {
+			// Previous startup crashed mid-migration; all SQL uses IF NOT EXISTS / OR REPLACE
+			// so re-running from the dirty version is safe.
+			slog.Warn("dirty migration state detected, resetting and retrying", "version", dirtyErr.Version)
+			if ferr := m.Force(dirtyErr.Version - 1); ferr != nil {
+				return fmt.Errorf("reset dirty migration v%d: %w", dirtyErr.Version, ferr)
+			}
+			if rerr := m.Up(); rerr != nil && rerr != migrate.ErrNoChange {
+				return fmt.Errorf("migrate up after dirty reset: %w", rerr)
+			}
+			return nil
+		}
+		return fmt.Errorf("migrate up: %w", err)
+	}
+	return nil
+}
 
 func main() {
 	cfg := config.Load()
+
+	if os.Getenv("SKIP_MIGRATIONS") != "true" {
+		if err := runMigrations(cfg.DatabaseURL); err != nil {
+			slog.Error("migrations failed", "error", err)
+			os.Exit(1)
+		}
+	}
 
 	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
 	if err != nil {
@@ -45,7 +99,7 @@ func main() {
 	}
 
 	authStore := auth.NewStore(pool)
-	authHandler := auth.NewHandler(authStore, cfg.SupabaseURL, cfg.ServiceRoleKey)
+	authHandler := auth.NewHandler(authStore, cfg.SupabaseURL, cfg.ServiceRoleKey, httpx.DefaultClient)
 
 	profileStore := profile.NewStore(pool)
 	profileSvc := profile.NewService(profileStore)
@@ -60,12 +114,15 @@ func main() {
 	importSvc := importer.NewService(importStore, bggClient, gameSvc)
 	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
 
+	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
+	rateLimit := httpx.RateLimiter(5, 10)
+
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux, authMiddleware)
+	authHandler.RegisterRoutes(mux, authMiddleware, rateLimit)
 	profileHandler.RegisterRoutes(mux, authMiddleware)
 	gameHandler.RegisterRoutes(mux, authMiddleware)
 	importHandler.RegisterRoutes(mux, authMiddleware)
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
@@ -84,6 +141,10 @@ func main() {
 			httpx.RequestID,
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500
 			httpx.Recover,
+			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
+			httpx.LimitBodySize(1 << 20),
+			// ref: api-layer.SEC.7 — rejects wrong Content-Type on body-bearing requests (CSRF text/plain bypass)
+			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
 			// ref: auth.MIDDLEWARE.5 — CORS validates origin

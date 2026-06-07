@@ -1,59 +1,35 @@
-# collection.feature.yaml — Board Game Collection (Browse & Filter)
+# collection.feature.yaml — Board Game Collection
 feature:
   name: collection
   product: mbgc
-  description: |
-    Main board game collection page with list/grid views,
-    full-text search, and multi-faceted filtering.
+  description: Browse, search, and filter the user's board game collection
 
 components:
-  GAME_LIST:
-    name: Game list/grid display
-    description: Fetches and displays the user's board game collection
+  DISPLAY:
+    name: Collection display
+    description: View the collection as a list or grid
     requirements:
-      1: Fetches games from GET /api/v1/games with pagination (page/limit)
-      2: Supports full-text search via Postgres tsvector on game name and description
-      3: Supports list view (vertical list items) and grid view (card tiles)
-      4: Persists view mode preference (list vs grid) in localStorage
-      5: Game cards show thumbnail, name, player count, playtime, weight badge, and star rating
-      6: Game list items show thumbnail, name, player count, playtime, weight badge, and assigned vibe pills
-      7: Shows loading skeleton placeholders while fetching
-      8: Shows empty state illustration when no games match current filters
-      9: Shows error message on API failure
+      1: The page displays the user's games with pagination
+      2: Games can be shown in list view or grid view
+      3: View mode is persisted across sessions
+      4: The page shows a loading state while fetching
+      5: The page shows an empty state when no games match
 
-  FILTERS:
-    name: Game filters
-    description: Client-side filtering by category, players, playtime, and weight
+  SEARCH:
+    name: Search and filter
+    description: Narrow the collection by text or game attributes
     requirements:
-      1: Search input debounced at 300ms before triggering API call
-      2: Category dropdown filters games by BGG category (type/category/mechanic)
-      3: "Players dropdown filters by player count ranges: solo, 1-2, exactly 2, 1-3, 1-4, 5+"
-      4: "Playtime dropdown filters by ranges: under 30min, 30-60min, over 60min"
-      5: "Weight dropdown filters by complexity: light (1-2), medium (2-4), heavy (4-5)"
-      6: Active filters are displayed as removable chips below the filter bar
-      7: Removing a filter chip resets that filter to default and re-filters results
-
-  PAGINATION:
-    name: Pagination
-    description: Paginated game results
-    requirements:
-      1: Backend returns total count and current page/limit in response metadata
-      2: Frontend renders pagination controls when more results exist
+      1: A text search filters games by name
+      2: Games can be filtered by category, player count, playtime, and weight
+      3: Active filters are shown as removable chips below the filter bar
+      4: Removing a chip resets that filter
+      5: Search input is debounced before triggering a request
 
   API:
-    name: Backend API
-    description: Server-side game listing and filtering
+    name: Backend game list API
+    description: Server-side game listing with filtering and pagination
     requirements:
-      1: "GET /api/v1/games accepts query params: search, category, page, limit"
-      2: Full-text search uses ts_rank with to_tsvector on search_vector column
-      3: Results are scoped to the authenticated user's user_id
-      4: "Response includes game metadata: id, name, thumbnail, players, playtime, weight, rating, collections"
-      5: Lists distinct categories from the user's game collection for filter dropdowns
-
-constraints:
-  PERF:
-    name: Performance constraints
-    requirements:
-      1: Client-side filtering is memoized (useMemo) to avoid re-computation on every render
-      2: Search debounce prevents API calls on every keystroke
-      3: Image loading uses lazy loading and fallback placeholder for missing thumbnails
+      1: GET /api/v1/games returns the authenticated user's games
+      2: Accepts search, category, player count, playtime, and weight filter parameters
+      3: Supports page and limit parameters; response includes total count
+      4: Full-text search is supported server-side

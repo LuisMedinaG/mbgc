@@ -1,0 +1,229 @@
+# pipeline.yml — Single workflow for all CI and deployment.
+#
+# On pull_request: branch-check + build/test (no deploy)
+# On push to dev:  build/test → deploy API to Cloud Run (dev)
+# On push to main: build/test → deploy API to Cloud Run (prod) + web to Cloudflare Pages
+# On workflow_dispatch: same as push on the selected branch
+#
+# Required secrets: see docs/runbook/ci-cd/_index.md
+# ref: ci-cd.PIPELINE.1
+name: Pipeline
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+
+  # ── Branch gate (PR only) ─────────────────────────────────────────────────
+  # Enforces: feature/* → dev only, dev → main only.
+  # ref: ci-cd.BRANCH_GATE.1
+  branch-check:
+    name: Branch Rules
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Enforce merge path
+        run: |
+          branch="${{ github.head_ref }}"
+          target="${{ github.base_ref }}"
+          if [ "$target" = "main" ]; then
+            if [ "$branch" = "dev" ]; then
+              echo "✓ dev → main allowed"
+            else
+              echo "✗ Only 'dev' can merge into 'main' (got '$branch')"
+              echo "  Open a PR from '$branch' into 'dev' first."
+              exit 1
+            fi
+          elif [ "$target" = "dev" ]; then
+            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
+              echo "✓ '$branch' → dev allowed"
+            else
+              echo "✗ Branch '$branch' cannot merge into 'dev'"
+              echo "  Rename to one of: feature/ fix/ bug/ chore/ refactor/ hotfix/"
+              echo "  Example: feature/add-game-search"
+              exit 1
+            fi
+          fi
+
+  # ── Build & test ──────────────────────────────────────────────────────────
+  # All three run in parallel. Deploy jobs are gated on these completing.
+
+  # ref: ci-cd.BUILD.1
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+      - name: Build
+        run: |
+          go build ./pkg/shared/...
+          go build ./services/api/...
+      - name: Test
+        run: |
+          go test -race ./pkg/shared/... -coverprofile=coverage-shared.out -covermode=atomic
+          go test -race ./services/api/... -coverprofile=coverage-api.out -covermode=atomic
+          echo '## Coverage' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage-api.out >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Coverage threshold
+        run: |
+          pct=$(go tool cover -func=coverage-api.out | grep '^total:' | awk '{print $3}' | tr -d '%')
+          echo "services/api coverage: ${pct}%"
+          if [ "$(echo "$pct < 50" | bc -l)" -eq 1 ]; then
+            echo "::error::Coverage ${pct}% is below 50% threshold"
+            exit 1
+          fi
+          go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
+          go tool cover -func=coverage-api.out >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: |
+            coverage-shared.out
+            coverage-api.out
+          retention-days: 7
+      - name: Vet
+        run: |
+          go vet ./pkg/shared/...
+          go vet ./services/api/...
+
+  # ref: ci-cd.BUILD.2
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install deps
+        run: bun install --frozen-lockfile
+        working-directory: web
+      - name: Lint
+        run: bun run lint
+        working-directory: web
+      - name: Build
+        run: bun run build
+        working-directory: web
+        env:
+          VITE_API_BASE_URL: ""
+
+  # ref: ci-cd.BUILD.3
+  infra-lint:
+    name: Infra Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.52.0
+      - name: TFLint
+        run: tflint --chdir=infra --recursive
+
+  # ── Deploy (push/dispatch only, gated on build success) ───────────────────
+
+  # ref: ci-cd.DEPLOY_API.8
+  # Separate stub job required: GitHub Actions does not support `environment:` on reusable-workflow
+  # caller jobs (jobs with `uses:`). This job holds the manual approval gate; deploy-api-prod
+  # depends on it so the approval fires before any migration or deploy step runs.
+  approve-prod:
+    name: Approve → prod
+    runs-on: ubuntu-latest
+    needs: go
+    if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    environment: production
+    steps:
+      - run: echo "Production deploy approved"
+
+  # ref: ci-cd.DEPLOY_API.1
+  deploy-api-prod:
+    name: Deploy API → prod
+    needs: [go, approve-prod]
+    if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/deploy-cloud-run.yml
+    with:
+      service_name: mbgc-api
+      dockerfile: services/api/deploy/Dockerfile
+      context: .
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_API }}
+      DATABASE_URL: ${{ secrets.API_DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.API_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.API_SUPABASE_SERVICE_ROLE_KEY }}
+      ALLOWED_ORIGIN: ${{ secrets.API_ALLOWED_ORIGIN }}
+      SEED_ADMIN_EMAIL: ${{ secrets.API_SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.API_SEED_ADMIN_PASSWORD }}
+      SEED_ADMIN_USERNAME: ${{ secrets.API_SEED_ADMIN_USERNAME }}
+
+  # ref: ci-cd.DEPLOY_API.2
+  deploy-api-dev:
+    name: Deploy API → dev
+    needs: go
+    if: github.ref_name == 'dev' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/deploy-cloud-run.yml
+    with:
+      service_name: mbgc-api-dev
+      dockerfile: services/api/deploy/Dockerfile
+      context: .
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_RUNTIME_SERVICE_ACCOUNT: ${{ secrets.GCP_RUNTIME_SA_API_DEV }}
+      DATABASE_URL: ${{ secrets.DEV_API_DATABASE_URL }}
+      SUPABASE_URL: ${{ secrets.DEV_API_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.DEV_API_SUPABASE_SERVICE_ROLE_KEY }}
+      ALLOWED_ORIGIN: ${{ secrets.DEV_API_ALLOWED_ORIGIN }}
+      SEED_ADMIN_EMAIL: ${{ secrets.DEV_API_SEED_ADMIN_EMAIL }}
+      SEED_ADMIN_PASSWORD: ${{ secrets.DEV_API_SEED_ADMIN_PASSWORD }}
+      SEED_ADMIN_USERNAME: ${{ secrets.DEV_API_SEED_ADMIN_USERNAME }}
+
+  # ref: ci-cd.DEPLOY_WEB.1
+  deploy-web:
+    name: Deploy Web → prod
+    needs: web
+    if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install deps
+        run: bun install --frozen-lockfile
+        working-directory: web
+      - name: Build
+        run: bun run build
+        working-directory: web
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy web/dist --project-name=mbgc-web --branch=main

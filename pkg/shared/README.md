@@ -8,7 +8,7 @@ Shared Go module used by `services/api` and any future Go services in this monor
 |---------|--------|
 | `envelope` | Standard JSON response wrappers (`Response`, `ListResponse`, `ErrorResponse`) |
 | `apierr` | Sentinel errors and machine-readable error codes |
-| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`, `TrustGatewayHeaders`) and context helpers |
+| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`, `RateLimiter`, `LimitBodySize`) and context helpers |
 
 ## Wire format
 

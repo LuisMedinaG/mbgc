@@ -1,3 +1,7 @@
+# e2e.yml — Manual Playwright end-to-end tests against a live environment.
+# Triggered via workflow_dispatch only — not part of the automatic CI pipeline.
+# Caller selects the target branch and browser. Uploads playwright-report on failure.
+# ref: ci-cd.E2E.1, ci-cd.E2E.2, ci-cd.E2E.3
 name: E2E
 
 on:
@@ -6,7 +10,7 @@ on:
       branch:
         description: Branch to test
         required: false
-        default: staging
+        default: dev
       browser:
         description: Browser
         required: false

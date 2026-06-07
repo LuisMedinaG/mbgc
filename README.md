@@ -25,7 +25,8 @@ make dev           # API :8080 + web :5173 in tmux
 | Bun | `curl -fsSL https://bun.sh/install \| bash` |
 | Supabase CLI | `brew install supabase/tap/supabase` |
 | tmux | `brew install tmux` |
-| psql | `brew install libpq && brew link --force libpq` |
+| golang-migrate | `brew install golang-migrate` |
+| psql (optional) | `brew install libpq && brew link --force libpq` |
 | gcloud (prod) | `brew install --cask google-cloud-sdk` |
 | Terraform (infra) | `brew install terraform` |
 

@@ -2,15 +2,23 @@ package profile
 
 import "context"
 
-type Service struct {
-	store *Store
+// profileStore defines the store contract for handler testability.
+type profileStore interface {
+	GetProfile(ctx context.Context, userID string) (*Profile, error)
+	UpsertProfile(ctx context.Context, userID string) (*Profile, error)
+	SetBGGUsername(ctx context.Context, userID, bggUsername string) error
 }
 
-func NewService(st *Store) *Service {
+type Service struct {
+	store profileStore
+}
+
+func NewService(st profileStore) *Service {
 	return &Service{store: st}
 }
 
 // GetProfile returns the profile, creating it on first access (lazy upsert).
+// ref: profile.VIEW.1 — GET /api/v1/profile with lazy upsert on first access
 func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	p, err := s.store.GetProfile(ctx, userID)
 	if err == nil {

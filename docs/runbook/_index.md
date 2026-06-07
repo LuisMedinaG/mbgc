@@ -2,7 +2,12 @@
 
 Common issues and their fixes for the mbgc infrastructure.
 
-## Categories
+## Guides
+
+- [Testing](testing.md) — patterns, mocking strategies, coverage
+- [Production Deploy](prod-deploy.md) — step-by-step release checklist (migrations → merge → verify)
+
+## Troubleshooting Categories
 
 - [Cloudflare](cloudflare/) — DNS, Pages, token management, setup
 - [Cloud Run](cloud-run/)

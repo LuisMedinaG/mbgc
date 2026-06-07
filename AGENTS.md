@@ -79,14 +79,13 @@ make dev           # start API + web in tmux
 make db-migrate    # apply pending migrations
 make db-reset      # wipe + replay local DB
 make build         # build API + web
-make test          # run Go tests
+make test          # run Go tests (pkg/shared + services/api with -race)
 make lint          # lint Go + web + infra
 
 # services/api Makefile:
-make dev           # go run ./cmd/server  (auto-loads .env)
+make dev           # go run ./cmd/server  (auto-loads .env, runs migrations at startup)
 make test-v        # go test -v -race ./...  ← use before every PR
 make tidy          # go mod tidy
-make migrate-up / migrate-down
 
 # Web (from web/):
 make dev           # Vite dev server
@@ -145,6 +144,9 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
   `aud` = `authenticated`. Anon/service_role API keys are rejected.
 - `SUPABASE_URL` is **required** to boot. `SUPABASE_JWT_SECRET` is optional.
 - JWT validation lives in `services/api/internal/jwt/` — middleware calls `httpx.SetGatewayUser` to put identity into context.
+- **Rate limiting:** Auth endpoints (login/refresh/logout) are rate-limited at 5 req/s per IP via `httpx.RateLimiter`. Returns 429.
+- **Body limits:** All request bodies capped at 1MB via `httpx.LimitBodySize` middleware.
+- **HTTP client:** Use `httpx.DefaultClient` (10s timeout) for outbound HTTP — never `http.DefaultClient`.
 
 ## go.work Workspace
 
@@ -160,10 +162,16 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 - Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
 - Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
 - Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
+- Use `httpx.DefaultClient` for outbound HTTP — never `http.DefaultClient`
+- Apply `httpx.LimitBodySize(1<<20)` to all JSON endpoints — 1MB cap
+- Cap user-supplied strings (search, filters) at 255 chars
+- **Testing:** see [docs/runbook/testing.md](./docs/runbook/testing.md). Coverage threshold: 50% minimum. Handler tests mock store interfaces (no DB). Run `make test-v` before every PR.
 
 **TypeScript:**
 - Strict mode, no `any`
 - All API calls through `web/src/lib/api.ts` — never raw `fetch()` in components or hooks
+- Server state via TanStack Query (`@tanstack/react-query` v5) — use `useQuery`/`useMutation`; never hand-roll `useState`+`useEffect` for API calls. Query keys in `web/src/lib/queryKeys.ts`, client config in `web/src/lib/queryClient.ts`
+- Hook conventions: `useGames(filters)`, `useGame(id)`, `useCollections()`, `useProfile()` — one hook per domain, exported from `web/src/hooks/`
 
 ## Git Workflow
 
@@ -187,6 +195,7 @@ refactor/*
 - Use `pkg/shared/apierr` sentinels for all error paths
 - Validate JWT in `services/api/internal/jwt/` middleware — never skip or trust forwarded headers from untrusted callers
 - Run `make test-v` before opening a PR
+- Define store interfaces per package — `Service` depends on the interface, not concrete `*Store` (enables `httptest` handler tests without DB)
 
 **Ask first:**
 - Any change to `pkg/shared` exported types (`services/api` depends on it)
@@ -194,6 +203,7 @@ refactor/*
 - Running `supabase db push` — this writes to the hosted production database
 - New external service integrations or third-party dependencies
 - Schema changes (migrations in `services/api/migrations/`)
+- Using `skip_migrations: true` on a prod deploy — only safe when the new code is schema-compatible with the current DB
 
 **Never:**
 - Push directly to `main` or `dev`

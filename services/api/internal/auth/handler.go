@@ -2,8 +2,11 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -12,25 +15,61 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-type Handler struct {
-	store       *Store
-	supabaseURL string
-	apiKey      string
+type supabaseAuthClient struct {
+	url    string
+	apiKey string
+	client *http.Client
 }
 
-func NewHandler(store *Store, supabaseURL, apiKey string) *Handler {
+type Handler struct {
+	store    *Store
+	supabase *supabaseAuthClient
+}
+
+func NewHandler(store *Store, supabaseURL, apiKey string, client *http.Client) *Handler {
 	return &Handler{
-		store:       store,
-		supabaseURL: strings.TrimSuffix(supabaseURL, "/"),
-		apiKey:      apiKey,
+		store: store,
+		supabase: &supabaseAuthClient{
+			url:    strings.TrimSuffix(supabaseURL, "/"),
+			apiKey: apiKey,
+			client: client,
+		},
 	}
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
-	mux.HandleFunc("POST /api/v1/auth/login", h.login)
-	mux.HandleFunc("POST /api/v1/auth/refresh", h.refresh)
-	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
-	mux.HandleFunc("GET /api/v1/ping", auth(http.HandlerFunc(h.ping)).ServeHTTP)
+func (s *supabaseAuthClient) doRequest(ctx context.Context, method, path string, body map[string]string) (int, []byte, error) {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, s.url+path, bytes.NewReader(payload))
+	if err != nil {
+		return 0, nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("apikey", s.apiKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, nil, fmt.Errorf("read response: %w", err)
+	}
+
+	return resp.StatusCode, respBody, nil
+}
+
+// ref: api-layer.SEC.5 — rateLimit middleware applied to login/refresh/logout (not auth'd)
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth, rateLimit func(http.Handler) http.Handler) {
+	mux.Handle("POST /api/v1/auth/login", rateLimit(http.HandlerFunc(h.login)))
+	mux.Handle("POST /api/v1/auth/refresh", rateLimit(http.HandlerFunc(h.refresh)))
+	mux.Handle("POST /api/v1/auth/logout", rateLimit(http.HandlerFunc(h.logout)))
+	mux.Handle("GET /api/v1/ping", auth(http.HandlerFunc(h.ping)))
 }
 
 type loginRequest struct {
@@ -51,26 +90,22 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(map[string]string{"email": req.Username, "password": req.Password})
-	supaReq, _ := http.NewRequestWithContext(r.Context(), http.MethodPost,
-		h.supabaseURL+"/auth/v1/token?grant_type=password", bytes.NewReader(body))
-	supaReq.Header.Set("Content-Type", "application/json")
-	supaReq.Header.Set("apikey", h.apiKey)
+	status, respBody, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+		"/auth/v1/token?grant_type=password",
+		map[string]string{"email": req.Username, "password": req.Password})
 
-	resp, err := http.DefaultClient.Do(supaReq)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if status != http.StatusOK {
 		httpx.WriteError(w, apierr.ErrWrongPassword)
 		return
 	}
 
 	var result tokenData
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		httpx.WriteError(w, fmt.Errorf("decode supabase response: %w", err))
 		return
 	}
@@ -89,26 +124,22 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := json.Marshal(map[string]string{"refresh_token": req.RefreshToken})
-	supaReq, _ := http.NewRequestWithContext(r.Context(), http.MethodPost,
-		h.supabaseURL+"/auth/v1/token?grant_type=refresh_token", bytes.NewReader(body))
-	supaReq.Header.Set("Content-Type", "application/json")
-	supaReq.Header.Set("apikey", h.apiKey)
+	status, respBody, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+		"/auth/v1/token?grant_type=refresh_token",
+		map[string]string{"refresh_token": req.RefreshToken})
 
-	resp, err := http.DefaultClient.Do(supaReq)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if status != http.StatusOK {
 		httpx.WriteError(w, apierr.ErrUnauthorized)
 		return
 	}
 
 	var result tokenData
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.Unmarshal(respBody, &result); err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
@@ -122,20 +153,17 @@ type logoutRequest struct {
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	var req logoutRequest
-	json.NewDecoder(r.Body).Decode(&req) //nolint:errcheck
+	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	accessToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	_, _, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+		"/auth/v1/logout?scope=global",
+		map[string]string{"refresh_token": req.RefreshToken})
 
-	body, _ := json.Marshal(map[string]string{"refresh_token": req.RefreshToken})
-	supaReq, _ := http.NewRequestWithContext(r.Context(), http.MethodPost,
-		h.supabaseURL+"/auth/v1/logout?scope=global", bytes.NewReader(body))
-	supaReq.Header.Set("Content-Type", "application/json")
-	supaReq.Header.Set("apikey", h.apiKey)
-	if accessToken != "" {
-		supaReq.Header.Set("Authorization", "Bearer "+accessToken)
+	// logout is best-effort; errors are not actionable to client
+	if err != nil {
+		slog.Debug("logout: request failed", "error", err)
 	}
 
-	http.DefaultClient.Do(supaReq) //nolint:errcheck — best-effort
 	w.WriteHeader(http.StatusNoContent)
 }
 

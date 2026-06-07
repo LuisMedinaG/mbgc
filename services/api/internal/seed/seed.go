@@ -13,6 +13,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
 )
 
@@ -68,7 +69,7 @@ func ensureAuthUser(ctx context.Context, cfg config.Config) (string, error) {
 	req.Header.Set("apikey", cfg.ServiceRoleKey)
 	req.Header.Set("Authorization", "Bearer "+cfg.ServiceRoleKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpx.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +123,7 @@ func ensureAdminAppMetadata(ctx context.Context, cfg config.Config, userID strin
 	req.Header.Set("apikey", cfg.ServiceRoleKey)
 	req.Header.Set("Authorization", "Bearer "+cfg.ServiceRoleKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpx.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -149,7 +150,7 @@ func lookupAuthUserByEmail(ctx context.Context, cfg config.Config) (string, erro
 	req.Header.Set("apikey", cfg.ServiceRoleKey)
 	req.Header.Set("Authorization", "Bearer "+cfg.ServiceRoleKey)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpx.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}

@@ -1,12 +1,24 @@
 package game
 
 import "context"
-
-type Service struct {
-	store *Store
+type gameStore interface {
+	ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
+	GetGame(ctx context.Context, id int64, userID string) (*Game, error)
+	CreateGame(ctx context.Context, userID string, bggID int) (int64, error)
+	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
+	DeleteGame(ctx context.Context, id int64, userID string) error
+	ListCollections(ctx context.Context, userID string) ([]Collection, error)
+	CreateCollection(ctx context.Context, userID, name, description string) (*Collection, error)
+	UpdateCollection(ctx context.Context, id int64, userID, name, description string) error
+	DeleteCollection(ctx context.Context, id int64, userID string) error
+	SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
 }
 
-func NewService(st *Store) *Service {
+type Service struct {
+	store gameStore
+}
+
+func NewService(st gameStore) *Service {
 	return &Service{store: st}
 }
 
