@@ -48,8 +48,8 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := GameFilter{
-		Search:   r.URL.Query().Get("search"),
-		Category: r.URL.Query().Get("category"),
+		Search:   truncate(r.URL.Query().Get("search"), 255),
+		Category: truncate(r.URL.Query().Get("category"), 255),
 		Page:     queryInt(r, "page", 1),
 		Limit:    queryInt(r, "limit", 20),
 	}
@@ -232,4 +232,12 @@ func queryInt(r *http.Request, key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+// ref: api-layer.SEC.7 — caps string length to prevent abuse
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
 }

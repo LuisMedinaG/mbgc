@@ -144,6 +144,9 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
   `aud` = `authenticated`. Anon/service_role API keys are rejected.
 - `SUPABASE_URL` is **required** to boot. `SUPABASE_JWT_SECRET` is optional.
 - JWT validation lives in `services/api/internal/jwt/` — middleware calls `httpx.SetGatewayUser` to put identity into context.
+- **Rate limiting:** Auth endpoints (login/refresh/logout) are rate-limited at 5 req/s per IP via `httpx.RateLimiter`. Returns 429.
+- **Body limits:** All request bodies capped at 1MB via `httpx.LimitBodySize` middleware.
+- **HTTP client:** Use `httpx.DefaultClient` (10s timeout) for outbound HTTP — never `http.DefaultClient`.
 
 ## go.work Workspace
 
@@ -159,6 +162,9 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 - Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
 - Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
 - Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
+- Use `httpx.DefaultClient` for outbound HTTP — never `http.DefaultClient`
+- Apply `httpx.LimitBodySize(1<<20)` to all JSON endpoints — 1MB cap
+- Cap user-supplied strings (search, filters) at 255 chars
 - **Testing:** see [docs/runbook/testing.md](./docs/runbook/testing.md). Coverage threshold: 50% minimum. Handler tests mock store interfaces (no DB). Run `make test-v` before every PR.
 
 **TypeScript:**

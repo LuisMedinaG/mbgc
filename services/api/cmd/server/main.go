@@ -99,7 +99,7 @@ func main() {
 	}
 
 	authStore := auth.NewStore(pool)
-	authHandler := auth.NewHandler(authStore, cfg.SupabaseURL, cfg.ServiceRoleKey)
+	authHandler := auth.NewHandler(authStore, cfg.SupabaseURL, cfg.ServiceRoleKey, httpx.DefaultClient)
 
 	profileStore := profile.NewStore(pool)
 	profileSvc := profile.NewService(profileStore)
@@ -114,8 +114,11 @@ func main() {
 	importSvc := importer.NewService(importStore, bggClient, gameSvc)
 	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
 
+	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
+	rateLimit := httpx.RateLimiter(5, 10)
+
 	mux := http.NewServeMux()
-	authHandler.RegisterRoutes(mux, authMiddleware)
+	authHandler.RegisterRoutes(mux, authMiddleware, rateLimit)
 	profileHandler.RegisterRoutes(mux, authMiddleware)
 	gameHandler.RegisterRoutes(mux, authMiddleware)
 	importHandler.RegisterRoutes(mux, authMiddleware)
@@ -138,6 +141,8 @@ func main() {
 			httpx.RequestID,
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500
 			httpx.Recover,
+			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
+			httpx.LimitBodySize(1 << 20),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
 			// ref: auth.MIDDLEWARE.5 — CORS validates origin

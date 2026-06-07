@@ -14,7 +14,7 @@ import (
 // --- login ---
 
 func TestLogin_InvalidBody(t *testing.T) {
-	h := NewHandler(nil, "", "")
+	h := NewHandler(nil, "", "", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader("bad json"))
 	r.Header.Set("Content-Type", "application/json")
@@ -26,7 +26,7 @@ func TestLogin_InvalidBody(t *testing.T) {
 }
 
 func TestLogin_MissingFields(t *testing.T) {
-	h := NewHandler(nil, "", "")
+	h := NewHandler(nil, "", "", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":""}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -44,7 +44,7 @@ func TestLogin_SupabaseFailure(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key")
+	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -66,7 +66,7 @@ func TestLogin_Success(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key")
+	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -86,7 +86,7 @@ func TestLogin_Success(t *testing.T) {
 }
 
 func TestLogin_SupabaseUnreachable(t *testing.T) {
-	h := NewHandler(nil, "http://127.0.0.1:1", "fake-key")
+	h := NewHandler(nil, "http://127.0.0.1:1", "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -100,7 +100,7 @@ func TestLogin_SupabaseUnreachable(t *testing.T) {
 // --- refresh ---
 
 func TestRefresh_MissingToken(t *testing.T) {
-	h := NewHandler(nil, "", "")
+	h := NewHandler(nil, "", "", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -118,7 +118,7 @@ func TestRefresh_SupabaseFailure(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key")
+	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{"refresh_token":"rt"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -140,7 +140,7 @@ func TestRefresh_Success(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key")
+	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{"refresh_token":"rt"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -160,7 +160,7 @@ func TestLogout_AlwaysSucceeds(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key")
+	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/logout", strings.NewReader(`{"refresh_token":"rt"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -173,7 +173,7 @@ func TestLogout_AlwaysSucceeds(t *testing.T) {
 }
 
 func TestLogout_WithoutToken(t *testing.T) {
-	h := NewHandler(nil, "", "")
+	h := NewHandler(nil, "", "", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/logout", strings.NewReader(`{}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -187,7 +187,7 @@ func TestLogout_WithoutToken(t *testing.T) {
 // --- ping ---
 
 func TestPing_WithUser(t *testing.T) {
-	h := NewHandler(nil, "", "")
+	h := NewHandler(nil, "", "", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/v1/ping", nil)
 	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
@@ -210,7 +210,7 @@ func TestPing_WithUser(t *testing.T) {
 }
 
 func TestPing_NoUser(t *testing.T) {
-	h := NewHandler(nil, "", "")
+	h := NewHandler(nil, "", "", http.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/v1/ping", nil)
 	h.ping(w, r)

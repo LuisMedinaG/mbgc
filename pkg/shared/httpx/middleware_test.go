@@ -198,54 +198,6 @@ func TestRequestID_PreservesExisting(t *testing.T) {
 	}
 }
 
-func TestTrustGatewayHeaders(t *testing.T) {
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := UserIDFromContext(r.Context())
-		if !ok || userID != "user-abc" {
-			t.Fatalf("expected user-abc, got %s (ok=%v)", userID, ok)
-		}
-		username := UsernameFromContext(r.Context())
-		if username != "alice" {
-			t.Fatalf("expected alice, got %s", username)
-		}
-		isAdmin := IsAdminFromContext(r.Context())
-		if !isAdmin {
-			t.Fatal("expected admin=true")
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	handler := TrustGatewayHeaders(inner)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
-	r.Header.Set("X-User-ID", "user-abc")
-	r.Header.Set("X-Username", "alice")
-	r.Header.Set("X-Is-Admin", "true")
-	handler.ServeHTTP(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestTrustGatewayHeaders_NoHeaders(t *testing.T) {
-	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, ok := UserIDFromContext(r.Context())
-		if ok {
-			t.Fatal("expected no user when no gateway headers")
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	handler := TrustGatewayHeaders(inner)
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/", nil)
-	handler.ServeHTTP(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-}
 
 func TestChain(t *testing.T) {
 	var order []string

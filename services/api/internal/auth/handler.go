@@ -16,21 +16,24 @@ type Handler struct {
 	store       *Store
 	supabaseURL string
 	apiKey      string
+	client      *http.Client
 }
 
-func NewHandler(store *Store, supabaseURL, apiKey string) *Handler {
+func NewHandler(store *Store, supabaseURL, apiKey string, client *http.Client) *Handler {
 	return &Handler{
 		store:       store,
 		supabaseURL: strings.TrimSuffix(supabaseURL, "/"),
 		apiKey:      apiKey,
+		client:      client,
 	}
 }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
-	mux.HandleFunc("POST /api/v1/auth/login", h.login)
-	mux.HandleFunc("POST /api/v1/auth/refresh", h.refresh)
-	mux.HandleFunc("POST /api/v1/auth/logout", h.logout)
-	mux.HandleFunc("GET /api/v1/ping", auth(http.HandlerFunc(h.ping)).ServeHTTP)
+// ref: api-layer.SEC.5 — rateLimit middleware applied to login/refresh/logout (not auth'd)
+func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth, rateLimit func(http.Handler) http.Handler) {
+	mux.Handle("POST /api/v1/auth/login", rateLimit(http.HandlerFunc(h.login)))
+	mux.Handle("POST /api/v1/auth/refresh", rateLimit(http.HandlerFunc(h.refresh)))
+	mux.Handle("POST /api/v1/auth/logout", rateLimit(http.HandlerFunc(h.logout)))
+	mux.Handle("GET /api/v1/ping", auth(http.HandlerFunc(h.ping)))
 }
 
 type loginRequest struct {
@@ -57,7 +60,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	supaReq.Header.Set("Content-Type", "application/json")
 	supaReq.Header.Set("apikey", h.apiKey)
 
-	resp, err := http.DefaultClient.Do(supaReq)
+	resp, err := h.client.Do(supaReq)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
@@ -95,7 +98,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	supaReq.Header.Set("Content-Type", "application/json")
 	supaReq.Header.Set("apikey", h.apiKey)
 
-	resp, err := http.DefaultClient.Do(supaReq)
+	resp, err := h.client.Do(supaReq)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
@@ -135,7 +138,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		supaReq.Header.Set("Authorization", "Bearer "+accessToken)
 	}
 
-	http.DefaultClient.Do(supaReq) //nolint:errcheck — best-effort
+	h.client.Do(supaReq) //nolint:errcheck — best-effort
 	w.WriteHeader(http.StatusNoContent)
 }
 

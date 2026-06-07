@@ -24,3 +24,13 @@ components:
       2: Error responses return a structured error code and human-readable message
       3: Internal error details are never exposed to API clients
       4: Database and internal errors are logged server-side but not returned to callers
+
+constraints:
+  SEC:
+    name: Security hardening
+    description: Server-level security protections against common attack vectors
+    requirements:
+      1: All outbound HTTP calls use a shared client with a 10-second timeout — never http.DefaultClient
+      2: Auth endpoints (login, refresh, logout) are rate-limited per IP (5 req/s, burst 10) to prevent brute-force
+      3: Request body size is capped at 1MB globally to prevent memory exhaustion
+      4: Search and filter query parameters are truncated to 255 characters to prevent abuse

@@ -104,18 +104,6 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// TrustGatewayHeaders reads X-User-ID, X-Username, and X-Is-Admin headers
-// injected by the gateway and populates the request context.
-// Apply this middleware on all routes inside internal services.
-func TrustGatewayHeaders(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if userID := r.Header.Get("X-User-ID"); userID != "" {
-			isAdmin := r.Header.Get("X-Is-Admin") == "true"
-			r = r.WithContext(SetGatewayUser(r.Context(), userID, r.Header.Get("X-Username"), isAdmin))
-		}
-		next.ServeHTTP(w, r)
-	})
-}
 
 // statusWriter captures the HTTP status code written by a handler.
 type statusWriter struct {
