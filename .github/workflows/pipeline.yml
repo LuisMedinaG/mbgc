@@ -213,7 +213,6 @@ jobs:
   deploy-api-prod:
     name: Deploy API → prod
     needs: [go, approve-prod]
-    timeout-minutes: 20
     if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
@@ -237,7 +236,6 @@ jobs:
   deploy-api-dev:
     name: Deploy API → dev
     needs: go
-    timeout-minutes: 20
     if: github.ref_name == 'dev' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
