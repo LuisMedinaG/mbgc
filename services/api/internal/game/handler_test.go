@@ -26,6 +26,7 @@ type mockGameStore struct {
 	updateCollectionFn  func(ctx context.Context, id int64, userID, name, description string) error
 	deleteCollectionFn  func(ctx context.Context, id int64, userID string) error
 	setGameCollectionsFn func(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
+	discoverFn          func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
 func (m *mockGameStore) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
@@ -57,6 +58,12 @@ func (m *mockGameStore) DeleteCollection(ctx context.Context, id int64, userID s
 }
 func (m *mockGameStore) SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error {
 	return m.setGameCollectionsFn(ctx, userID, gameID, collectionIDs)
+}
+func (m *mockGameStore) Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
+	if m.discoverFn != nil {
+		return m.discoverFn(ctx, userID, f)
+	}
+	return nil, 0, nil, apierr.ErrNotFound
 }
 
 func newAuthenticatedRequest(method, path string, body string) *http.Request {

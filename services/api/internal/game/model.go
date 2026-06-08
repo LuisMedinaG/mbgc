@@ -38,6 +38,7 @@ type Collection struct {
 	UserID      string    `json:"user_id"`
 	Name        string    `json:"name"`
 	Description *string   `json:"description,omitempty"`
+	GameCount   int       `json:"game_count"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

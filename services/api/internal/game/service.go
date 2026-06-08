@@ -12,6 +12,7 @@ type gameStore interface {
 	UpdateCollection(ctx context.Context, id int64, userID, name, description string) error
 	DeleteCollection(ctx context.Context, id int64, userID string) error
 	SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
+	Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
 type Service struct {
@@ -62,4 +63,8 @@ func (s *Service) CreateGame(ctx context.Context, userID string, bggID int) (int
 // GameExistsByBGGID checks if a game already exists — called by the importer.
 func (s *Service) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
 	return s.store.GameExistsByBGGID(ctx, userID, bggID)
+}
+
+func (s *Service) Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
+	return s.store.Discover(ctx, userID, f)
 }
