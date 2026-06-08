@@ -276,6 +276,27 @@ func TestRecord_ForwardsContext(t *testing.T) {
 	}
 }
 
+// ref: monitoring.SINK.6 — every emitted event carries status and latency_ms
+// (defaulted to 0 when the caller did not supply them)
+func TestRecord_DefaultsStatusAndLatency(t *testing.T) {
+	buf := captureSlog(t)
+	r := httptest.NewRequest("GET", "/api/v1/games", nil)
+
+	Record(r, "panic", slog.LevelError, "stack", "trace")
+
+	rec := decodeLine(t, buf)
+	if v, ok := rec["status"]; !ok {
+		t.Errorf("expected status field present, got %v", rec)
+	} else if v != float64(0) {
+		t.Errorf("expected status=0 (default), got %v", v)
+	}
+	if v, ok := rec["latency_ms"]; !ok {
+		t.Errorf("expected latency_ms field present, got %v", rec)
+	} else if v != float64(0) {
+		t.Errorf("expected latency_ms=0 (default), got %v", v)
+	}
+}
+
 // ref: monitoring.OBSERVABILITY.3 — kill switch makes Record a no-op.
 // Restores the prior Disabled state in Cleanup so it doesn't leak into
 // other tests in the package.
