@@ -1,0 +1,16 @@
+run:
+  timeout: 5m
+  tests: true
+linters:
+  enable:
+    - staticcheck
+    - errcheck
+    - govet
+    - gofmt
+    - revive
+skip-dirs:
+  - vendor
+issues:
+  exclude-use-default: false
+  exclude:
+    - 'error return value not checked.*(Close|Write|Flush)\('

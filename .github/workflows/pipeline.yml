@@ -92,6 +92,19 @@ jobs:
             echo '::error::gofmt needs to be run (files listed above)'
             exit 1
           fi
+      - name: Cache golangci-lint
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/golangci-lint
+          key: ${{ runner.os }}-golangci-${{ hashFiles('**/*.go','**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-golangci-
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.59.0
+          args: run ./... --timeout 5m
       - name: Test
         run: |
           go test -race ./pkg/shared/... -coverprofile=coverage-shared.out -covermode=atomic
