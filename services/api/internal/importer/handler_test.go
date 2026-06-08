@@ -36,7 +36,7 @@ func (m *mockImporterStore) LogSync(ctx context.Context, userID string, imported
 }
 
 type mockBGGClient struct {
-	available        bool
+	available         bool
 	fetchCollectionFn func(ctx context.Context, bggUsername string) ([]int, error)
 	fetchGamesFn      func(ctx context.Context, bggIDs []int) ([]BGGGame, error)
 }
@@ -56,7 +56,7 @@ func (m *mockBGGClient) FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame
 }
 
 type mockGameService struct {
-	gameExistsFn   func(ctx context.Context, userID string, bggID int) (bool, error)
+	gameExistsFn    func(ctx context.Context, userID string, bggID int) (bool, error)
 	upsertBGGGameFn func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
 }
 

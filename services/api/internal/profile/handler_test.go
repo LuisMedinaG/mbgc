@@ -15,8 +15,8 @@ import (
 
 // mockProfileStore implements profileStore for handler tests.
 type mockProfileStore struct {
-	getProfileFn    func(ctx context.Context, userID string) (*Profile, error)
-	upsertProfileFn func(ctx context.Context, userID string) (*Profile, error)
+	getProfileFn     func(ctx context.Context, userID string) (*Profile, error)
+	upsertProfileFn  func(ctx context.Context, userID string) (*Profile, error)
 	setBGGUsernameFn func(ctx context.Context, userID, bggUsername string) error
 	getBGGUsernameFn func(ctx context.Context, userID string) (string, error)
 }

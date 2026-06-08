@@ -130,7 +130,9 @@ func ensureAdminAppMetadata(ctx context.Context, cfg config.Config, userID strin
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var result struct{ Msg string `json:"msg"` }
+		var result struct {
+			Msg string `json:"msg"`
+		}
 		json.NewDecoder(resp.Body).Decode(&result)
 		return fmt.Errorf("admin API returned %d: %s", resp.StatusCode, result.Msg)
 	}

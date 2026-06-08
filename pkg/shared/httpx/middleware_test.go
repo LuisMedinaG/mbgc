@@ -205,7 +205,6 @@ func TestRequestID_PreservesExisting(t *testing.T) {
 	}
 }
 
-
 func TestChain(t *testing.T) {
 	var order []string
 	mw := func(name string) func(http.Handler) http.Handler {

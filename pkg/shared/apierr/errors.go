@@ -10,16 +10,16 @@ import "errors"
 // Machine-readable error codes returned in ErrorResponse.Error.Code.
 // Keep these stable — clients may switch on them.
 const (
-	CodeBadRequest          = "BAD_REQUEST"
-	CodeConflict            = "CONFLICT"
-	CodeDuplicate           = "DUPLICATE"
-	CodeForbidden           = "FORBIDDEN"
-	CodeInternal            = "INTERNAL_ERROR"
-	CodeNotFound            = "NOT_FOUND"
-	CodeRateLimit           = "RATE_LIMIT_EXCEEDED"
-	CodeUnauthorized        = "UNAUTHORIZED"
+	CodeBadRequest           = "BAD_REQUEST"
+	CodeConflict             = "CONFLICT"
+	CodeDuplicate            = "DUPLICATE"
+	CodeForbidden            = "FORBIDDEN"
+	CodeInternal             = "INTERNAL_ERROR"
+	CodeNotFound             = "NOT_FOUND"
+	CodeRateLimit            = "RATE_LIMIT_EXCEEDED"
+	CodeUnauthorized         = "UNAUTHORIZED"
 	CodeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
-	CodeValidation          = "VALIDATION_FAILED"
+	CodeValidation           = "VALIDATION_FAILED"
 )
 
 // Sentinel errors returned by the service layer.
@@ -37,12 +37,12 @@ var (
 	ErrWrongPassword        = errors.New("wrong password")
 )
 
-func IsBadRequest(err error) bool  { return errors.Is(err, ErrBadRequest) }
-func IsDuplicate(err error) bool   { return errors.Is(err, ErrDuplicate) }
-func IsForbidden(err error) bool   { return errors.Is(err, ErrForbidden) }
-func IsNotFound(err error) bool    { return errors.Is(err, ErrNotFound) }
-func IsRateLimit(err error) bool   { return errors.Is(err, ErrRateLimit) }
-func IsValidation(err error) bool  { return errors.Is(err, ErrValidation) }
+func IsBadRequest(err error) bool { return errors.Is(err, ErrBadRequest) }
+func IsDuplicate(err error) bool  { return errors.Is(err, ErrDuplicate) }
+func IsForbidden(err error) bool  { return errors.Is(err, ErrForbidden) }
+func IsNotFound(err error) bool   { return errors.Is(err, ErrNotFound) }
+func IsRateLimit(err error) bool  { return errors.Is(err, ErrRateLimit) }
+func IsValidation(err error) bool { return errors.Is(err, ErrValidation) }
 
 // IsUnauthorized reports whether err is or wraps ErrUnauthorized or ErrWrongPassword.
 func IsUnauthorized(err error) bool {
