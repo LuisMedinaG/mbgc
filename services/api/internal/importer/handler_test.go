@@ -16,6 +16,7 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 )
 
 type mockImporterStore struct {
@@ -34,20 +35,42 @@ func (m *mockImporterStore) LogSync(ctx context.Context, userID string, imported
 	return m.logSyncFn(ctx, userID, imported, fullRefresh)
 }
 
-type mockBGGClient struct{ available bool }
+type mockBGGClient struct {
+	available        bool
+	fetchCollectionFn func(ctx context.Context, bggUsername string) ([]int, error)
+	fetchGamesFn      func(ctx context.Context, bggIDs []int) ([]BGGGame, error)
+}
 
 func (m *mockBGGClient) Available() bool { return m.available }
+func (m *mockBGGClient) FetchCollection(ctx context.Context, bggUsername string) ([]int, error) {
+	if m.fetchCollectionFn != nil {
+		return m.fetchCollectionFn(ctx, bggUsername)
+	}
+	return nil, nil
+}
+func (m *mockBGGClient) FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame, error) {
+	if m.fetchGamesFn != nil {
+		return m.fetchGamesFn(ctx, bggIDs)
+	}
+	return nil, nil
+}
 
 type mockGameService struct {
-	gameExistsFn func(ctx context.Context, userID string, bggID int) (bool, error)
-	createGameFn func(ctx context.Context, userID string, bggID int) (int64, error)
+	gameExistsFn   func(ctx context.Context, userID string, bggID int) (bool, error)
+	upsertBGGGameFn func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
 }
 
 func (m *mockGameService) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
-	return m.gameExistsFn(ctx, userID, bggID)
+	if m.gameExistsFn != nil {
+		return m.gameExistsFn(ctx, userID, bggID)
+	}
+	return false, nil
 }
-func (m *mockGameService) CreateGame(ctx context.Context, userID string, bggID int) (int64, error) {
-	return m.createGameFn(ctx, userID, bggID)
+func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+	if m.upsertBGGGameFn != nil {
+		return m.upsertBGGGameFn(ctx, userID, g)
+	}
+	return 0, true, nil
 }
 
 func okStore() *mockImporterStore {
@@ -292,11 +315,11 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) {
 			return bggID == 174430, nil
 		},
-		createGameFn: func(ctx context.Context, userID string, bggID int) (int64, error) {
-			return int64(bggID), nil
+		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+			return int64(g.BGGID), true, nil
 		},
 	}
-	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, gs)
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{available: true}, gs)
 	w := httptest.NewRecorder()
 	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[174430,167791]}`, false))
 	if w.Code != http.StatusOK {
@@ -312,9 +335,11 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 func TestCSVImport_AllNew(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
-		createGameFn: func(ctx context.Context, userID string, bggID int) (int64, error) { return int64(bggID), nil },
+		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+			return int64(g.BGGID), true, nil
+		},
 	}
-	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, gs)
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{available: true}, gs)
 	w := httptest.NewRecorder()
 	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[1,2,3]}`, false))
 	if w.Code != http.StatusOK {
@@ -330,9 +355,11 @@ func TestCSVImport_AllNew(t *testing.T) {
 func TestCSVImport_CreateFails(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
-		createGameFn: func(ctx context.Context, userID string, bggID int) (int64, error) { return 0, apierr.ErrInternal },
+		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+			return 0, false, apierr.ErrInternal
+		},
 	}
-	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, gs)
+	h := mkHandler(&mockImporterStore{}, &mockBGGClient{available: true}, gs)
 	w := httptest.NewRecorder()
 	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[1,2]}`, false))
 	if w.Code != http.StatusOK {

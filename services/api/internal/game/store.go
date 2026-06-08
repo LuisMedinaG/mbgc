@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -107,6 +108,90 @@ func (s *Store) CreateGame(ctx context.Context, userID string, bggID int) (int64
 	err := s.db.QueryRow(ctx, `INSERT INTO games.games (user_id, bgg_id, name) VALUES ($1, $2, '')
 		RETURNING id`, userID, bggID).Scan(&id)
 	return id, err
+}
+
+// BGGGameData is the subset of game data fetched from BGG that we persist.
+// Defined here (not in importer) to keep the DB schema and its input shape
+// colocated — the importer translates BGG XML into this struct.
+type BGGGameData struct {
+	BGGID              int
+	Name               string
+	Description        string
+	YearPublished      *int
+	Image              *string
+	Thumbnail          *string
+	MinPlayers         *int
+	MaxPlayers         *int
+	PlayTime           *int
+	Categories         []string
+	Mechanics          []string
+	Types              []string
+	Weight             *float64
+	Rating             *float64
+	LanguageDependence *int
+	RecommendedPlayers []int
+}
+
+// UpsertBGGGame inserts a new game from BGG or updates an existing one (matched
+// by user_id + bgg_id). Returns the game id and whether it was newly created.
+func (s *Store) UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error) {
+	name := g.Name
+	if name == "" {
+		name = "(unnamed BGG " + strconv.Itoa(g.BGGID) + ")"
+	}
+	var id int64
+	var created bool
+	err := s.db.QueryRow(ctx, `
+		INSERT INTO games.games (
+			user_id, bgg_id, name, description, year_published, image, thumbnail,
+			min_players, max_players, playtime, categories, mechanics, types,
+			weight, rating, language_dependence, recommended_players
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		ON CONFLICT (user_id, bgg_id) DO UPDATE SET
+			name = EXCLUDED.name,
+			description = EXCLUDED.description,
+			year_published = EXCLUDED.year_published,
+			image = EXCLUDED.image,
+			thumbnail = EXCLUDED.thumbnail,
+			min_players = EXCLUDED.min_players,
+			max_players = EXCLUDED.max_players,
+			playtime = EXCLUDED.playtime,
+			categories = EXCLUDED.categories,
+			mechanics = EXCLUDED.mechanics,
+			types = EXCLUDED.types,
+			weight = EXCLUDED.weight,
+			rating = EXCLUDED.rating,
+			language_dependence = EXCLUDED.language_dependence,
+			recommended_players = EXCLUDED.recommended_players,
+			updated_at = now()
+		RETURNING id, (xmax = 0)`,
+		userID, g.BGGID, name, nullStr(g.Description), g.YearPublished, g.Image, g.Thumbnail,
+		g.MinPlayers, g.MaxPlayers, g.PlayTime,
+		emptySlice(g.Categories), emptySlice(g.Mechanics), emptySlice(g.Types),
+		g.Weight, g.Rating, g.LanguageDependence, emptyIntSlice(g.RecommendedPlayers),
+	).Scan(&id, &created)
+	return id, created, err
+}
+
+func nullStr(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func emptySlice(s []string) []string {
+	if s == nil {
+		return []string{}
+	}
+	return s
+}
+
+func emptyIntSlice(s []int) []int {
+	if s == nil {
+		return []int{}
+	}
+	return s
 }
 
 // ref: auth.MULTI_TENANCY.1 — WHERE user_id = $1 scopes all queries to the owner

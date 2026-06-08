@@ -6,6 +6,7 @@ type gameStore interface {
 	GetGame(ctx context.Context, id int64, userID string) (*Game, error)
 	CreateGame(ctx context.Context, userID string, bggID int) (int64, error)
 	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
+	UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
 	DeleteGame(ctx context.Context, id int64, userID string) error
 	ListCollections(ctx context.Context, userID string) ([]Collection, error)
 	CreateCollection(ctx context.Context, userID, name, description string) (*Collection, error)
@@ -67,4 +68,9 @@ func (s *Service) GameExistsByBGGID(ctx context.Context, userID string, bggID in
 
 func (s *Service) Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
 	return s.store.Discover(ctx, userID, f)
+}
+
+// UpsertBGGGame creates or updates a game from BGG data — called by the importer.
+func (s *Service) UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error) {
+	return s.store.UpsertBGGGame(ctx, userID, g)
 }

@@ -20,6 +20,7 @@ type mockGameStore struct {
 	getGameFn           func(ctx context.Context, id int64, userID string) (*Game, error)
 	createGameFn        func(ctx context.Context, userID string, bggID int) (int64, error)
 	gameExistsByBGGIDFn func(ctx context.Context, userID string, bggID int) (bool, error)
+	upsertBGGGameFn     func(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
 	deleteGameFn        func(ctx context.Context, id int64, userID string) error
 	listCollectionsFn   func(ctx context.Context, userID string) ([]Collection, error)
 	createCollectionFn  func(ctx context.Context, userID, name, description string) (*Collection, error)
@@ -40,6 +41,12 @@ func (m *mockGameStore) CreateGame(ctx context.Context, userID string, bggID int
 }
 func (m *mockGameStore) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
 	return m.gameExistsByBGGIDFn(ctx, userID, bggID)
+}
+func (m *mockGameStore) UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error) {
+	if m.upsertBGGGameFn != nil {
+		return m.upsertBGGGameFn(ctx, userID, g)
+	}
+	return 0, true, nil
 }
 func (m *mockGameStore) DeleteGame(ctx context.Context, id int64, userID string) error {
 	return m.deleteGameFn(ctx, id, userID)
