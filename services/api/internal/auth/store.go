@@ -10,24 +10,20 @@ type Store struct {
 	db *pgxpool.Pool
 }
 
-type Profile struct {
-	ID           string
-	BGGUsername  string
-	IsAdmin      bool
-	CreatedAt    string
-	LastModified string
-}
-
 func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
-func (s *Store) GetProfile(ctx context.Context, userID string) (*Profile, error) {
-	var p Profile
+// EmailByUsername resolves a login username to the Supabase auth email via an
+// indexed lookup on profile.users joined to auth.users. Returns pgx.ErrNoRows
+// when no match exists.
+func (s *Store) EmailByUsername(ctx context.Context, username string) (string, error) {
+	var email string
 	err := s.db.QueryRow(ctx, `
-		SELECT id, bgg_username, is_admin, created_at, last_modified
-		FROM profiles
-		WHERE id = $1
-	`, userID).Scan(&p.ID, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.LastModified)
-	return &p, err
+		SELECT u.email
+		FROM auth.users u
+		JOIN profile.users p ON p.id = u.id
+		WHERE lower(p.username) = lower($1)
+	`, username).Scan(&email)
+	return email, err
 }

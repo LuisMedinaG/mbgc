@@ -34,7 +34,7 @@ func AdminUser(ctx context.Context, cfg config.Config, db *pgxpool.Pool) error {
 		return fmt.Errorf("app_metadata: %w", err)
 	}
 
-	if err := ensureAdminProfile(ctx, db, userID); err != nil {
+	if err := ensureAdminProfile(ctx, db, userID, cfg.SeedAdminUsername); err != nil {
 		return fmt.Errorf("admin profile: %w", err)
 	}
 
@@ -173,11 +173,16 @@ func lookupAuthUserByEmail(ctx context.Context, cfg config.Config) (string, erro
 	return "", fmt.Errorf("user %q not found", cfg.SeedAdminEmail)
 }
 
-func ensureAdminProfile(ctx context.Context, db *pgxpool.Pool, userID string) error {
+// ensureAdminProfile upserts the admin profile row. username is stored for
+// username-based login resolution; an empty username leaves any existing value
+// untouched (NULLIF + COALESCE).
+func ensureAdminProfile(ctx context.Context, db *pgxpool.Pool, userID, username string) error {
 	_, err := db.Exec(ctx, `
-		INSERT INTO profile.users (id, is_admin)
-		VALUES ($1, true)
-		ON CONFLICT (id) DO UPDATE SET is_admin = true
-	`, userID)
+		INSERT INTO profile.users (id, is_admin, username)
+		VALUES ($1, true, NULLIF($2, ''))
+		ON CONFLICT (id) DO UPDATE SET
+			is_admin = true,
+			username = COALESCE(NULLIF($2, ''), profile.users.username)
+	`, userID, username)
 	return err
 }
