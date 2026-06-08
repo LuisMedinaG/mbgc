@@ -96,6 +96,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ref: auth.LOGIN.3 — resolve username to email; return generic error on miss to prevent enumeration
 	// Accept either email or username. If a username (no @), resolve it to an
 	// email via an indexed DB lookup. A miss returns the same error as a wrong
 	// password so we never reveal whether a username exists.

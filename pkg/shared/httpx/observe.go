@@ -60,6 +60,18 @@ func Record(r *http.Request, event string, level slog.Level, attrs ...any) {
 	// dropped before it can influence the emitted event.
 	filtered := filterAttrs(attrs)
 
+	// status and latency_ms are part of the monitoring contract
+	// (monitoring.SINK.6). Defaults are injected here so caller-supplied
+	// non-request events (panic, rate_limit, sync_*) still serialize with
+	// the canonical field set, and downstream metrics can group_by on them.
+	// ref: monitoring.SINK.6 — status/latency_ms always present
+	if !hasAttrKey(attrs, "status") {
+		filtered = append(filtered, slog.Int("status", 0))
+	}
+	if !hasAttrKey(attrs, "latency_ms") {
+		filtered = append(filtered, slog.Int64("latency_ms", 0))
+	}
+
 	// Helper-managed fields are appended last so they win any same-key
 	// collision in slog's last-write-wins JSON output, defending against
 	// a caller that re-injects a reserved key through attrs.
@@ -95,4 +107,16 @@ func filterAttrs(attrs []any) []any {
 		out = append(out, slog.Any(key, attrs[i+1]))
 	}
 	return out
+}
+
+// hasAttrKey reports whether attrs (a slog-style key/value list) contains a
+// pair with the given key. Used to default-inject required monitoring fields
+// when the caller did not supply them.
+func hasAttrKey(attrs []any, key string) bool {
+	for i := 0; i+1 < len(attrs); i += 2 {
+		if k, ok := attrs[i].(string); ok && k == key {
+			return true
+		}
+	}
+	return false
 }

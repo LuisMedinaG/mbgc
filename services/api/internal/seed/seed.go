@@ -173,6 +173,7 @@ func lookupAuthUserByEmail(ctx context.Context, cfg config.Config) (string, erro
 	return "", fmt.Errorf("user %q not found", cfg.SeedAdminEmail)
 }
 
+// ref: profile.ADMIN_SEED.1 — upsert admin profile with optional username
 // ensureAdminProfile upserts the admin profile row. username is stored for
 // username-based login resolution; an empty username leaves any existing value
 // untouched (NULLIF + COALESCE).

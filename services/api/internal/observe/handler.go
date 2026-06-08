@@ -24,6 +24,7 @@ func NewHandler() slog.Handler {
 	return newFailOpen(os.Stdout, os.Stderr, slog.LevelInfo)
 }
 
+// ref: monitoring.FAIL_OPEN.1, monitoring.FAIL_OPEN.2 — testable fail-open constructor
 // newFailOpen is the testable constructor.
 func newFailOpen(primary, meta io.Writer, level slog.Level) slog.Handler {
 	return &failOpenHandler{
@@ -32,15 +33,19 @@ func newFailOpen(primary, meta io.Writer, level slog.Level) slog.Handler {
 	}
 }
 
+// ref: monitoring.FAIL_OPEN.1, monitoring.FAIL_OPEN.2 — failOpenHandler splits primary/meta sinks
 type failOpenHandler struct {
 	primary slog.Handler
 	meta    slog.Handler
 }
 
+// ref: monitoring.FAIL_OPEN.1 — defer Enabled to the primary sink
 func (h *failOpenHandler) Enabled(ctx context.Context, level slog.Level) bool {
 	return h.primary.Enabled(ctx, level)
 }
 
+// ref: monitoring.FAIL_OPEN.1, monitoring.FAIL_OPEN.2, monitoring.OBSERVABILITY.1 —
+// primary failure never propagates; meta_warning is emitted to the meta sink
 func (h *failOpenHandler) Handle(ctx context.Context, r slog.Record) error {
 	if err := h.primary.Handle(ctx, r); err != nil {
 		// Best-effort meta-warning. The meta handler is on a different sink
@@ -58,10 +63,12 @@ func (h *failOpenHandler) Handle(ctx context.Context, r slog.Record) error {
 	return nil
 }
 
+// ref: monitoring.FAIL_OPEN.1 — WithAttrs threads attrs through the primary sink only
 func (h *failOpenHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &failOpenHandler{primary: h.primary.WithAttrs(attrs), meta: h.meta}
 }
 
+// ref: monitoring.FAIL_OPEN.1 — WithGroup threads grouping through the primary sink only
 func (h *failOpenHandler) WithGroup(name string) slog.Handler {
 	return &failOpenHandler{primary: h.primary.WithGroup(name), meta: h.meta}
 }
@@ -84,6 +91,7 @@ func Heartbeat(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// ref: monitoring.OBSERVABILITY.2 — emit a single heartbeat event via the shared sink
 func emitHeartbeat() {
 	httpx.Record(nil, "heartbeat", slog.LevelInfo)
 }

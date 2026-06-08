@@ -14,6 +14,7 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
+// ref: auth.LOGIN.3 — resolve username to email; pgx.ErrNoRows drives the generic error in handler.login
 // EmailByUsername resolves a login username to the Supabase auth email via an
 // indexed lookup on profile.users joined to auth.users. Returns pgx.ErrNoRows
 // when no match exists.
