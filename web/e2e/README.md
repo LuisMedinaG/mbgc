@@ -11,14 +11,14 @@ e2e/
 │   └── auth.ts          # authenticatedPage fixture — mocked by default, live with TEST_TOKEN
 ├── helpers/
 │   ├── api-mocks.ts     # Mock handlers for all /api/v1/* routes + fixture data
-│   ├── nav.ts           # goToCollection / goToFirstGame / goToVibes
-│   └── mocks.ts         # deprecated re-export — use api-mocks.ts directly
+│   └── nav.ts           # goToCollection / goToFirstGame / goToVibes
 ├── tests/               # Spec files, one per feature area
 │   ├── auth.spec.ts
 │   ├── collection.spec.ts
 │   ├── game-detail.spec.ts
-│   ├── lightbox.spec.ts
+│   ├── import.spec.ts
 │   ├── navigation.spec.ts
+│   ├── profile.spec.ts
 │   └── vibes.spec.ts
 └── README.md
 ```
@@ -33,7 +33,7 @@ bun run test:e2e
 bunx playwright test --ui
 
 # Single file
-bun run test:e2e e2e/tests/auth.spec.ts
+bunx playwright test e2e/tests/vibes.spec.ts
 
 # With a real backend (live mode)
 TEST_TOKEN=<supabase-jwt> bun run test:e2e
@@ -46,48 +46,36 @@ By default (no `TEST_TOKEN`), `fixtures/auth.ts` calls `mockAll()` from
 data (games, collections, profile) lives in that file — update it once to
 change what all tests see.
 
-To override a single route inside a test:
+The mocks hold state in module-local `state` arrays (collections, games)
+so a single test can assert CRUD round-trips without re-mounting the app.
+Call `resetState()` in `beforeEach` to restore defaults.
 
-```ts
-import { mockAll, FIXTURE_GAMES } from '../helpers/api-mocks'
+## Coverage philosophy
 
-test.beforeEach(async ({ page }) => await mockAll(page))
+These tests are **broad, not deep**. They verify the major user flows
+work end-to-end (UI → API contract → backend response shape), but they
+do NOT check CSS, copy text, or visual details. The goal is to catch:
 
-test('shows empty state', async ({ page }) => {
-  // Re-register the route to override — last registration wins
-  await page.route('**/api/v1/games*', route =>
-    route.fulfill({ status: 200, contentType: 'application/json',
-      body: JSON.stringify({ data: [], meta: { page: 1, limit: 20, total: 0 } }) }),
-  )
-  // ...
-})
-```
+- Broken API contracts (frontend calls an endpoint wrong way)
+- Unimplemented stub handlers (returns 404 / NOT_FOUND silently)
+- Error display bugs (`[object Object]` instead of real message)
+- Missing UI affordances for happy-path flows
+- Auth/redirect logic failures
 
-## Writing a test
+The earlier suite missed all of these. The new suite asserts on
+**observable behavior** — what the user sees and what the API receives.
 
-**Authenticated (default for UI flows):**
+## Per-spec coverage
 
-```ts
-import { test, expect } from '../fixtures/auth'
-import { goToFirstGame } from '../helpers/nav'
-
-test('game detail shows name', async ({ authenticatedPage: page }) => {
-  await goToFirstGame(page)
-  await expect(page.locator('h1').first()).toBeVisible()
-})
-```
-
-**Unauthenticated (login UI, redirects):**
-
-```ts
-import { test, expect } from '@playwright/test'
-import { mockAuthLogin } from '../helpers/api-mocks'
-
-test('login form submits', async ({ page }) => {
-  await mockAuthLogin(page)
-  // ...
-})
-```
+| Spec | Covers |
+|---|---|
+| `auth.spec` | Login success/failure, 401 → token refresh, unauthenticated redirect |
+| `collection.spec` | List renders, search filter narrows, nav to detail, empty state |
+| `game-detail.spec` | Render + stats, BGG link, vibe edit/cancel, rules URL validation, delete confirm |
+| `vibes.spec` | Create/rename/delete CRUD, discover (browse games in a collection) |
+| `import.spec` | BGG sync (gated by username), full refresh, success/fail, CSV upload → preview → import |
+| `profile.spec` | View + change BGG username, success/error feedback |
+| `navigation.spec` | Tab navigation between pages |
 
 ## CI
 
@@ -104,3 +92,17 @@ secret and pass it via `env:` in the workflow step.
 - **Prefer role/label selectors** (`getByRole`, `getByLabel`) over CSS/XPath.
 - **No cross-file imports between spec files.** Specs depend only on `fixtures/` and `helpers/`.
 - **Skip gracefully** when a precondition is missing rather than asserting false positives.
+- **Test the API call shape, not just the UI.** Use `page.waitForRequest` to assert
+  the request body/method/URL — that's where contract bugs hide.
+- **Always assert error messages are shown, not `[object Object]`.** This was the
+  bug class that bit us last time — make it impossible to regress.
+- **Reset shared state between tests.** Call `resetState()` in `beforeEach` if
+  your spec mutates collections or games.
+
+## Debugging
+
+- `[WebServer] ...` lines in test output are from Vite's stdout (warnings, errors).
+- For detailed request/response logs, add `page.on('request', ...)` /
+  `page.on('response', ...)` to your test.
+- `test-results/<spec>-<test>/` contains screenshots + videos for failed runs.
+- For backend failures, check the API log at `/tmp/api.log` (if running via `make dev`).

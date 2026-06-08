@@ -1,13 +1,12 @@
 /**
  * Network-level mocks for all /api/v1/* routes.
  *
- * Usage in a test (or beforeEach):
+ * Two modes:
+ *   - mockAll(page)  — install all routes against FIXTURE_* data
+ *   - per-route overrides via individual helpers or page.route() in tests
  *
- *   import { mockAll } from '../helpers/api-mocks'
- *   test.beforeEach(async ({ page }) => { await mockAll(page) })
- *
- * Individual mocks can be called separately to override specific endpoints
- * while keeping the rest handled by mockAll.
+ * State (collections, games created via POST) is held in module-local arrays
+ * so a single test can assert CRUD round-trips without re-mounting the app.
  */
 import type { Page } from '@playwright/test'
 
@@ -32,6 +31,15 @@ export const FIXTURE_GAMES = [
     language_dependence: 3, recommended_players: [4],
     rules_url: null, vibes: [], player_aids: [],
   },
+  {
+    id: 3, bgg_id: 167791, name: 'Terraforming Mars',
+    description: 'Card-driven engine builder', year_published: 2016,
+    image: '', thumbnail: '', min_players: 1, max_players: 5,
+    play_time: 120, categories: ['Science Fiction'], mechanics: ['Card Drafting'],
+    types: ['Board Game'], weight: 3.27, rating: 8.3,
+    language_dependence: 2, recommended_players: [2, 3],
+    rules_url: null, vibes: [], player_aids: [],
+  },
 ]
 
 export const FIXTURE_COLLECTIONS = [
@@ -41,8 +49,27 @@ export const FIXTURE_COLLECTIONS = [
 
 export const FIXTURE_PROFILE = {
   id: 'user-1',
+  username: 'testuser',
   bgg_username: 'testuser',
   is_admin: false,
+}
+
+// Mutable state for the duration of a test. Tests can call resetState() to
+// restore the defaults.
+const state = {
+  games: [...FIXTURE_GAMES],
+  collections: [...FIXTURE_COLLECTIONS],
+  profile: { ...FIXTURE_PROFILE },
+  nextGameId: FIXTURE_GAMES.length + 1,
+  nextCollectionId: FIXTURE_COLLECTIONS.length + 1,
+}
+
+export function resetState(): void {
+  state.games = [...FIXTURE_GAMES]
+  state.collections = [...FIXTURE_COLLECTIONS]
+  state.profile = { ...FIXTURE_PROFILE }
+  state.nextGameId = FIXTURE_GAMES.length + 1
+  state.nextCollectionId = FIXTURE_COLLECTIONS.length + 1
 }
 
 // ── Individual mock helpers ────────────────────────────────────────────────────
@@ -103,53 +130,188 @@ export async function mockPing(page: Page): Promise<void> {
 /** Mock GET /api/v1/games */
 export async function mockListGames(page: Page): Promise<void> {
   await page.route('**/api/v1/games*', (route) => {
+    const url = route.request().url()
     if (route.request().method() !== 'GET') return route.continue()
+    // List endpoint has no path segment after /games (or has ?query)
+    // e.g. /api/v1/games or /api/v1/games?limit=20
+    // Exclude detail URLs like /api/v1/games/1
+    if (/\/api\/v1\/games\/\d+/.test(url)) return route.fallback()
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        data: FIXTURE_GAMES,
-        meta: { page: 1, limit: 20, total: FIXTURE_GAMES.length },
+        data: state.games,
+        meta: { page: 1, limit: 20, total: state.games.length },
       }),
     })
   })
 }
 
-/** Mock GET /api/v1/games/:id */
+/** Mock GET /api/v1/games/:id (also handles PUT collections + DELETE) */
 export async function mockGetGame(page: Page): Promise<void> {
+  // Use a wide-net pattern (matches anything with /games/) and self-filter.
+  // This is more reliable than relying on Playwright glob edge cases.
+  await page.route('**/api/v1/games/**', (route) => {
+    const url = route.request().url()
+    // Only handle paths that have an ID after /games/
+    if (!/\/api\/v1\/games\/\d+/.test(url)) return route.fallback()
+    const match = url.match(/\/api\/v1\/games\/(\d+)/)
+    if (!match) return route.fallback()
+    const id = Number(match[1])
+    const game = state.games.find(g => g.id === id)
+    if (!game) {
+      return route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'NOT_FOUND', message: 'not found' } }),
+      })
+    }
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { ...game, player_aids: [], vibeCollectionIds: [] } }),
+      })
+    }
+    return route.fallback()
+  })
+}
+
+/** Mock DELETE /api/v1/games/:id */
+export async function mockDeleteGame(page: Page): Promise<void> {
   await page.route(/\/api\/v1\/games\/\d+$/, (route) => {
-    if (route.request().method() !== 'GET') return route.continue()
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ data: { ...FIXTURE_GAMES[0], player_aids: [] } }),
-    })
+    if (route.request().method() !== 'DELETE') return route.fallback()
+    const url = route.request().url()
+    const id = Number(url.match(/\/api\/v1\/games\/(\d+)/)![1])
+    const idx = state.games.findIndex(g => g.id === id)
+    if (idx >= 0) state.games.splice(idx, 1)
+    return route.fulfill({ status: 204 })
   })
 }
 
-/** Mock GET /api/v1/collections */
-export async function mockListCollections(page: Page): Promise<void> {
+/** Mock full /api/v1/collections CRUD */
+export async function mockCollections(page: Page): Promise<void> {
   await page.route('**/api/v1/collections*', (route) => {
-    if (route.request().method() !== 'GET') return route.continue()
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        data: FIXTURE_COLLECTIONS,
-        meta: { page: 1, limit: 20, total: FIXTURE_COLLECTIONS.length },
-      }),
-    })
+    const method = route.request().method()
+    if (method === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: state.collections,
+          meta: { page: 1, limit: state.collections.length, total: state.collections.length },
+        }),
+      })
+    }
+    if (method === 'POST') {
+      const body = JSON.parse(route.request().postData() ?? '{}')
+      const created = {
+        id: state.nextCollectionId++,
+        user_id: 'user-1',
+        name: body.name ?? '',
+        description: body.description ?? '',
+        game_count: 0,
+      }
+      state.collections.push(created)
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: created }),
+      })
+    }
+    const m = route.request().url().match(/\/api\/v1\/collections\/(\d+)/)
+    if (m) {
+      const id = Number(m[1])
+      const idx = state.collections.findIndex(c => c.id === id)
+      if (idx < 0) {
+        return route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'NOT_FOUND', message: 'not found' } }),
+        })
+      }
+      if (method === 'PUT') {
+        const body = JSON.parse(route.request().postData() ?? '{}')
+        state.collections[idx] = { ...state.collections[idx], ...body }
+        return route.fulfill({ status: 204 })
+      }
+      if (method === 'DELETE') {
+        state.collections.splice(idx, 1)
+        return route.fulfill({ status: 204 })
+      }
+    }
+    return route.continue()
   })
 }
 
-/** Mock GET /api/v1/profile */
-export async function mockGetProfile(page: Page): Promise<void> {
+/** Mock GET /api/v1/profile + PUT /api/v1/profile/bgg-username */
+export async function mockProfile(page: Page): Promise<void> {
   await page.route('**/api/v1/profile', (route) => {
     if (route.request().method() !== 'GET') return route.continue()
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ data: FIXTURE_PROFILE }),
+      body: JSON.stringify({ data: state.profile }),
+    })
+  })
+  await page.route('**/api/v1/profile/bgg-username', (route) => {
+    if (route.request().method() !== 'PUT') return route.continue()
+    const body = JSON.parse(route.request().postData() ?? '{}')
+    state.profile = { ...state.profile, bgg_username: body.bgg_username ?? '' }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: state.profile }),
+    })
+  })
+}
+
+/** Mock POST /api/v1/import/sync (BGG sync) */
+export async function mockBGGSync(
+  page: Page,
+  opts: { status?: number; body?: object; error?: string } = {},
+): Promise<void> {
+  const status = opts.status ?? 200
+  await page.route('**/api/v1/import/sync', (route) => {
+    if (status === 200) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: opts.body ?? { imported: 3, skipped: 0, failed: 0 } }),
+      })
+    }
+    return route.fulfill({
+      status,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: opts.error ?? 'sync failed' } }),
+    })
+  })
+}
+
+/** Mock POST /api/v1/import/csv/preview + POST /api/v1/import/csv */
+export async function mockCSVImport(page: Page): Promise<void> {
+  await page.route('**/api/v1/import/csv/preview', (route) => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: {
+          rows: [
+            { bgg_id: 174430, name: 'Gloomhaven', already_owned: false },
+            { bgg_id: 13, name: 'Catan', already_owned: false },
+          ],
+          total_rows: 2,
+          preview_limit: 100,
+        },
+        meta: { page: 1, limit: 2, total: 2 },
+      }),
+    })
+  })
+  await page.route('**/api/v1/import/csv', (route) => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { imported: 2, failed: 0 } }),
     })
   })
 }
@@ -157,22 +319,19 @@ export async function mockGetProfile(page: Page): Promise<void> {
 // ── Catch-all ──────────────────────────────────────────────────────────────────
 
 /**
- * Install all API mocks. Call this in `test.beforeEach` for a fully offline
- * test run. Individual mocks override the catch-all for their specific route.
+ * Install all API mocks. Call in `test.beforeEach` for a fully offline run.
+ * Individual mocks override the catch-all for their specific route.
+ *
+ * State is NOT reset between tests — call `resetState()` in beforeEach if
+ * your test mutates collections/games.
  */
 export async function mockAll(page: Page): Promise<void> {
-  await mockAuthLogin(page)
-  await mockAuthLogout(page)
-  await mockAuthRefresh(page)
-  await mockPing(page)
-  await mockListGames(page)
-  await mockGetGame(page)
-  await mockListCollections(page)
-  await mockGetProfile(page)
+  process.stderr.write('[api-mocks] mockAll called\n')
 
-  // Registered last = runs first (Playwright LIFO).
-  // Handles CORS preflight for cross-origin API calls (port 9999 bypass);
-  // non-OPTIONS fall through to the specific mock above.
+  // Playwright LIFO: last-registered runs first. Register the broad
+  // OPTIONS preflight handler FIRST so it runs LAST. Then register
+  // specific routes AFTER so they run FIRST and shadow the preflight
+  // for matching URLs (only OPTIONS preflight falls through).
   await page.route('**/api/v1/**', (route) => {
     if (route.request().method() === 'OPTIONS') {
       return route.fulfill({
@@ -185,6 +344,25 @@ export async function mockAll(page: Page): Promise<void> {
         },
       })
     }
+    // Unmocked GET/POST/PUT/DELETE on /api/v1/* — fall through to the
+    // network so the browser surfaces a real connection error.
     return route.fallback()
   })
+
+  // Specific routes — registered AFTER the catch-all, so they run FIRST in LIFO.
+  await mockAuthLogin(page)
+  await mockAuthLogout(page)
+  await mockAuthRefresh(page)
+  await mockPing(page)
+  await mockProfile(page)
+  // mockListGames uses a glob `**/api/v1/games*` that ALSO matches
+  // `/api/v1/games/:id`. It self-filters and continues for those.
+  await mockListGames(page)
+  // mockGetGame has a tighter pattern for detail URLs — register it AFTER
+  // mockListGames so its glob wins in LIFO.
+  await mockGetGame(page)
+  await mockDeleteGame(page)
+  await mockCollections(page)
+  await mockBGGSync(page)
+  await mockCSVImport(page)
 }
