@@ -1,9 +1,13 @@
 # pipeline.yml — Single workflow for all CI and deployment.
 #
-# On pull_request: branch-check + build/test (no deploy)
+# On pull_request: detect changes → branch-check + selective build/test (no deploy)
 # On push to dev:  build/test → deploy API to Cloud Run (dev)
 # On push to main: build/test → deploy API to Cloud Run (prod) + web to Cloudflare Pages
 # On workflow_dispatch: same as push on the selected branch
+#
+# Path filtering: on PRs, only changed paths trigger their CI job.
+# Push/dispatch always runs all jobs for deploy gating.
+# Infra lint lives in infra.yml (already path-filtered to infra/**).
 #
 # Required secrets: see docs/runbook/ci-cd/_index.md
 # ref: ci-cd.PIPELINE.1
@@ -26,12 +30,35 @@ concurrency:
 
 jobs:
 
+  # ── Change detection ──────────────────────────────────────────────────────
+  # On PRs: build jobs skip when their paths are unchanged (saves minutes).
+  # On push/dispatch: all jobs run unconditionally (needed for deploy gating).
+  # ref: ci-cd.PIPELINE.2
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    outputs:
+      go:  ${{ steps.filter.outputs.go }}
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            go:
+              - '**/*.go'
+              - '**/go.sum'
+              - 'go.work'
+            web:
+              - 'web/**'
+
   # ── Branch gate (PR only) ─────────────────────────────────────────────────
   # Enforces: feature/* → dev only, dev → main only.
   # ref: ci-cd.BRANCH_GATE.1
   branch-check:
     name: Branch Rules
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: github.event_name == 'pull_request'
     steps:
       - name: Enforce merge path
@@ -58,12 +85,15 @@ jobs:
           fi
 
   # ── Build & test ──────────────────────────────────────────────────────────
-  # All three run in parallel. Deploy jobs are gated on these completing.
+  # Go and Web run in parallel, each gated on path-change detection for PRs.
 
   # ref: ci-cd.BUILD.1
   go:
     name: Go
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: changes
+    if: needs.changes.outputs.go == 'true' || github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - name: Cache Go modules
@@ -82,10 +112,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.work
-      - name: Build
-        run: |
-          go build ./pkg/shared/...
-          go build ./services/api/...
       - name: Fmt
         run: |
           if [ -n "$(gofmt -l . | tee /dev/stderr)" ]; then
@@ -95,16 +121,19 @@ jobs:
       - name: Cache golangci-lint
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cache/golangci-lint
+          path: ~/.cache/golangci-lint
           key: ${{ runner.os }}-golangci-${{ hashFiles('**/*.go','**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-golangci-
-      - name: Run golangci-lint
+      - name: Lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.59.0
           args: run ./... --timeout 5m
+      - name: Build
+        run: |
+          go build ./pkg/shared/...
+          go build ./services/api/...
       - name: Test
         run: |
           go test -race ./pkg/shared/... -coverprofile=coverage-shared.out -covermode=atomic
@@ -122,9 +151,6 @@ jobs:
             echo "::error::Coverage ${pct}% is below 50% threshold"
             exit 1
           fi
-          go tool cover -func=coverage-shared.out >> "$GITHUB_STEP_SUMMARY"
-          go tool cover -func=coverage-api.out >> "$GITHUB_STEP_SUMMARY"
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4
@@ -134,20 +160,19 @@ jobs:
             coverage-shared.out
             coverage-api.out
           retention-days: 7
-      - name: Vet
-        run: |
-          go vet ./pkg/shared/...
-          go vet ./services/api/...
 
   # ref: ci-cd.BUILD.2
   web:
     name: Web
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
       - name: Cache Bun dependencies
         uses: actions/cache@v4
         with:
@@ -169,23 +194,6 @@ jobs:
         env:
           VITE_API_BASE_URL: ""
 
-  # ref: ci-cd.BUILD.3
-  infra-lint:
-    name: Infra Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.14.8
-      - name: Terraform fmt
-        run: terraform fmt -check -recursive infra/
-      - uses: terraform-linters/setup-tflint@v4
-        with:
-          tflint_version: v0.52.0
-      - name: TFLint
-        run: tflint --chdir=infra --recursive
-
   # ── Deploy (push/dispatch only, gated on build success) ───────────────────
 
   # ref: ci-cd.DEPLOY_API.8
@@ -194,7 +202,7 @@ jobs:
   # depends on it so the approval fires before any migration or deploy step runs.
   approve-prod:
     name: Approve → prod
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [go, web]
     if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     environment: production
@@ -205,6 +213,7 @@ jobs:
   deploy-api-prod:
     name: Deploy API → prod
     needs: [go, approve-prod]
+    timeout-minutes: 20
     if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
@@ -228,6 +237,7 @@ jobs:
   deploy-api-dev:
     name: Deploy API → dev
     needs: go
+    timeout-minutes: 20
     if: github.ref_name == 'dev' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/deploy-cloud-run.yml
     with:
@@ -248,16 +258,29 @@ jobs:
       SEED_ADMIN_USERNAME: ${{ secrets.DEV_API_SEED_ADMIN_USERNAME }}
 
   # ref: ci-cd.DEPLOY_WEB.1
+  # deploy-web rebuilds with the real VITE_API_BASE_URL (a repository variable) rather
+  # than the empty string used in the web CI job. Vite bakes env vars into the bundle
+  # at build time, so the two builds cannot share an artifact.
   deploy-web:
     name: Deploy Web → prod
     needs: web
+    timeout-minutes: 15
     if: github.ref_name == 'main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun
+            web/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('web/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
       - name: Install deps
         run: bun install --frozen-lockfile
         working-directory: web
@@ -276,7 +299,7 @@ jobs:
   # ref: ci-cd.DEPLOY_API.8 — notify merged PR with link to prod approval gate
   notify-prod-approval:
     name: Notify → prod approval
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [go, web]
     if: github.ref_name == 'main' && github.event_name == 'push'
     permissions:
