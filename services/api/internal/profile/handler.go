@@ -58,5 +58,10 @@ func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	profile, err := h.svc.GetProfile(r.Context(), userID)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, envelope.New(profile))
 }

@@ -24,9 +24,9 @@ func NewStore(db *pgxpool.Pool) *Store {
 func (s *Store) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var p Profile
 	err := s.db.QueryRow(ctx,
-		`SELECT id, bgg_username, is_admin, created_at, updated_at
+		`SELECT id, COALESCE(username, ''), bgg_username, is_admin, created_at, updated_at
 		 FROM profile.users WHERE id = $1`, userID).
-		Scan(&p.ID, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.UpdatedAt)
+		Scan(&p.ID, &p.Username, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.ErrNotFound
@@ -42,9 +42,9 @@ func (s *Store) UpsertProfile(ctx context.Context, userID string) (*Profile, err
 		`INSERT INTO profile.users (id)
 		 VALUES ($1)
 		 ON CONFLICT (id) DO UPDATE SET updated_at = now()
-		 RETURNING id, bgg_username, is_admin, created_at, updated_at`,
+		 RETURNING id, COALESCE(username, ''), bgg_username, is_admin, created_at, updated_at`,
 		userID).
-		Scan(&p.ID, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.UpdatedAt)
+		Scan(&p.ID, &p.Username, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.UpdatedAt)
 	return &p, err
 }
 

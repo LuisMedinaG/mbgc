@@ -151,6 +151,9 @@ func TestSetBGGUsername_Success(t *testing.T) {
 		upsertProfileFn: func(ctx context.Context, userID string) (*Profile, error) {
 			return &Profile{ID: userID}, nil
 		},
+		getProfileFn: func(ctx context.Context, userID string) (*Profile, error) {
+			return &Profile{ID: userID, Username: "admin", BGGUsername: strPtr("myhandle")}, nil
+		},
 		setBGGUsernameFn: func(ctx context.Context, userID, bggUsername string) error {
 			return nil
 		},
@@ -160,8 +163,8 @@ func TestSetBGGUsername_Success(t *testing.T) {
 	r := newAuthenticatedRequest("PUT", "/api/v1/profile/bgg-username", `{"bgg_username":"myhandle"}`)
 	h.SetBGGUsername(w, r)
 
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }
 
