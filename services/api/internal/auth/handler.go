@@ -21,12 +21,18 @@ type supabaseAuthClient struct {
 	client *http.Client
 }
 
+// userStore resolves a login username to an email. Handler depends on the
+// interface (not *Store) so handler tests can run without a database.
+type userStore interface {
+	EmailByUsername(ctx context.Context, username string) (string, error)
+}
+
 type Handler struct {
-	store    *Store
+	store    userStore
 	supabase *supabaseAuthClient
 }
 
-func NewHandler(store *Store, supabaseURL, apiKey string, client *http.Client) *Handler {
+func NewHandler(store userStore, supabaseURL, apiKey string, client *http.Client) *Handler {
 	return &Handler{
 		store: store,
 		supabase: &supabaseAuthClient{
@@ -64,43 +70,6 @@ func (s *supabaseAuthClient) doRequest(ctx context.Context, method, path string,
 	return resp.StatusCode, respBody, nil
 }
 
-// lookupUserByUsername searches for a user by username in user_metadata.
-// Returns the user's email if found, or an error if not found or lookup fails.
-func (s *supabaseAuthClient) lookupUserByUsername(ctx context.Context, username string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet,
-		s.url+"/auth/v1/admin/users?per_page=1000", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("apikey", s.apiKey)
-	req.Header.Set("Authorization", "Bearer "+s.apiKey)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Users []struct {
-			Email    string `json:"email"`
-			Metadata struct {
-				Username string `json:"username"`
-			} `json:"user_metadata"`
-		} `json:"users"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode users: %w", err)
-	}
-
-	for _, u := range result.Users {
-		if u.Metadata.Username == username {
-			return u.Email, nil
-		}
-	}
-	return "", fmt.Errorf("username not found")
-}
-
 // ref: api-layer.SEC.5 — rateLimit middleware applied to login/refresh/logout (not auth'd)
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth, rateLimit func(http.Handler) http.Handler) {
 	mux.Handle("POST /api/v1/auth/login", rateLimit(http.HandlerFunc(h.login)))
@@ -127,12 +96,13 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Accept either email or username. If username (no @), look up email via Admin API.
+	// Accept either email or username. If a username (no @), resolve it to an
+	// email via an indexed DB lookup. A miss returns the same error as a wrong
+	// password so we never reveal whether a username exists.
 	authEmail := req.Username
 	if !strings.Contains(req.Username, "@") {
-		email, err := h.supabase.lookupUserByUsername(r.Context(), req.Username)
+		email, err := h.store.EmailByUsername(r.Context(), req.Username)
 		if err != nil {
-			// Don't leak whether username exists
 			httpx.WriteError(w, apierr.ErrWrongPassword)
 			return
 		}
