@@ -12,11 +12,13 @@ import (
 	"time"
 )
 
+// ref: monitoring.FAIL_OPEN.1 — errWriter simulates a broken sink for fail-open tests
 // errWriter is an io.Writer that always returns an error.
 type errWriter struct{ err error }
 
 func (w *errWriter) Write(p []byte) (int, error) { return 0, w.err }
 
+// ref: monitoring.OBSERVABILITY.1 — parse a single meta_warning JSON record
 func decodeFirstLine(t *testing.T, buf *bytes.Buffer) map[string]any {
 	t.Helper()
 	raw := strings.TrimRight(buf.String(), "\n")
@@ -131,6 +133,7 @@ func TestHeartbeat_EmitsOnTick(t *testing.T) {
 	}
 }
 
+// ref: monitoring.OBSERVABILITY.2 — syncBuf collects concurrent heartbeat writes
 // syncBuf is a thread-safe bytes.Buffer for slog handler output.
 type syncBuf struct {
 	mu  sync.Mutex

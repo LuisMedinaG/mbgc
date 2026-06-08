@@ -35,6 +35,12 @@ components:
       2: Admin users have elevated BGG sync rate limits
       3: Only admins can trigger full-refresh BGG syncs
 
+  ADMIN_SEED:
+    name: Admin profile seeding
+    description: Bootstrap the admin user profile at first API boot
+    requirements:
+      1: ensureAdminProfile upserts the admin profile row, creating it on first boot and updating is_admin=true on subsequent boots; an empty username is a no-op that preserves any existing value
+
 constraints:
   SEC:
     name: Security constraints

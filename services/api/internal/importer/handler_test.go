@@ -376,6 +376,7 @@ func TestTruncateToDay(t *testing.T) {
 	}
 }
 
+// ref: monitoring.SINK.5 — capture slog JSON output for sink assertions
 // captureSlog swaps slog.Default to a JSON handler writing to a buffer for
 // the duration of the test, then restores the previous default.
 func captureSlog(t *testing.T) *bytes.Buffer {
@@ -387,6 +388,7 @@ func captureSlog(t *testing.T) *bytes.Buffer {
 	return buf
 }
 
+// ref: monitoring.SINK.6 — decode newline-delimited JSON log records
 // decodeLines parses every JSON line in buf.
 func decodeLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
 	t.Helper()
@@ -404,6 +406,7 @@ func decodeLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
 	return out
 }
 
+// ref: monitoring.SINK.7 — find first log record for a given event
 func findEvent(records []map[string]any, event string) map[string]any {
 	for _, r := range records {
 		if r["event"] == event {

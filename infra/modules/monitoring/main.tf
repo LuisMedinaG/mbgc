@@ -224,7 +224,7 @@ resource "google_monitoring_alert_policy" "rate_limit_flood" {
         | align rate(5m)
         | every 5m
         | group_by [], sliding(5m)
-        | condition_val > 100
+        | condition_val > 500
       EOT
       duration = "300s"
     }

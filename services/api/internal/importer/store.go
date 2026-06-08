@@ -17,10 +17,12 @@ type Store struct {
 	canSyncRow func(ctx context.Context, userID string) (count int, resetDate time.Time, err error)
 }
 
+// ref: importer.RATE.4 — initialize store with default rate-limit loader
 func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db, canSyncRow: defaultCanSyncRow(db)}
 }
 
+// ref: importer.RATE.5 — load rate-limit count/reset_date row for a user
 // defaultCanSyncRow runs the real query against the rate_limits table.
 func defaultCanSyncRow(db *pgxpool.Pool) func(ctx context.Context, userID string) (int, time.Time, error) {
 	return func(ctx context.Context, userID string) (int, time.Time, error) {
