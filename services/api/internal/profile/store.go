@@ -60,3 +60,19 @@ func (s *Store) SetBGGUsername(ctx context.Context, userID, bggUsername string) 
 	}
 	return nil
 }
+
+// GetBGGUsername returns the configured BGG handle for the user, or "" if unset.
+func (s *Store) GetBGGUsername(ctx context.Context, userID string) (string, error) {
+	var username *string
+	err := s.db.QueryRow(ctx, `SELECT bgg_username FROM profile.users WHERE id = $1`, userID).Scan(&username)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", err
+	}
+	if username == nil {
+		return "", nil
+	}
+	return *username, nil
+}

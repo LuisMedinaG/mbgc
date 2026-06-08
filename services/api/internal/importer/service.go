@@ -33,14 +33,19 @@ type gameService interface {
 	UpsertBGGGame(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
 }
 
+type profileService interface {
+	GetBGGUsername(ctx context.Context, userID string) (string, error)
+}
+
 type Service struct {
 	store   importerStore
 	bgg     bggClient
 	gameSvc gameService
+	profSvc profileService
 }
 
-func NewService(st importerStore, bggClient bggClient, gameSvc gameService) *Service {
-	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc}
+func NewService(st importerStore, bggClient bggClient, gameSvc gameService, profSvc profileService) *Service {
+	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc, profSvc: profSvc}
 }
 
 // syncKind is the value of the sync_kind attribute on a sync_* event.
@@ -52,7 +57,7 @@ const (
 
 // ref: importer.BGG_SYNC.2 — sync is disabled when BGG credentials are not configured
 // ref: monitoring.SINK.5 — emits sync_start, sync_ok, or sync_error across the lifetime of a sync
-func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
+func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
 	ctx := r.Context()
 	kind := syncKindIncremental
 	if fullRefresh {
@@ -77,11 +82,25 @@ func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool
 	// ref: monitoring.SINK.5 — sync_start fires once the early-rejection checks have passed
 	httpx.Record(r, "sync_start", slog.LevelInfo, "sync_kind", kind)
 
+	// Fetch the user's BGG username from their profile (set via PUT /profile/bgg-username).
+	// The JWT subject / username is the local account, not the BGG handle.
+	bggUsername, err := s.profSvc.GetBGGUsername(ctx, userID)
+	if err != nil {
+		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
+		return nil, fmt.Errorf("fetching BGG username: %w", err)
+	}
+
 	result := &SyncResult{}
 
 	if bggUsername == "" {
-		// ref: monitoring.SINK.5 — sync_error when user has no BGG username configured
-		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
+		// ref: monitoring.SINK.5 — sync_ok with 0 imported when user has no BGG username configured
+		httpx.Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", 0)
+		if err := s.store.RecordSync(ctx, userID); err != nil {
+			return nil, err
+		}
+		if err := s.store.LogSync(ctx, userID, 0, fullRefresh); err != nil {
+			return nil, err
+		}
 		return result, nil
 	}
 

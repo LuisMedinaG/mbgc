@@ -73,6 +73,17 @@ func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g ga
 	return 0, true, nil
 }
 
+type mockProfileService struct {
+	getBGGUsernameFn func(ctx context.Context, userID string) (string, error)
+}
+
+func (m *mockProfileService) GetBGGUsername(ctx context.Context, userID string) (string, error) {
+	if m.getBGGUsernameFn != nil {
+		return m.getBGGUsernameFn(ctx, userID)
+	}
+	return "mytestuser", nil
+}
+
 func okStore() *mockImporterStore {
 	return &mockImporterStore{
 		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
@@ -89,7 +100,7 @@ func authReq(method, path, body string, isAdmin bool) *http.Request {
 }
 
 func mkHandler(store importerStore, bgg bggClient, gs gameService) *Handler {
-	return NewHandler(NewService(store, bgg, gs), 3, 20)
+	return NewHandler(NewService(store, bgg, gs, &mockProfileService{}), 3, 20)
 }
 
 func TestSync_Unauthenticated(t *testing.T) {

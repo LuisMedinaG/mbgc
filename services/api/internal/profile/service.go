@@ -7,6 +7,7 @@ type profileStore interface {
 	GetProfile(ctx context.Context, userID string) (*Profile, error)
 	UpsertProfile(ctx context.Context, userID string) (*Profile, error)
 	SetBGGUsername(ctx context.Context, userID, bggUsername string) error
+	GetBGGUsername(ctx context.Context, userID string) (string, error)
 }
 
 type Service struct {
@@ -32,4 +33,9 @@ func (s *Service) SetBGGUsername(ctx context.Context, userID, bggUsername string
 		return err
 	}
 	return s.store.SetBGGUsername(ctx, userID, bggUsername)
+}
+
+// GetBGGUsername returns the configured BGG handle, or "" if unset.
+func (s *Service) GetBGGUsername(ctx context.Context, userID string) (string, error) {
+	return s.store.GetBGGUsername(ctx, userID)
 }
