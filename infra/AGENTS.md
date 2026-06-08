@@ -87,7 +87,7 @@ Post-apply (re-run after `terraform apply`):
 - `GCP_PROJECT_ID` — GCP project ID
 - `GCP_RUNTIME_SA_API` — runtime service account for `mbgc-api`
 
-IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.serviceAccountAdmin`, `iam.workloadIdentityPoolAdmin`, `artifactregistry.admin`, `resourcemanager.projectIamAdmin`, `serviceusage.serviceUsageAdmin`
+IAM roles on the Terraform SA: `run.admin`, `iam.serviceAccountUser`, `iam.serviceAccountAdmin`, `iam.workloadIdentityPoolAdmin`, `artifactregistry.admin`, `resourcemanager.projectIamAdmin`, `serviceusage.serviceUsageAdmin`, `logging.configWriter`, `monitoring.admin`
 
 ## CI
 
