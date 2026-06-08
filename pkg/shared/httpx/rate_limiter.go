@@ -1,6 +1,7 @@
 package httpx
 
 import (
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -52,6 +53,8 @@ func RateLimiter(ratePerSec float64, burst int) func(http.Handler) http.Handler 
 			mu.Unlock()
 
 			if !v.limiter.Allow() {
+				// ref: monitoring.SINK.3
+				Record(r, "rate_limit", slog.LevelWarn)
 				WriteError(w, apierr.ErrRateLimit)
 				return
 			}

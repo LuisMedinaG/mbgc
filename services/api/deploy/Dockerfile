@@ -10,7 +10,7 @@ COPY go.work go.work.sum ./
 WORKDIR /app/services/api
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /server ./cmd/server
 
-FROM gcr.io/distroless/static-debian12
+FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /server /server
 EXPOSE 8080
 ENTRYPOINT ["/server"]

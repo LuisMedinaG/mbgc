@@ -13,6 +13,15 @@ import (
 // stored XSS via javascript: URIs in <a href={rules_url}> renders.
 var rulesURLRe = regexp.MustCompile(`^https://(drive|docs)\.google\.com/`)
 
+// validateRulesURL returns ErrValidation wrapped with a message if url is non-empty
+// and not in the Drive/Docs https allowlist. Empty is allowed (clears the field).
+func validateRulesURL(url string) error {
+	if url != "" && !rulesURLRe.MatchString(url) {
+		return fmt.Errorf("%w: rules_url must be a Google Drive or Docs https URL", apierr.ErrValidation)
+	}
+	return nil
+}
+
 type Store struct {
 	db      *pgxpool.Pool
 	dataDir string
@@ -96,8 +105,8 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 // ref: auth.MULTI_TENANCY.3 — verifies user_id before updating rules URL
 // ref: game-detail.RULES_URL.1 — reject non-allowlist URLs (XSS hardening)
 func (s *Store) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error {
-	if rulesURL != "" && !rulesURLRe.MatchString(rulesURL) {
-		return fmt.Errorf("%w: rules_url must be a Google Drive or Docs https URL", apierr.ErrValidation)
+	if err := validateRulesURL(rulesURL); err != nil {
+		return err
 	}
 	tag, err := s.db.Exec(ctx,
 		`UPDATE games.games SET rules_url = $1, updated_at = now()

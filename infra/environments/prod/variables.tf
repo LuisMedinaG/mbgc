@@ -49,3 +49,8 @@ variable "domain" {
   type        = string
   default     = "lumedina.dev"
 }
+
+variable "alert_email" {
+  description = "Email address that receives monitoring alerts. Set via terraform.tfvars (gitignored) or TF_VAR_alert_email in CI."
+  type        = string
+}

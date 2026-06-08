@@ -145,6 +145,7 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// ref: api-layer.CONFIG.7 — cap user-supplied strings at 255 chars before persistence
 	var body struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -153,6 +154,8 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
+	body.Name = httpx.Truncate(body.Name, 255)
+	body.Description = httpx.Truncate(body.Description, 255)
 	col, err := h.svc.CreateCollection(r.Context(), userID, body.Name, body.Description)
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -171,6 +174,7 @@ func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
+	// ref: api-layer.CONFIG.7 — cap user-supplied strings at 255 chars before persistence
 	var body struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
@@ -179,6 +183,8 @@ func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
+	body.Name = httpx.Truncate(body.Name, 255)
+	body.Description = httpx.Truncate(body.Description, 255)
 	if err := h.svc.UpdateCollection(r.Context(), id, userID, body.Name, body.Description); err != nil {
 		httpx.WriteError(w, err)
 		return

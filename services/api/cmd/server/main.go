@@ -24,6 +24,7 @@ import (
 	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/observe"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
 	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
@@ -69,7 +70,26 @@ func runMigrations(databaseURL string) error {
 }
 
 func main() {
+	// ref: monitoring.OBSERVABILITY.1, monitoring.FAIL_OPEN.1 — install the
+	// fail-open JSON handler before any slog call. Must be the first line of
+	// main so config-load failures are also captured as structured events.
+	slog.SetDefault(slog.New(observe.NewHandler()))
+
+	// ref: monitoring.OBSERVABILITY.3 — kill switch. When set, Record becomes
+	// a no-op and log ingestion from this service drops to zero. Flip on the
+	// next deploy with: gcloud run services update mbgc-api --update-env-vars MONITORING_DISABLED=true
+	if os.Getenv("MONITORING_DISABLED") == "true" {
+		httpx.Disabled.Store(true)
+		slog.Info("monitoring disabled via MONITORING_DISABLED env var")
+	}
+
 	cfg := config.Load()
+
+	// ref: monitoring.OBSERVABILITY.2 — heartbeat goroutine. Cancelled on
+	// shutdown so it stops cleanly with the rest of the service.
+	hbCtx, hbCancel := context.WithCancel(context.Background())
+	defer hbCancel()
+	go observe.Heartbeat(hbCtx, 5*time.Minute)
 
 	if os.Getenv("SKIP_MIGRATIONS") != "true" {
 		if err := runMigrations(cfg.DatabaseURL); err != nil {
