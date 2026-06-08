@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -372,5 +373,225 @@ func TestTruncateToDay(t *testing.T) {
 	}
 	if out.Year() != 2025 || out.Month() != 6 || out.Day() != 4 {
 		t.Fatalf("expected same date, got %v", out)
+	}
+}
+
+// captureSlog swaps slog.Default to a JSON handler writing to a buffer for
+// the duration of the test, then restores the previous default.
+func captureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return buf
+}
+
+// decodeLines parses every JSON line in buf.
+func decodeLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("failed to parse log line %q: %v", line, err)
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func findEvent(records []map[string]any, event string) map[string]any {
+	for _, r := range records {
+		if r["event"] == event {
+			return r
+		}
+	}
+	return nil
+}
+
+// ref: monitoring.SINK.5 — successful sync emits sync_start and sync_ok with sync_kind
+func TestSync_EmitsSyncStartAndSyncOk(t *testing.T) {
+	buf := captureSlog(t)
+	h := mkHandler(okStore(), &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	recs := decodeLines(t, buf)
+	start := findEvent(recs, "sync_start")
+	if start == nil {
+		t.Fatalf("expected sync_start event, got %d records: %s", len(recs), buf.String())
+	}
+	if start["level"] != "INFO" {
+		t.Errorf("expected sync_start level=INFO, got %v", start["level"])
+	}
+	if start["sync_kind"] != "incremental" {
+		t.Errorf("expected sync_kind=incremental, got %v", start["sync_kind"])
+	}
+
+	ok := findEvent(recs, "sync_ok")
+	if ok == nil {
+		t.Fatalf("expected sync_ok event, got: %s", buf.String())
+	}
+	if ok["level"] != "INFO" {
+		t.Errorf("expected sync_ok level=INFO, got %v", ok["level"])
+	}
+	if ok["sync_kind"] != "incremental" {
+		t.Errorf("expected sync_kind=incremental, got %v", ok["sync_kind"])
+	}
+	if ok["game_count"] != float64(0) {
+		t.Errorf("expected game_count=0, got %v", ok["game_count"])
+	}
+
+	if findEvent(recs, "sync_error") != nil {
+		t.Errorf("did not expect sync_error on success, got: %s", buf.String())
+	}
+}
+
+// ref: monitoring.SINK.5 — full_refresh sync_kind flows through to the event
+func TestSync_FullRefreshEmitsFullRefreshKind(t *testing.T) {
+	buf := captureSlog(t)
+	h := mkHandler(okStore(), &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync?full_refresh=true", "", true))
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	recs := decodeLines(t, buf)
+	start := findEvent(recs, "sync_start")
+	if start == nil || start["sync_kind"] != "full_refresh" {
+		t.Errorf("expected sync_start sync_kind=full_refresh, got %v", start)
+	}
+	ok := findEvent(recs, "sync_ok")
+	if ok == nil || ok["sync_kind"] != "full_refresh" {
+		t.Errorf("expected sync_ok sync_kind=full_refresh, got %v", ok)
+	}
+}
+
+// ref: monitoring.SINK.5 — BGG unconfigured emits sync_error at error level,
+// no sync_start fires (the rejection happens before sync begins).
+func TestSync_EmitsSyncErrorOnBGGUnconfigured(t *testing.T) {
+	buf := captureSlog(t)
+	h := mkHandler(okStore(), &mockBGGClient{available: false}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+
+	recs := decodeLines(t, buf)
+	errEv := findEvent(recs, "sync_error")
+	if errEv == nil {
+		t.Fatalf("expected sync_error event, got: %s", buf.String())
+	}
+	if errEv["level"] != "ERROR" {
+		t.Errorf("expected sync_error level=ERROR for config failure, got %v", errEv["level"])
+	}
+	if errEv["sync_kind"] != "incremental" {
+		t.Errorf("expected sync_kind=incremental, got %v", errEv["sync_kind"])
+	}
+	if findEvent(recs, "sync_start") != nil {
+		t.Errorf("did not expect sync_start before rejection, got: %s", buf.String())
+	}
+	if findEvent(recs, "sync_ok") != nil {
+		t.Errorf("did not expect sync_ok on error path, got: %s", buf.String())
+	}
+}
+
+// ref: monitoring.SINK.5 — rate-limit emits sync_error at warn level
+// (per-handoff: rate-limit is abuse signal, not a server fault).
+func TestSync_EmitsSyncErrorOnRateLimited(t *testing.T) {
+	buf := captureSlog(t)
+	store := &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+			return apierr.ErrRateLimit
+		},
+		recordSyncFn: func(ctx context.Context, userID string) error { return nil },
+		logSyncFn:    func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
+	}
+	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429, got %d", w.Code)
+	}
+
+	recs := decodeLines(t, buf)
+	errEv := findEvent(recs, "sync_error")
+	if errEv == nil {
+		t.Fatalf("expected sync_error event, got: %s", buf.String())
+	}
+	if errEv["level"] != "WARN" {
+		t.Errorf("expected sync_error level=WARN for rate-limit, got %v", errEv["level"])
+	}
+	if findEvent(recs, "sync_start") != nil {
+		t.Errorf("did not expect sync_start before rejection, got: %s", buf.String())
+	}
+}
+
+// ref: monitoring.SINK.5 — non-rate-limit store failure during CheckRateLimit
+// emits sync_error at error level (real server fault, not abuse).
+func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
+	buf := captureSlog(t)
+	store := &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+			return apierr.ErrInternal
+		},
+		recordSyncFn: func(ctx context.Context, userID string) error { return nil },
+		logSyncFn:    func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
+	}
+	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+
+	recs := decodeLines(t, buf)
+	errEv := findEvent(recs, "sync_error")
+	if errEv == nil {
+		t.Fatalf("expected sync_error event, got: %s", buf.String())
+	}
+	if errEv["level"] != "ERROR" {
+		t.Errorf("expected sync_error level=ERROR for server fault, got %v", errEv["level"])
+	}
+}
+
+// ref: monitoring.SINK.5 — store-layer failure after sync_start fires
+// sync_error at error level and suppresses sync_ok.
+func TestSync_EmitsSyncErrorOnStoreFailure(t *testing.T) {
+	buf := captureSlog(t)
+	store := &mockImporterStore{
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string) error { return apierr.ErrInternal },
+		logSyncFn:        func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
+	}
+	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
+	w := httptest.NewRecorder()
+	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	if w.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d", w.Code)
+	}
+
+	recs := decodeLines(t, buf)
+	if findEvent(recs, "sync_start") == nil {
+		t.Errorf("expected sync_start before store failure, got: %s", buf.String())
+	}
+	errEv := findEvent(recs, "sync_error")
+	if errEv == nil {
+		t.Fatalf("expected sync_error event, got: %s", buf.String())
+	}
+	if errEv["level"] != "ERROR" {
+		t.Errorf("expected sync_error level=ERROR for store failure, got %v", errEv["level"])
+	}
+	if findEvent(recs, "sync_ok") != nil {
+		t.Errorf("did not expect sync_ok on store failure, got: %s", buf.String())
 	}
 }

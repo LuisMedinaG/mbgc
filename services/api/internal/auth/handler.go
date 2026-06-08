@@ -21,12 +21,18 @@ type supabaseAuthClient struct {
 	client *http.Client
 }
 
+// userStore resolves a login username to an email. Handler depends on the
+// interface (not *Store) so handler tests can run without a database.
+type userStore interface {
+	EmailByUsername(ctx context.Context, username string) (string, error)
+}
+
 type Handler struct {
-	store    *Store
+	store    userStore
 	supabase *supabaseAuthClient
 }
 
-func NewHandler(store *Store, supabaseURL, apiKey string, client *http.Client) *Handler {
+func NewHandler(store userStore, supabaseURL, apiKey string, client *http.Client) *Handler {
 	return &Handler{
 		store: store,
 		supabase: &supabaseAuthClient{
@@ -90,9 +96,22 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Accept either email or username. If a username (no @), resolve it to an
+	// email via an indexed DB lookup. A miss returns the same error as a wrong
+	// password so we never reveal whether a username exists.
+	authEmail := req.Username
+	if !strings.Contains(req.Username, "@") {
+		email, err := h.store.EmailByUsername(r.Context(), req.Username)
+		if err != nil {
+			httpx.WriteError(w, apierr.ErrWrongPassword)
+			return
+		}
+		authEmail = email
+	}
+
 	status, respBody, err := h.supabase.doRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=password",
-		map[string]string{"email": req.Username, "password": req.Password})
+		map[string]string{"email": authEmail, "password": req.Password})
 
 	if err != nil {
 		httpx.WriteError(w, err)

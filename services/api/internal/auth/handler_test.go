@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -38,6 +40,7 @@ func TestLogin_MissingFields(t *testing.T) {
 }
 
 // ref: auth.LOGIN.1 — proxies to Supabase token endpoint
+// ref: auth.LOGIN.1 — accepts email or username format
 func TestLogin_SupabaseFailure(t *testing.T) {
 	supa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
@@ -46,7 +49,7 @@ func TestLogin_SupabaseFailure(t *testing.T) {
 
 	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
+	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u@example.com","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
 	h.login(w, r)
 
@@ -68,7 +71,7 @@ func TestLogin_Success(t *testing.T) {
 
 	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
+	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u@example.com","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
 	h.login(w, r)
 
@@ -88,12 +91,66 @@ func TestLogin_Success(t *testing.T) {
 func TestLogin_SupabaseUnreachable(t *testing.T) {
 	h := NewHandler(nil, "http://127.0.0.1:1", "fake-key", http.DefaultClient)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u","password":"p"}`))
+	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u@example.com","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
 	h.login(w, r)
 
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
+	}
+}
+
+// fakeStore implements userStore for handler tests without a database.
+type fakeStore struct {
+	email string
+	err   error
+}
+
+func (f fakeStore) EmailByUsername(_ context.Context, _ string) (string, error) {
+	return f.email, f.err
+}
+
+// ref: auth.LOGIN.1 — accepts username, resolves to email via indexed store lookup
+func TestLogin_WithUsername(t *testing.T) {
+	supa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "at-123",
+			"refresh_token": "rt-456",
+			"expires_in":    3600,
+		})
+	}))
+	defer supa.Close()
+
+	h := NewHandler(fakeStore{email: "test@example.com"}, supa.URL, "fake-key", http.DefaultClient)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"testuser","password":"p"}`))
+	r.Header.Set("Content-Type", "application/json")
+	h.login(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+
+	var resp envelope.Response[tokenData]
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data.AccessToken != "at-123" {
+		t.Fatalf("expected at-123, got %s", resp.Data.AccessToken)
+	}
+}
+
+// ref: auth.LOGIN.3 — unknown username returns generic error (no enumeration)
+func TestLogin_UnknownUsername(t *testing.T) {
+	h := NewHandler(fakeStore{err: errors.New("no rows")}, "http://unused", "fake-key", http.DefaultClient)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"ghost","password":"p"}`))
+	r.Header.Set("Content-Type", "application/json")
+	h.login(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
 

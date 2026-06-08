@@ -43,9 +43,9 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label htmlFor="username" className="field-label">Username</label>
+            <label htmlFor="username" className="field-label">Email or Username</label>
             <input id="username" type="text" value={username} onChange={e => setUsername(e.target.value)}
-              autoComplete="username" required className="form-input" />
+              autoComplete="email" required className="form-input" />
           </div>
           <div>
             <label htmlFor="password" className="field-label">Password</label>

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
@@ -43,6 +44,11 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
+			if origin != "" {
+				// ref: api-layer.SEC.8 — Vary: Origin prevents caches from serving
+				// one origin's ACAO response to another origin.
+				w.Header().Add("Vary", "Origin")
+			}
 			if _, ok := allowed[origin]; ok {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
@@ -60,14 +66,14 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 }
 
 // Recover catches panics, logs the stack trace, and returns 500.
+// ref: monitoring.SINK.2
 func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if v := recover(); v != nil {
-				slog.Error("panic recovered",
+				Record(r, "panic", slog.LevelError,
 					"value", v,
 					"stack", string(debug.Stack()),
-					"request_id", RequestIDFromContext(r.Context()),
 				)
 				WriteJSON(w, http.StatusInternalServerError, envelope.NewError(apierr.CodeInternal, "internal server error"))
 			}
@@ -88,18 +94,32 @@ func RequestID(next http.Handler) http.Handler {
 	})
 }
 
-// Logger logs method, path, status, and latency via slog structured logging.
+// Logger logs method, path, status, and latency via Record (structured,
+// allow-list-filtered). Event name is "request" for normal logs, with
+// "server_error" for 5xx, "auth_failure" for 401 on /auth/*, and "request"
+// for other 4xx (info level per monitoring.COST.1).
+// ref: monitoring.SINK.1, monitoring.SINK.4, monitoring.COST.1
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &statusWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rw, r)
-		slog.Info("request",
-			"method", r.Method,
-			"path", r.URL.Path,
+
+		event := "request"
+		level := slog.LevelInfo
+		if rw.status >= 500 {
+			event = "server_error"
+			level = slog.LevelError
+		} else if rw.status == http.StatusUnauthorized && strings.HasPrefix(r.URL.Path, "/auth/") {
+			event = "auth_failure"
+			level = slog.LevelWarn
+		} else if rw.status >= 400 {
+			level = slog.LevelInfo
+		}
+
+		Record(r, event, level,
 			"status", rw.status,
 			"latency_ms", time.Since(start).Milliseconds(),
-			"request_id", RequestIDFromContext(r.Context()),
 		)
 	})
 }
