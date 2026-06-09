@@ -130,7 +130,8 @@ jobs:
         with:
           version: v1.59.0
           working-directory: ${{ github.workspace }}
-          args: run ./pkg/shared/... ./services/api/... --timeout 5m
+          args: run ./... --timeout 5m
+          working-directory: ./services/api
       - name: Build
         run: |
           go build ./pkg/shared/...
