@@ -18,7 +18,8 @@ test.describe('Tab navigation', () => {
     await page.goto('/#/vibes')
     await expect(page.getByRole('heading', { name: 'Browse by Vibe' }))
       .toBeVisible({ timeout: 8000 })
-    await page.getByRole('link', { name: /collection/i }).click()
+    // Use the bottom nav tab (with ⊞ icon) — header has a different "My Collection" link
+    await page.getByRole('link', { name: '⊞ Collection' }).click()
     await expect(page.getByRole('heading', { name: 'Board Game Collection' }))
       .toBeVisible({ timeout: 8000 })
   })

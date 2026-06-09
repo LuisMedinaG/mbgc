@@ -36,7 +36,7 @@ func (m *mockImporterStore) LogSync(ctx context.Context, userID string, imported
 }
 
 type mockBGGClient struct {
-	available        bool
+	available         bool
 	fetchCollectionFn func(ctx context.Context, bggUsername string) ([]int, error)
 	fetchGamesFn      func(ctx context.Context, bggIDs []int) ([]BGGGame, error)
 }
@@ -56,7 +56,7 @@ func (m *mockBGGClient) FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame
 }
 
 type mockGameService struct {
-	gameExistsFn   func(ctx context.Context, userID string, bggID int) (bool, error)
+	gameExistsFn    func(ctx context.Context, userID string, bggID int) (bool, error)
 	upsertBGGGameFn func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
 }
 
@@ -71,6 +71,17 @@ func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g ga
 		return m.upsertBGGGameFn(ctx, userID, g)
 	}
 	return 0, true, nil
+}
+
+type mockProfileService struct {
+	getBGGUsernameFn func(ctx context.Context, userID string) (string, error)
+}
+
+func (m *mockProfileService) GetBGGUsername(ctx context.Context, userID string) (string, error) {
+	if m.getBGGUsernameFn != nil {
+		return m.getBGGUsernameFn(ctx, userID)
+	}
+	return "mytestuser", nil
 }
 
 func okStore() *mockImporterStore {
@@ -89,7 +100,7 @@ func authReq(method, path, body string, isAdmin bool) *http.Request {
 }
 
 func mkHandler(store importerStore, bgg bggClient, gs gameService) *Handler {
-	return NewHandler(NewService(store, bgg, gs), 3, 20)
+	return NewHandler(NewService(store, bgg, gs, &mockProfileService{}), 3, 20)
 }
 
 func TestSync_Unauthenticated(t *testing.T) {

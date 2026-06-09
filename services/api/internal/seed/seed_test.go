@@ -44,11 +44,11 @@ func TestAdminUser_PropagatesAuthUserError(t *testing.T) {
 
 func TestEnsureAuthUser_CreatesNew(t *testing.T) {
 	cfg := config.Config{
-		SupabaseURL:        "http://localhost:54321",
-		ServiceRoleKey:     "test-key",
-		SeedAdminEmail:     "admin@test.local",
-		SeedAdminPassword:  "password123",
-		SeedAdminUsername:  "admin_user",
+		SupabaseURL:       "http://localhost:54321",
+		ServiceRoleKey:    "test-key",
+		SeedAdminEmail:    "admin@test.local",
+		SeedAdminPassword: "password123",
+		SeedAdminUsername: "admin_user",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -101,10 +101,10 @@ func TestEnsureAuthUser_CreatesNew(t *testing.T) {
 
 func TestEnsureAuthUser_ReturnsExistingUserID(t *testing.T) {
 	cfg := config.Config{
-		SupabaseURL:        "http://localhost:54321",
-		ServiceRoleKey:     "test-key",
-		SeedAdminEmail:     "admin@test.local",
-		SeedAdminPassword:  "password123",
+		SupabaseURL:       "http://localhost:54321",
+		ServiceRoleKey:    "test-key",
+		SeedAdminEmail:    "admin@test.local",
+		SeedAdminPassword: "password123",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -145,10 +145,10 @@ func TestEnsureAuthUser_ReturnsExistingUserID(t *testing.T) {
 
 func TestEnsureAuthUser_ErrorOnHTTPFailure(t *testing.T) {
 	cfg := config.Config{
-		SupabaseURL:        "http://localhost:54321",
-		ServiceRoleKey:     "test-key",
-		SeedAdminEmail:     "admin@test.local",
-		SeedAdminPassword:  "password123",
+		SupabaseURL:       "http://localhost:54321",
+		ServiceRoleKey:    "test-key",
+		SeedAdminEmail:    "admin@test.local",
+		SeedAdminPassword: "password123",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -170,11 +170,11 @@ func TestEnsureAuthUser_ErrorOnHTTPFailure(t *testing.T) {
 
 func TestEnsureAuthUser_WithoutUsername(t *testing.T) {
 	cfg := config.Config{
-		SupabaseURL:        "http://localhost:54321",
-		ServiceRoleKey:     "test-key",
-		SeedAdminEmail:     "admin@test.local",
-		SeedAdminPassword:  "password123",
-		SeedAdminUsername:  "", // No username
+		SupabaseURL:       "http://localhost:54321",
+		ServiceRoleKey:    "test-key",
+		SeedAdminEmail:    "admin@test.local",
+		SeedAdminPassword: "password123",
+		SeedAdminUsername: "", // No username
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -380,4 +380,3 @@ func TestLookupAuthUserByEmail_NotFound(t *testing.T) {
 		t.Errorf("error should say 'not found', got: %v", err)
 	}
 }
-

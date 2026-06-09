@@ -14,15 +14,15 @@ func TestLoad(t *testing.T) {
 		{
 			name: "minimal valid config",
 			env: map[string]string{
-				"DATABASE_URL":               "postgres://user:pass@localhost/db",
-				"SUPABASE_URL":               "http://localhost:54321",
+				"DATABASE_URL":              "postgres://user:pass@localhost/db",
+				"SUPABASE_URL":              "http://localhost:54321",
 				"SUPABASE_SERVICE_ROLE_KEY": "test-key",
 			},
 		},
 		{
 			name: "missing required DATABASE_URL",
 			env: map[string]string{
-				"SUPABASE_URL":               "http://localhost:54321",
+				"SUPABASE_URL":              "http://localhost:54321",
 				"SUPABASE_SERVICE_ROLE_KEY": "test-key",
 			},
 			wantErr: true,
@@ -30,7 +30,7 @@ func TestLoad(t *testing.T) {
 		{
 			name: "missing required SUPABASE_URL",
 			env: map[string]string{
-				"DATABASE_URL":               "postgres://user:pass@localhost/db",
+				"DATABASE_URL":              "postgres://user:pass@localhost/db",
 				"SUPABASE_SERVICE_ROLE_KEY": "test-key",
 			},
 			wantErr: true,

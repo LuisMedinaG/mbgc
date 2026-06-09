@@ -15,9 +15,10 @@ import (
 
 // mockProfileStore implements profileStore for handler tests.
 type mockProfileStore struct {
-	getProfileFn    func(ctx context.Context, userID string) (*Profile, error)
-	upsertProfileFn func(ctx context.Context, userID string) (*Profile, error)
+	getProfileFn     func(ctx context.Context, userID string) (*Profile, error)
+	upsertProfileFn  func(ctx context.Context, userID string) (*Profile, error)
 	setBGGUsernameFn func(ctx context.Context, userID, bggUsername string) error
+	getBGGUsernameFn func(ctx context.Context, userID string) (string, error)
 }
 
 func (m *mockProfileStore) GetProfile(ctx context.Context, userID string) (*Profile, error) {
@@ -28,6 +29,12 @@ func (m *mockProfileStore) UpsertProfile(ctx context.Context, userID string) (*P
 }
 func (m *mockProfileStore) SetBGGUsername(ctx context.Context, userID, bggUsername string) error {
 	return m.setBGGUsernameFn(ctx, userID, bggUsername)
+}
+func (m *mockProfileStore) GetBGGUsername(ctx context.Context, userID string) (string, error) {
+	if m.getBGGUsernameFn != nil {
+		return m.getBGGUsernameFn(ctx, userID)
+	}
+	return "", nil
 }
 
 func newAuthenticatedRequest(method, path string, body string) *http.Request {

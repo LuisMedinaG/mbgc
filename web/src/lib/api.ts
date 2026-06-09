@@ -233,9 +233,9 @@ export interface DiscoverResponse {
 }
 
 export interface SyncResult {
-  added:   number
-  updated: number
-  total:   number
+  imported: number
+  skipped:  number
+  failed:   number
 }
 
 export interface CSVPreviewRow {
@@ -423,7 +423,8 @@ export const api = {
 
   // Import
   async syncBGG(fullRefresh = false): Promise<SyncResult> {
-    const r = await request<{ data: SyncResult }>('POST', '/import/sync', { full_refresh: fullRefresh })
+    const path = fullRefresh ? '/import/sync?full_refresh=true' : '/import/sync'
+    const r = await request<{ data: SyncResult }>('POST', path, undefined)
     return r.data
   },
 

@@ -16,18 +16,18 @@ import (
 
 // mockGameStore implements gameStore for handler tests.
 type mockGameStore struct {
-	listGamesFn         func(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
-	getGameFn           func(ctx context.Context, id int64, userID string) (*Game, error)
-	createGameFn        func(ctx context.Context, userID string, bggID int) (int64, error)
-	gameExistsByBGGIDFn func(ctx context.Context, userID string, bggID int) (bool, error)
-	upsertBGGGameFn     func(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
-	deleteGameFn        func(ctx context.Context, id int64, userID string) error
-	listCollectionsFn   func(ctx context.Context, userID string) ([]Collection, error)
-	createCollectionFn  func(ctx context.Context, userID, name, description string) (*Collection, error)
-	updateCollectionFn  func(ctx context.Context, id int64, userID, name, description string) error
-	deleteCollectionFn  func(ctx context.Context, id int64, userID string) error
+	listGamesFn          func(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
+	getGameFn            func(ctx context.Context, id int64, userID string) (*Game, error)
+	createGameFn         func(ctx context.Context, userID string, bggID int) (int64, error)
+	gameExistsByBGGIDFn  func(ctx context.Context, userID string, bggID int) (bool, error)
+	upsertBGGGameFn      func(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
+	deleteGameFn         func(ctx context.Context, id int64, userID string) error
+	listCollectionsFn    func(ctx context.Context, userID string) ([]Collection, error)
+	createCollectionFn   func(ctx context.Context, userID, name, description string) (*Collection, error)
+	updateCollectionFn   func(ctx context.Context, id int64, userID, name, description string) error
+	deleteCollectionFn   func(ctx context.Context, id int64, userID string) error
 	setGameCollectionsFn func(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
-	discoverFn          func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
+	discoverFn           func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
 func (m *mockGameStore) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {

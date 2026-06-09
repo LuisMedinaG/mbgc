@@ -20,10 +20,31 @@ permissions:
   pull-requests: write
 
 jobs:
+  # Runs on both PR and push (workflow is already path-filtered to infra/**).
+  # Moved here from pipeline.yml so it benefits from the paths: filter and
+  # stays co-located with plan/apply.
+  lint:
+    name: Terraform Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.8
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive infra/
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.52.0
+      - name: TFLint
+        run: tflint --chdir=infra --recursive
+
   plan:
     name: Terraform Plan (prod)
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: infra/environments/prod
@@ -87,7 +108,8 @@ jobs:
   apply:
     name: Terraform Apply (prod)
     if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: infra/environments/prod

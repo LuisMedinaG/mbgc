@@ -1,6 +1,7 @@
 package game
 
 import "context"
+
 type gameStore interface {
 	ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
 	GetGame(ctx context.Context, id int64, userID string) (*Game, error)

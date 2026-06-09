@@ -131,7 +131,7 @@ func main() {
 
 	bggClient := importer.NewClient(cfg.BGGToken, cfg.BGGCookie)
 	importStore := importer.NewStore(pool)
-	importSvc := importer.NewService(importStore, bggClient, gameSvc)
+	importSvc := importer.NewService(importStore, bggClient, gameSvc, profileSvc)
 	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
 
 	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
@@ -162,7 +162,7 @@ func main() {
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500
 			httpx.Recover,
 			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
-			httpx.LimitBodySize(1 << 20),
+			httpx.LimitBodySize(1<<20),
 			// ref: api-layer.SEC.7 — rejects wrong Content-Type on body-bearing requests (CSRF text/plain bypass)
 			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP

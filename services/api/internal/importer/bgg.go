@@ -197,7 +197,7 @@ func (c *Client) FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame, error
 const bggThingURL = "https://boardgamegeek.com/xmlapi2/thing"
 
 type bggThingXMLItems struct {
-	XMLName xml.Name         `xml:"items"`
+	XMLName xml.Name          `xml:"items"`
 	Items   []bggThingXMLItem `xml:"item"`
 }
 
