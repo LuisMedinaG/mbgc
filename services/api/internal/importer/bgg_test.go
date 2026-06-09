@@ -43,7 +43,7 @@ func TestParseLanguageDependence(t *testing.T) {
 			want: 2,
 		},
 		{
-			name: "zero votes returns 0",
+			name:     "zero votes returns 0",
 			pollName: "language_dependence",
 			xml: `<items>
 				<item>
@@ -57,7 +57,7 @@ func TestParseLanguageDependence(t *testing.T) {
 			want: 0,
 		},
 		{
-			name: "non-language_dependence poll is ignored",
+			name:     "non-language_dependence poll is ignored",
 			pollName: "language_dependence",
 			xml: `<items>
 				<item>
@@ -71,7 +71,7 @@ func TestParseLanguageDependence(t *testing.T) {
 			want: 0,
 		},
 		{
-			name: "invalid level is skipped",
+			name:     "invalid level is skipped",
 			pollName: "language_dependence",
 			xml: `<items>
 				<item>
