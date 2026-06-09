@@ -129,6 +129,7 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.59.0
+          working-directory: ${{ github.workspace }}
           args: run ./... --timeout 5m
       - name: Build
         run: |
