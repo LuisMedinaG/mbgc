@@ -1,6 +1,7 @@
 run:
   timeout: 5m
   tests: true
+  out-format: colored-line-number
 linters:
   enable:
     - staticcheck
