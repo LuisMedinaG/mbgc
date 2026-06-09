@@ -125,13 +125,15 @@ jobs:
           key: ${{ runner.os }}-golangci-${{ hashFiles('**/*.go','**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-golangci-
+      - name: Download modules
+        run: go mod download -x
+        working-directory: ${{ github.workspace }}
       - name: Lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.59.0
           working-directory: ${{ github.workspace }}
           args: run ./... --timeout 5m
-          working-directory: ./services/api
       - name: Build
         run: |
           go build ./pkg/shared/...
