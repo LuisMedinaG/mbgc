@@ -128,14 +128,18 @@ jobs:
       - name: Lint (pkg/shared)
         uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          # Pin to a v1 release — v2 (which `latest` resolves to) has a
+          # breaking config schema. Migration tracked separately.
+          version: v1.64.8
           install-mode: goinstall
           working-directory: pkg/shared
           args: --timeout 5m
       - name: Lint (services/api)
         uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
+          # Pin to a v1 release — v2 (which `latest` resolves to) has a
+          # breaking config schema. Migration tracked separately.
+          version: v1.64.8
           install-mode: goinstall
           working-directory: services/api
           args: --timeout 5m
