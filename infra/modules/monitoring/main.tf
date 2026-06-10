@@ -131,8 +131,8 @@ resource "google_monitoring_alert_policy" "panic_spike" {
         | metric 'logging.googleapis.com/user/panic_count'
         | align rate(5m)
         | every 5m
-        | group_by [], sliding(5m)
-        | condition_val > 3
+        | group_by []
+        | condition val() > 0.01
       EOT
       duration = "0s"
     }
@@ -156,17 +156,20 @@ resource "google_monitoring_alert_policy" "error_ratio" {
     display_name = "server_error / request > 0.01"
     condition_monitoring_query_language {
       query    = <<-EOT
-        fetch cloud_run_revision
-        | metric 'logging.googleapis.com/user/server_error_count'
-        | align rate(5m)
-        | group_by [], sliding(5m)
-        |
-        fetch cloud_run_revision
-        | metric 'logging.googleapis.com/user/request_count'
-        | align rate(5m)
-        | group_by [], sliding(5m)
-        | div
-        | condition_val > 0.01
+        {
+          fetch cloud_run_revision
+          | metric 'logging.googleapis.com/user/server_error_count'
+          | align rate(5m)
+          | every 5m
+          | group_by [];
+          fetch cloud_run_revision
+          | metric 'logging.googleapis.com/user/request_count'
+          | align rate(5m)
+          | every 5m
+          | group_by []
+        }
+        | ratio
+        | condition val() > 0.01
       EOT
       duration = "0s"
     }
@@ -196,8 +199,8 @@ resource "google_monitoring_alert_policy" "auth_probe" {
         | metric 'logging.googleapis.com/user/auth_failure_count'
         | align rate(1m)
         | every 1m
-        | group_by [], sliding(1m)
-        | condition_val > 10
+        | group_by []
+        | condition val() > 0.167
       EOT
       duration = "0s"
     }
@@ -223,8 +226,8 @@ resource "google_monitoring_alert_policy" "rate_limit_flood" {
         | metric 'logging.googleapis.com/user/rate_limit_count'
         | align rate(5m)
         | every 5m
-        | group_by [], sliding(5m)
-        | condition_val > 500
+        | group_by []
+        | condition val() > 1.667
       EOT
       duration = "300s"
     }
