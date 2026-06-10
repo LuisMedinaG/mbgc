@@ -28,3 +28,10 @@ func (s *Store) EmailByUsername(ctx context.Context, username string) (string, e
 	`, username).Scan(&email)
 	return email, err
 }
+
+// ref: auth.CHANGE_PASSWORD.1 — lookup email by UUID to verify current password
+func (s *Store) EmailByUserID(ctx context.Context, userID string) (string, error) {
+	var email string
+	err := s.db.QueryRow(ctx, `SELECT email FROM auth.users WHERE id = $1`, userID).Scan(&email)
+	return email, err
+}

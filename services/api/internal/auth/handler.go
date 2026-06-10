@@ -21,10 +21,11 @@ type supabaseAuthClient struct {
 	client *http.Client
 }
 
-// userStore resolves a login username to an email. Handler depends on the
+// userStore resolves identifiers to emails. Handler depends on the
 // interface (not *Store) so handler tests can run without a database.
 type userStore interface {
 	EmailByUsername(ctx context.Context, username string) (string, error)
+	EmailByUserID(ctx context.Context, userID string) (string, error)
 }
 
 type Handler struct {
@@ -70,12 +71,43 @@ func (s *supabaseAuthClient) doRequest(ctx context.Context, method, path string,
 	return resp.StatusCode, respBody, nil
 }
 
+// doRequestWithBearer is like doRequest but also sets Authorization: Bearer for
+// endpoints that require the user's own JWT (e.g. PUT /auth/v1/user).
+func (s *supabaseAuthClient) doRequestWithBearer(ctx context.Context, method, path string, body map[string]string, bearerToken string) (int, []byte, error) {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, s.url+path, bytes.NewReader(payload))
+	if err != nil {
+		return 0, nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("apikey", s.apiKey)
+	req.Header.Set("Authorization", "Bearer "+bearerToken)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return resp.StatusCode, nil, fmt.Errorf("read response: %w", err)
+	}
+
+	return resp.StatusCode, respBody, nil
+}
+
 // ref: api-layer.SEC.5 — rateLimit middleware applied to login/refresh/logout (not auth'd)
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth, rateLimit func(http.Handler) http.Handler) {
 	mux.Handle("POST /api/v1/auth/login", rateLimit(http.HandlerFunc(h.login)))
 	mux.Handle("POST /api/v1/auth/refresh", rateLimit(http.HandlerFunc(h.refresh)))
 	mux.Handle("POST /api/v1/auth/logout", rateLimit(http.HandlerFunc(h.logout)))
 	mux.Handle("GET /api/v1/ping", auth(http.HandlerFunc(h.ping)))
+	mux.Handle("PUT /api/v1/auth/password", auth(http.HandlerFunc(h.changePassword))) // ref: auth.CHANGE_PASSWORD.1
 }
 
 type loginRequest struct {
@@ -182,6 +214,64 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	// logout is best-effort; errors are not actionable to client
 	if err != nil {
 		slog.Debug("logout: request failed", "error", err)
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type changePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+// ref: auth.CHANGE_PASSWORD.1 — verifies current password then updates via Supabase user endpoint
+func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
+	var req changePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpx.WriteError(w, fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest))
+		return
+	}
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		httpx.WriteError(w, fmt.Errorf("%w: current_password and new_password are required", apierr.ErrBadRequest))
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		httpx.WriteError(w, fmt.Errorf("%w: new_password must be at least 8 characters", apierr.ErrBadRequest))
+		return
+	}
+
+	userID, _ := httpx.UserIDFromContext(r.Context())
+	email, err := h.store.EmailByUserID(r.Context(), userID)
+	if err != nil {
+		httpx.WriteError(w, apierr.ErrUnauthorized)
+		return
+	}
+
+	// Verify current password via token grant before allowing update.
+	status, _, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+		"/auth/v1/token?grant_type=password",
+		map[string]string{"email": email, "password": req.CurrentPassword})
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	if status != http.StatusOK {
+		httpx.WriteError(w, apierr.ErrWrongPassword)
+		return
+	}
+
+	bearerToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	status, _, err = h.supabase.doRequestWithBearer(r.Context(), http.MethodPut,
+		"/auth/v1/user",
+		map[string]string{"password": req.NewPassword},
+		bearerToken)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	if status != http.StatusOK {
+		httpx.WriteError(w, apierr.ErrInternal)
+		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
