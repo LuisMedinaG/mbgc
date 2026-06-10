@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strconv"
 
-	sq "github.com/Masterminds/squirrel"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -57,8 +57,8 @@ func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]G
 
 	offset := (f.Page - 1) * f.Limit
 	listSQL, listArgs, err := sq.Select(
-		"id, user_id, bgg_id, name, description, year_published, image, thumbnail,"+
-			" min_players, max_players, playtime, categories, mechanics, types, weight, rating,"+
+		"id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
+			" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
 			" language_dependence, recommended_players, rules_url, created_at, updated_at").
 		From("games.games").
 		Where(pred).
@@ -379,8 +379,8 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 	}
 
 	listSQL, listArgs, err := sq.Select(
-		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail,"+
-			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating,"+
+		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail," +
+			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating," +
 			" g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at").
 		From("games.games g").
 		Join("games.collection_games cg ON g.id = cg.game_id").
