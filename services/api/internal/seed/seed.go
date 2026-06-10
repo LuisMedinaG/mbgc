@@ -133,6 +133,8 @@ func ensureAdminAppMetadata(ctx context.Context, cfg config.Config, userID strin
 		var result struct {
 			Msg string `json:"msg"`
 		}
+		//nolint:errcheck // best-effort error-body extraction; on Decode failure
+		// result.Msg stays empty and the wrapped error below is still meaningful.
 		json.NewDecoder(resp.Body).Decode(&result)
 		return fmt.Errorf("admin API returned %d: %s", resp.StatusCode, result.Msg)
 	}

@@ -28,6 +28,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -409,4 +411,128 @@ func TestSmoke_CollectionsCRUD_RoundTrip(t *testing.T) {
 		t.Errorf("collection still present after delete: %s", wList2.Body.String())
 	}
 	_ = wGet
+}
+
+// ref: auth.MULTI_TENANCY.3, game-detail.VIBE_ASSIGN.2 — SetGameCollections
+// must be atomic. If any collection in the requested set doesn't belong to
+// the user (or any other failure inside the txn), the game must keep its
+// previous collection set — never end up partially or fully stripped
+// (issue #39).
+//
+// This test is skipped unless MBGC_TEST_DATABASE_URL is set; it requires a
+// real Postgres with the mbgc migrations applied. Run with:
+//
+//	MBGC_TEST_DATABASE_URL=postgres://... make test-integration
+//
+// It is intentionally not run in `go test ./services/api/...` so that the
+// default CI suite stays hermetic.
+func TestSmoke_SetGameCollections_AtomicOnPartialFailure(t *testing.T) {
+	h := newHarness(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	userA := "55555555-5555-5555-5555-555555555555"
+	userB := "66666666-6666-6666-6666-666666666666"
+
+	var gameID, colA1, colA2, colB int64
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO games.games (user_id, bgg_id, name) VALUES ($1, 1, 'AtomicGame') RETURNING id`,
+		userA).Scan(&gameID); err != nil {
+		t.Fatalf("seed game: %v", err)
+	}
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO games.collections (user_id, name) VALUES ($1, 'A1') RETURNING id`,
+		userA).Scan(&colA1); err != nil {
+		t.Fatalf("seed A1: %v", err)
+	}
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO games.collections (user_id, name) VALUES ($1, 'A2') RETURNING id`,
+		userA).Scan(&colA2); err != nil {
+		t.Fatalf("seed A2: %v", err)
+	}
+	if err := h.pool.QueryRow(ctx,
+		`INSERT INTO games.collections (user_id, name) VALUES ($1, 'B') RETURNING id`,
+		userB).Scan(&colB); err != nil {
+		t.Fatalf("seed B: %v", err)
+	}
+
+	tok := signTestToken(t, userA, "a@test.local", "userA", false)
+
+	// Initial state: game in [A1, A2].
+	good := fmt.Sprintf(`{"collection_ids":[%d,%d]}`, colA1, colA2)
+	if w := h.do("POST", fmt.Sprintf("/api/v1/games/%d/collections", gameID), tok, good); w.Code != 204 {
+		t.Fatalf("initial set: %d %s", w.Code, w.Body.String())
+	}
+
+	var before int
+	if err := h.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM games.collection_games WHERE game_id = $1`, gameID).Scan(&before); err != nil {
+		t.Fatalf("count before: %v", err)
+	}
+	if before != 2 {
+		t.Fatalf("expected 2 rows before, got %d", before)
+	}
+
+	// Attempt to set to [A1, B] — B belongs to userB, so the count check
+	// inside the txn must trip and the whole transaction must roll back.
+	bad := fmt.Sprintf(`{"collection_ids":[%d,%d]}`, colA1, colB)
+	w := h.do("POST", fmt.Sprintf("/api/v1/games/%d/collections", gameID), tok, bad)
+	if w.Code != 404 {
+		t.Fatalf("cross-tenant: got %d body %s, want 404", w.Code, w.Body.String())
+	}
+
+	// Atomicity check: the DELETE in the txn must have been rolled back.
+	// Without the fix, the row count drops to 0; with the fix, it stays 2.
+	var after int
+	if err := h.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM games.collection_games WHERE game_id = $1`, gameID).Scan(&after); err != nil {
+		t.Fatalf("count after: %v", err)
+	}
+	if after != before {
+		t.Errorf("non-atomic: rows before=%d after=%d (expected unchanged)", before, after)
+	}
+
+	// The set is still exactly [A1, A2].
+	rows, err := h.pool.Query(ctx,
+		`SELECT collection_id FROM games.collection_games WHERE game_id = $1 ORDER BY collection_id`, gameID)
+	if err != nil {
+		t.Fatalf("read back: %v", err)
+	}
+	defer rows.Close()
+	var got []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			t.Fatalf("scan: %v", err)
+		}
+		got = append(got, id)
+	}
+	want := []int64{colA1, colA2}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("collection_games for game %d = %v, want %v", gameID, got, want)
+	}
+
+	// Sanity: a clean replace still works on the success path.
+	replaced := fmt.Sprintf(`{"collection_ids":[%d]}`, colA2)
+	if w := h.do("POST", fmt.Sprintf("/api/v1/games/%d/collections", gameID), tok, replaced); w.Code != 204 {
+		t.Fatalf("replace: %d %s", w.Code, w.Body.String())
+	}
+	rows2, err := h.pool.Query(ctx,
+		`SELECT collection_id FROM games.collection_games WHERE game_id = $1`, gameID)
+	if err != nil {
+		t.Fatalf("read back 2: %v", err)
+	}
+	defer rows2.Close()
+	var after2 []int64
+	for rows2.Next() {
+		var id int64
+		if err := rows2.Scan(&id); err != nil {
+			t.Fatalf("scan 2: %v", err)
+		}
+		after2 = append(after2, id)
+	}
+	sort.Slice(after2, func(i, j int) bool { return after2[i] < after2[j] })
+	if !reflect.DeepEqual(after2, []int64{colA2}) {
+		t.Errorf("after replace: %v, want [%d]", after2, colA2)
+	}
 }

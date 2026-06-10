@@ -10,12 +10,31 @@ linters:
     - errcheck
     - govet
     - revive
+  settings:
+    revive:
+      # The codebase uses the // ref: <ACID> convention above exported
+      # methods/types to anchor spec references. revive's `exported` rule
+      # wants the doc comment to start with the symbol name, which
+      # conflicts with the convention. The ACID anchor is the
+      # authoritative doc.
+      rules:
+        - name: exported
+          disabled: true
   exclusions:
     paths:
       - vendor
     rules:
+      # errcheck: `defer x.Close()` / `defer w.Write(...)` etc. — the
+      # idiomatic Go pattern. Matching the function name in the message
+      # text rather than the leading "Error return value..." wording
+      # because errcheck formats the symbol with backticks.
       - linters: [errcheck]
-        text: 'error return value not checked.*(Close|Write|Flush)\('
+        text: '`[^`]*\.(Close|Write|Flush)`'
+      # errcheck on test files: test bodies commonly discard
+      # `io.Copy`/`json.Decode` errors because the assertion-of-interest is
+      # elsewhere. Standard convention.
+      - linters: [errcheck]
+        path: _test\.go
 
 formatters:
   enable:
