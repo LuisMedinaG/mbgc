@@ -11,10 +11,9 @@ linters:
     - govet
     - gofmt
     - revive
-
-issues:
-  exclude-dirs:
-    - vendor
-  exclude-rules:
-    - linters: [errcheck]
-      text: 'error return value not checked.*(Close|Write|Flush)\('
+  exclusions:
+    paths:
+      - vendor
+    rules:
+      - linters: [errcheck]
+        text: 'error return value not checked.*(Close|Write|Flush)\('
