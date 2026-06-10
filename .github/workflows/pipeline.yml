@@ -126,21 +126,21 @@ jobs:
         run: go mod download -x
         working-directory: ${{ github.workspace }}
       - name: Lint (pkg/shared)
-        uses: golangci/golangci-lint-action@v8
+        # golangci-lint-action v6 supports golangci-lint v1.x via the default
+        # `binary` install mode (downloads a prebuilt). v7+ requires v2.x
+        # which has a breaking config schema. Migration tracked separately.
+        uses: golangci/golangci-lint-action@v6
         with:
-          # Pin to a v1 release — v2 (which `latest` resolves to) has a
-          # breaking config schema. Migration tracked separately.
           version: v1.64.8
-          install-mode: goinstall
           working-directory: pkg/shared
           args: --timeout 5m
       - name: Lint (services/api)
-        uses: golangci/golangci-lint-action@v8
+        # golangci-lint-action v6 supports golangci-lint v1.x via the default
+        # `binary` install mode (downloads a prebuilt). v7+ requires v2.x
+        # which has a breaking config schema. Migration tracked separately.
+        uses: golangci/golangci-lint-action@v6
         with:
-          # Pin to a v1 release — v2 (which `latest` resolves to) has a
-          # breaking config schema. Migration tracked separately.
           version: v1.64.8
-          install-mode: goinstall
           working-directory: services/api
           args: --timeout 5m
       - name: Build
