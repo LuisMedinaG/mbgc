@@ -1,8 +1,8 @@
 # deploy-cloud-run.yml — Reusable workflow: build Docker image and deploy to Cloud Run.
 # Called by pipeline.yml (deploy-api-prod / deploy-api-dev jobs). Not triggered directly.
 #
-# Steps: GCP auth via Workload Identity Federation → docker build + push to Artifact Registry
-#        (tagged with commit SHA) → gcloud run deploy with non-empty env vars.
+# Steps: GCP auth via Workload Identity Federation → docker buildx + push to Artifact Registry
+#        (tagged with commit SHA, GHA layer cache) → gcloud run deploy with non-empty env vars.
 # Migrations run at server startup via golang-migrate (embedded SQL, tracked in schema_migrations).
 # ref: ci-cd.DEPLOY_API.4, ci-cd.DEPLOY_API.5, ci-cd.DEPLOY_API.6, ci-cd.DEPLOY_API.7
 name: Deploy to Cloud Run
@@ -59,11 +59,15 @@ permissions:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     env:
       IMAGE: ${{ inputs.region }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mbgc/${{ inputs.service_name }}:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+
+      # Buildx required for GHA layer cache backend (type=gha).
+      - uses: docker/setup-buildx-action@v3
 
       - id: auth
         uses: google-github-actions/auth@v2
@@ -77,19 +81,22 @@ jobs:
         run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
 
       - name: Build and push image
-        run: |
-          docker build -f "$DOCKERFILE" -t "$IMAGE" "$CONTEXT"
-          docker push "$IMAGE"
-        env:
-          DOCKERFILE: ${{ inputs.dockerfile }}
-          CONTEXT: ${{ inputs.context }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy to Cloud Run
         run: |
-          # Build --update-env-vars, skipping secrets that are empty (not yet set)
+          # Build --update-env-vars, skipping optional secrets that are empty
           # to avoid overwriting existing Cloud Run env vars with blank values.
           _env=""
           _add() { if [ -n "$2" ]; then _env="${_env:+$_env,}$1=$2"; fi; }
+          _add PORT                   "8080"
           _add DATABASE_URL              "$DATABASE_URL"
           _add SUPABASE_URL              "$SUPABASE_URL"
           _add SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
@@ -103,7 +110,7 @@ jobs:
             --project "$PROJECT" \
             --service-account "$RUNTIME_SA" \
             ${_env:+--update-env-vars "$_env"} \
-            --quiet
+            --verbosity=warning
         env:
           SERVICE: ${{ inputs.service_name }}
           REGION: ${{ inputs.region }}

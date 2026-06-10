@@ -126,7 +126,9 @@ for _role in \
   roles/iam.workloadIdentityPoolAdmin \
   roles/artifactregistry.admin \
   roles/resourcemanager.projectIamAdmin \
-  roles/serviceusage.serviceUsageAdmin; do
+  roles/serviceusage.serviceUsageAdmin \
+  roles/logging.configWriter \
+  roles/monitoring.admin; do
   gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
     --member "serviceAccount:${GCP_SA_EMAIL}" \
     --role "$_role" \

@@ -87,7 +87,10 @@ async function request<T>(
   if (res.status === 204) return undefined as T
 
   const json = await res.json()
-  if (!res.ok) throw new ApiError(res.status, json.error ?? 'request failed')
+  if (!res.ok) {
+    const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'request failed'
+    throw new ApiError(res.status, msg)
+  }
   return json as T
 }
 
@@ -111,7 +114,10 @@ async function upload<T>(path: string, formData: FormData, retry = true): Promis
   if (res.status === 204) return undefined as T
 
   const json = await res.json()
-  if (!res.ok) throw new ApiError(res.status, json.error ?? 'request failed')
+  if (!res.ok) {
+    const msg = typeof json.error === 'string' ? json.error : json.error?.message ?? 'request failed'
+    throw new ApiError(res.status, msg)
+  }
   return json as T
 }
 
@@ -227,9 +233,9 @@ export interface DiscoverResponse {
 }
 
 export interface SyncResult {
-  added:   number
-  updated: number
-  total:   number
+  imported: number
+  skipped:  number
+  failed:   number
 }
 
 export interface CSVPreviewRow {
@@ -417,7 +423,8 @@ export const api = {
 
   // Import
   async syncBGG(fullRefresh = false): Promise<SyncResult> {
-    const r = await request<{ data: SyncResult }>('POST', '/import/sync', { full_refresh: fullRefresh })
+    const path = fullRefresh ? '/import/sync?full_refresh=true' : '/import/sync'
+    const r = await request<{ data: SyncResult }>('POST', path, undefined)
     return r.data
   },
 

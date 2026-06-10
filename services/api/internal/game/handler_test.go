@@ -16,16 +16,18 @@ import (
 
 // mockGameStore implements gameStore for handler tests.
 type mockGameStore struct {
-	listGamesFn         func(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
-	getGameFn           func(ctx context.Context, id int64, userID string) (*Game, error)
-	createGameFn        func(ctx context.Context, userID string, bggID int) (int64, error)
-	gameExistsByBGGIDFn func(ctx context.Context, userID string, bggID int) (bool, error)
-	deleteGameFn        func(ctx context.Context, id int64, userID string) error
-	listCollectionsFn   func(ctx context.Context, userID string) ([]Collection, error)
-	createCollectionFn  func(ctx context.Context, userID, name, description string) (*Collection, error)
-	updateCollectionFn  func(ctx context.Context, id int64, userID, name, description string) error
-	deleteCollectionFn  func(ctx context.Context, id int64, userID string) error
+	listGamesFn          func(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
+	getGameFn            func(ctx context.Context, id int64, userID string) (*Game, error)
+	createGameFn         func(ctx context.Context, userID string, bggID int) (int64, error)
+	gameExistsByBGGIDFn  func(ctx context.Context, userID string, bggID int) (bool, error)
+	upsertBGGGameFn      func(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
+	deleteGameFn         func(ctx context.Context, id int64, userID string) error
+	listCollectionsFn    func(ctx context.Context, userID string) ([]Collection, error)
+	createCollectionFn   func(ctx context.Context, userID, name, description string) (*Collection, error)
+	updateCollectionFn   func(ctx context.Context, id int64, userID, name, description string) error
+	deleteCollectionFn   func(ctx context.Context, id int64, userID string) error
 	setGameCollectionsFn func(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
+	discoverFn           func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
 func (m *mockGameStore) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
@@ -39,6 +41,12 @@ func (m *mockGameStore) CreateGame(ctx context.Context, userID string, bggID int
 }
 func (m *mockGameStore) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
 	return m.gameExistsByBGGIDFn(ctx, userID, bggID)
+}
+func (m *mockGameStore) UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error) {
+	if m.upsertBGGGameFn != nil {
+		return m.upsertBGGGameFn(ctx, userID, g)
+	}
+	return 0, true, nil
 }
 func (m *mockGameStore) DeleteGame(ctx context.Context, id int64, userID string) error {
 	return m.deleteGameFn(ctx, id, userID)
@@ -57,6 +65,12 @@ func (m *mockGameStore) DeleteCollection(ctx context.Context, id int64, userID s
 }
 func (m *mockGameStore) SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error {
 	return m.setGameCollectionsFn(ctx, userID, gameID, collectionIDs)
+}
+func (m *mockGameStore) Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
+	if m.discoverFn != nil {
+		return m.discoverFn(ctx, userID, f)
+	}
+	return nil, 0, nil, apierr.ErrNotFound
 }
 
 func newAuthenticatedRequest(method, path string, body string) *http.Request {

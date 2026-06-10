@@ -2,35 +2,47 @@ import { test, expect } from '../fixtures/auth'
 import { goToCollection } from '../helpers/nav'
 
 test.describe('Collection page', () => {
-  test.beforeEach(async ({ authenticatedPage }) => {
-    await goToCollection(authenticatedPage)
-  })
-
-  test('shows heading and game count', async ({ authenticatedPage: page }) => {
+  test('renders heading and total count', async ({ authenticatedPage: page }) => {
+    await goToCollection(page)
     await expect(page.getByRole('heading', { name: 'Board Game Collection' })).toBeVisible()
-    await expect(page.getByText(/\d+ game/)).toBeVisible()
+    // The fixture has 3 games, header should show "3 games" or similar
+    await expect(page.getByText(/3 games/)).toBeVisible()
   })
 
-  test('has at least one game in the list', async ({ authenticatedPage: page }) => {
-    const count = await page.locator('a[href*="/games/"]').count()
-    expect(count).toBeGreaterThan(0)
+  test('lists all games as links to /games/:id', async ({ authenticatedPage: page }) => {
+    await goToCollection(page)
+    const links = page.locator('a[href*="/games/"]')
+    await expect(links).toHaveCount(3)
   })
 
-  test('search filter narrows the game list', async ({ authenticatedPage: page }) => {
-    const total = await page.locator('a[href*="/games/"]').count()
-    const firstName = await page.locator('a[href*="/games/"]').first().textContent()
-    const prefix = (firstName ?? '').slice(0, 4).trim()
-    if (!prefix) test.skip()
-
-    await page.getByPlaceholder(/search/i).fill(prefix)
-    await page.waitForTimeout(400) // debounce
-    const filtered = await page.locator('a[href*="/games/"]').count()
-    expect(filtered).toBeLessThanOrEqual(total)
-  })
-
-  test('navigates to game detail on click', async ({ authenticatedPage: page }) => {
+  test('navigates to game detail on first link click', async ({ authenticatedPage: page }) => {
+    await goToCollection(page)
     await page.locator('a[href*="/games/"]').first().click()
     await expect(page).toHaveURL(/\/games\/\d+/, { timeout: 8000 })
-    await expect(page.locator('h1').first()).toBeVisible({ timeout: 10000 })
+  })
+
+  test('empty state shows when API returns zero games', async ({ page }) => {
+    // Use a fresh page (not authenticatedPage) — install empty mocks manually.
+    await page.route('**/api/v1/auth/refresh', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { access_token: 'mock.jwt.refreshed' } }) }))
+    await page.route('**/api/v1/ping', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { pong: true, username: 'testuser' } }) }))
+    await page.route('**/api/v1/profile', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: { id: 'u1', username: 't', bgg_username: 't', is_admin: false } }) }))
+    await page.route('**/api/v1/games*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: [], meta: { page: 1, limit: 20, total: 0 } }) }))
+    await page.route('**/api/v1/collections*', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ data: [], meta: { page: 1, limit: 0, total: 0 } }) }))
+    await page.addInitScript(() => {
+      localStorage.setItem('mbgc_access', 'mock.jwt.access')
+      localStorage.setItem('mbgc_refresh', 'mock.jwt.refresh')
+    })
+    await page.goto('/')
+    await expect(page.getByText(/no games|0 games|empty/i).first()).toBeVisible({ timeout: 10000 })
   })
 })

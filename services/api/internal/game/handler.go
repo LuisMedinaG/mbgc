@@ -19,14 +19,15 @@ func NewHandler(svc *Service) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
-	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))            // ref: collection.API.1
-	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))          // ref: game-detail.DETAIL_VIEW.1
-	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))    // ref: game-detail.DELETE.1
+	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))                            // ref: collection.API.1
+	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                         // ref: game-detail.DETAIL_VIEW.1
+	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))                   // ref: game-detail.DELETE.1
 	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections))) // ref: vibes.ASSIGN.1
-	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))    // ref: vibes.LIST.1
-	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))  // ref: vibes.CRUD.1
-	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))  // ref: vibes.CRUD.3
-	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection))) // ref: vibes.CRUD.4
+	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))                // ref: vibes.LIST.1
+	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))              // ref: vibes.CRUD.1
+	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))          // ref: vibes.CRUD.3
+	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection)))       // ref: vibes.CRUD.4
+	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                          // ref: vibes.DISCOVER.1
 }
 
 // ref: auth.MULTI_TENANCY.2 — user identity extracted from context via httpx.UserIDFromContext
@@ -207,4 +208,37 @@ func (h *Handler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	collectionID, err := strconv.ParseInt(r.URL.Query().Get("collection_id"), 10, 64)
+	if err != nil || collectionID == 0 {
+		httpx.WriteError(w, apierr.ErrBadRequest)
+		return
+	}
+	f := DiscoverFilter{
+		CollectionID: collectionID,
+		Type:         httpx.Truncate(r.URL.Query().Get("type"), 255),
+		Category:     httpx.Truncate(r.URL.Query().Get("category"), 255),
+		Mechanic:     httpx.Truncate(r.URL.Query().Get("mechanic"), 255),
+	}
+	games, total, col, err := h.svc.Discover(r.Context(), userID, f)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	type discoverResponse struct {
+		Data       []Game      `json:"data"`
+		Total      int         `json:"total"`
+		Collection *Collection `json:"collection"`
+	}
+	httpx.WriteJSON(w, http.StatusOK, envelope.New(discoverResponse{
+		Data:       games,
+		Total:      total,
+		Collection: col,
+	}))
 }

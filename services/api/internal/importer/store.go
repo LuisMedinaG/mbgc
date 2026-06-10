@@ -38,7 +38,8 @@ func defaultCanSyncRow(db *pgxpool.Pool) func(ctx context.Context, userID string
 // ref: importer.RATE.1 — checks rate_limits table keyed by user_id
 // ref: importer.BGG_SYNC.5 — rate limit resets daily at midnight UTC
 // ref: importer.RATE.3 — distinguishes first-sync (ErrNoRows) from real DB failure;
-//   on real failure, fails CLOSED to preserve the daily quota.
+//
+//	on real failure, fails CLOSED to preserve the daily quota.
 func (s *Store) CanSync(ctx context.Context, userID string, limit int) (bool, error) {
 	count, resetDate, err := s.canSyncRow(ctx, userID)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -124,7 +124,6 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-
 // statusWriter captures the HTTP status code written by a handler.
 type statusWriter struct {
 	http.ResponseWriter

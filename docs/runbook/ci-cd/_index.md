@@ -36,6 +36,12 @@ Three layers prevent accidental schema changes to prod:
 
 After this, every prod deploy waits for your explicit approval in the GitHub Actions UI.
 
+**Approving a release (every merge to main):**
+1. Merge the PR to `main` — CI runs automatically.
+2. A bot comment appears on the PR with a direct link to the Actions run.
+3. Click the link → find **Approve → prod** (yellow clock icon) → **Review deployments** → **Approve and deploy**.
+4. The API deploys to Cloud Run. Web already deployed via Cloudflare Pages (no gate needed).
+
 Dev deploys (`deploy-api-dev`) run automatically — dev is a sandbox.
 
 ### 2. Schema backup artifact

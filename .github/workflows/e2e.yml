@@ -1,10 +1,16 @@
-# e2e.yml — Manual Playwright end-to-end tests against a live environment.
-# Triggered via workflow_dispatch only — not part of the automatic CI pipeline.
-# Caller selects the target branch and browser. Uploads playwright-report on failure.
+# e2e.yml — Playwright end-to-end tests against a live environment.
+# Triggers:
+#   pull_request → main: runs against dev env (vars.DEV_API_URL) to validate what's being promoted.
+#   workflow_dispatch: manual run; caller selects branch, browser, and base URL.
+#   Push to main (merge) intentionally excluded — e2e would race the prod deploy; trigger manually
+#   after deploy or wire via workflow_run if desired.
+# Uploads playwright-report on failure.
 # ref: ci-cd.E2E.1, ci-cd.E2E.2, ci-cd.E2E.3
 name: E2E
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       branch:
@@ -17,36 +23,62 @@ on:
         default: chromium
         type: choice
         options: [chromium, firefox]
+      base_url:
+        description: Base URL for tests (defaults to dev environment)
+        required: false
 
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   e2e:
     name: E2E (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.branch }}
+          ref: ${{ inputs.branch || github.sha }}
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.15"
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun
+            web/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('web/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
         working-directory: web
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('web/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browsers
-        run: bunx playwright install ${{ github.event.inputs.browser }} --with-deps
+        run: bunx playwright install ${{ inputs.browser || 'chromium' }} --with-deps
         working-directory: web
 
       - name: Run E2E tests
-        run: bunx playwright test --project=${{ github.event.inputs.browser }}
+        run: bunx playwright test --project=${{ inputs.browser || 'chromium' }}
         working-directory: web
         env:
           CI: true
+          PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.DEV_API_URL }}
 
       - uses: actions/upload-artifact@v4
         if: failure()

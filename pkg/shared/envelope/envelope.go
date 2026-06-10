@@ -2,9 +2,9 @@
 //
 // Every handler should return one of:
 //
-//	 envelope.Response[T]      — single resource
-//	 envelope.ListResponse[T]  — paginated collection
-//	 envelope.ErrorResponse    — error condition
+//	envelope.Response[T]      — single resource
+//	envelope.ListResponse[T]  — paginated collection
+//	envelope.ErrorResponse    — error condition
 //
 // Wire format:
 //

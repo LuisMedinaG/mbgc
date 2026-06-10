@@ -15,9 +15,10 @@ import (
 
 // mockProfileStore implements profileStore for handler tests.
 type mockProfileStore struct {
-	getProfileFn    func(ctx context.Context, userID string) (*Profile, error)
-	upsertProfileFn func(ctx context.Context, userID string) (*Profile, error)
+	getProfileFn     func(ctx context.Context, userID string) (*Profile, error)
+	upsertProfileFn  func(ctx context.Context, userID string) (*Profile, error)
 	setBGGUsernameFn func(ctx context.Context, userID, bggUsername string) error
+	getBGGUsernameFn func(ctx context.Context, userID string) (string, error)
 }
 
 func (m *mockProfileStore) GetProfile(ctx context.Context, userID string) (*Profile, error) {
@@ -28,6 +29,12 @@ func (m *mockProfileStore) UpsertProfile(ctx context.Context, userID string) (*P
 }
 func (m *mockProfileStore) SetBGGUsername(ctx context.Context, userID, bggUsername string) error {
 	return m.setBGGUsernameFn(ctx, userID, bggUsername)
+}
+func (m *mockProfileStore) GetBGGUsername(ctx context.Context, userID string) (string, error) {
+	if m.getBGGUsernameFn != nil {
+		return m.getBGGUsernameFn(ctx, userID)
+	}
+	return "", nil
 }
 
 func newAuthenticatedRequest(method, path string, body string) *http.Request {
@@ -151,6 +158,9 @@ func TestSetBGGUsername_Success(t *testing.T) {
 		upsertProfileFn: func(ctx context.Context, userID string) (*Profile, error) {
 			return &Profile{ID: userID}, nil
 		},
+		getProfileFn: func(ctx context.Context, userID string) (*Profile, error) {
+			return &Profile{ID: userID, Username: "admin", BGGUsername: strPtr("myhandle")}, nil
+		},
 		setBGGUsernameFn: func(ctx context.Context, userID, bggUsername string) error {
 			return nil
 		},
@@ -160,8 +170,8 @@ func TestSetBGGUsername_Success(t *testing.T) {
 	r := newAuthenticatedRequest("PUT", "/api/v1/profile/bgg-username", `{"bgg_username":"myhandle"}`)
 	h.SetBGGUsername(w, r)
 
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
 	}
 }
 

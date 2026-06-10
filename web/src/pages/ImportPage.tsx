@@ -66,9 +66,9 @@ export default function ImportPage() {
         {syncResult && (
           <div className="bg-[#d1fae5] rounded-lg px-4 py-3 flex gap-6">
             {([
-              { label: 'Added',   value: syncResult.added },
-              { label: 'Updated', value: syncResult.updated },
-              { label: 'Total',   value: syncResult.total },
+              { label: 'Imported', value: syncResult.imported },
+              { label: 'Skipped',  value: syncResult.skipped },
+              { label: 'Failed',   value: syncResult.failed },
             ] as const).map(s => (
               <div key={s.label}>
                 <div className="font-heading text-[1.25rem] font-bold text-[#065f46]">{s.value}</div>

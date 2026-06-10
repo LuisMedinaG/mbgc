@@ -13,6 +13,7 @@ import (
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 )
 
 type importerStore interface {
@@ -23,21 +24,28 @@ type importerStore interface {
 
 type bggClient interface {
 	Available() bool
+	FetchCollection(ctx context.Context, bggUsername string) ([]int, error)
+	FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame, error)
 }
 
 type gameService interface {
 	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
-	CreateGame(ctx context.Context, userID string, bggID int) (int64, error)
+	UpsertBGGGame(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
+}
+
+type profileService interface {
+	GetBGGUsername(ctx context.Context, userID string) (string, error)
 }
 
 type Service struct {
 	store   importerStore
 	bgg     bggClient
 	gameSvc gameService
+	profSvc profileService
 }
 
-func NewService(st importerStore, bggClient bggClient, gameSvc gameService) *Service {
-	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc}
+func NewService(st importerStore, bggClient bggClient, gameSvc gameService, profSvc profileService) *Service {
+	return &Service{store: st, bgg: bggClient, gameSvc: gameSvc, profSvc: profSvc}
 }
 
 // syncKind is the value of the sync_kind attribute on a sync_* event.
@@ -49,7 +57,7 @@ const (
 
 // ref: importer.BGG_SYNC.2 — sync is disabled when BGG credentials are not configured
 // ref: monitoring.SINK.5 — emits sync_start, sync_ok, or sync_error across the lifetime of a sync
-func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
+func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
 	ctx := r.Context()
 	kind := syncKindIncremental
 	if fullRefresh {
@@ -74,8 +82,73 @@ func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool
 	// ref: monitoring.SINK.5 — sync_start fires once the early-rejection checks have passed
 	httpx.Record(r, "sync_start", slog.LevelInfo, "sync_kind", kind)
 
-	// TODO: fetch BGG collection, create games via gameSvc
+	// Fetch the user's BGG username from their profile (set via PUT /profile/bgg-username).
+	// The JWT subject / username is the local account, not the BGG handle.
+	bggUsername, err := s.profSvc.GetBGGUsername(ctx, userID)
+	if err != nil {
+		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
+		return nil, fmt.Errorf("fetching BGG username: %w", err)
+	}
+
 	result := &SyncResult{}
+
+	if bggUsername == "" {
+		// ref: monitoring.SINK.5 — sync_ok with 0 imported when user has no BGG username configured
+		httpx.Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", 0)
+		if err := s.store.RecordSync(ctx, userID); err != nil {
+			return nil, err
+		}
+		if err := s.store.LogSync(ctx, userID, 0, fullRefresh); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	// Fetch the user's BGG collection (owned items only)
+	bggIDs, err := s.bgg.FetchCollection(ctx, bggUsername)
+	if err != nil {
+		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
+		return nil, fmt.Errorf("fetching BGG collection: %w", err)
+	}
+
+	// Determine which IDs need metadata fetched
+	var toFetch []int
+	if fullRefresh {
+		toFetch = bggIDs
+	} else {
+		for _, id := range bggIDs {
+			exists, err := s.gameSvc.GameExistsByBGGID(ctx, userID, id)
+			if err != nil {
+				continue
+			}
+			if !exists {
+				toFetch = append(toFetch, id)
+			}
+		}
+	}
+
+	// Fetch metadata in batches
+	if len(toFetch) > 0 {
+		games, err := s.bgg.FetchGames(ctx, toFetch)
+		if err != nil {
+			httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
+			return nil, fmt.Errorf("fetching game metadata: %w", err)
+		}
+		for _, g := range games {
+			data := bggGameToGameData(g)
+			_, created, err := s.gameSvc.UpsertBGGGame(ctx, userID, data)
+			if err != nil {
+				result.Failed = append(result.Failed, strconv.Itoa(g.BGGID))
+				continue
+			}
+			if created {
+				result.Imported++
+			} else {
+				result.Skipped++
+			}
+		}
+	}
+
 	if err := s.store.RecordSync(ctx, userID); err != nil {
 		// ref: monitoring.SINK.5 — sync_error at error level for store-layer failure
 		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
@@ -89,6 +162,55 @@ func (s *Service) Sync(r *http.Request, userID, bggUsername string, isAdmin bool
 	// ref: monitoring.SINK.5 — sync_ok with imported game count
 	httpx.Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", result.Imported)
 	return result, nil
+}
+
+func bggGameToGameData(g BGGGame) game.BGGGameData {
+	data := game.BGGGameData{
+		BGGID:       g.BGGID,
+		Name:        g.Name,
+		Description: g.Description,
+		Categories:  g.Categories,
+		Mechanics:   g.Mechanics,
+		Types:       g.Types,
+	}
+	if g.YearPublished > 0 {
+		v := g.YearPublished
+		data.YearPublished = &v
+	}
+	if g.Image != "" {
+		v := g.Image
+		data.Image = &v
+	}
+	if g.Thumbnail != "" {
+		v := g.Thumbnail
+		data.Thumbnail = &v
+	}
+	if g.MinPlayers > 0 {
+		v := g.MinPlayers
+		data.MinPlayers = &v
+	}
+	if g.MaxPlayers > 0 {
+		v := g.MaxPlayers
+		data.MaxPlayers = &v
+	}
+	if g.PlayTime > 0 {
+		v := g.PlayTime
+		data.PlayTime = &v
+	}
+	if g.Weight > 0 {
+		v := g.Weight
+		data.Weight = &v
+	}
+	if g.Rating > 0 {
+		v := g.Rating
+		data.Rating = &v
+	}
+	if g.LanguageDependence > 0 {
+		v := g.LanguageDependence
+		data.LanguageDependence = &v
+	}
+	data.RecommendedPlayers = g.RecommendedPlayers
+	return data
 }
 
 func (s *Service) ParseCSVPreview(r io.Reader) ([]CSVPreviewRow, error) {
@@ -141,6 +263,17 @@ func (s *Service) ParseCSVPreview(r io.Reader) ([]CSVPreviewRow, error) {
 // ref: importer.CSV_IMPORT.4 — importing skips games already present in the collection
 func (s *Service) ImportBGGIDs(ctx context.Context, userID string, bggIDs []int) (*SyncResult, error) {
 	result := &SyncResult{}
+
+	// Fetch metadata for all IDs in one batch call (cheaper than per-ID)
+	games, err := s.bgg.FetchGames(ctx, bggIDs)
+	if err != nil {
+		return nil, fmt.Errorf("fetching BGG metadata: %w", err)
+	}
+	gameByID := make(map[int]BGGGame, len(games))
+	for _, g := range games {
+		gameByID[g.BGGID] = g
+	}
+
 	for _, id := range bggIDs {
 		exists, err := s.gameSvc.GameExistsByBGGID(ctx, userID, id)
 		if err != nil {
@@ -151,7 +284,15 @@ func (s *Service) ImportBGGIDs(ctx context.Context, userID string, bggIDs []int)
 			result.Skipped++
 			continue
 		}
-		if _, err := s.gameSvc.CreateGame(ctx, userID, id); err != nil {
+		g, ok := gameByID[id]
+		if !ok {
+			// BGG didn't return metadata — still create a stub so the user can
+			// see the BGG ID and add details later.
+			g = BGGGame{BGGID: id, Name: ""}
+		}
+		data := bggGameToGameData(g)
+		if _, _, err := s.gameSvc.UpsertBGGGame(ctx, userID, data); err != nil {
+			slog.Error("importer: upsert game", "bgg_id", id, "error", err)
 			result.Failed = append(result.Failed, strconv.Itoa(id))
 			continue
 		}
