@@ -30,6 +30,7 @@ concurrency:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_OPTIONS: "--no-deprecation"
 
 jobs:
 
@@ -126,17 +127,15 @@ jobs:
         run: go mod download -x
         working-directory: ${{ github.workspace }}
       - name: Lint (pkg/shared)
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
-          install-mode: goinstall
+          version: v2.12.2
           working-directory: pkg/shared
           args: --timeout 5m
       - name: Lint (services/api)
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: latest
-          install-mode: goinstall
+          version: v2.12.2
           working-directory: services/api
           args: --timeout 5m
       - name: Build

@@ -1,7 +1,7 @@
 # infra.yml — Terraform plan/apply for GCP, Cloudflare, and Supabase infrastructure.
 # Separate from pipeline.yml because it posts plan output as a PR comment.
 #
-# On PR to main (infra/ changes): terraform plan → posts diff as PR comment
+# On PR to main: terraform lint (always) + plan (infra/ changes only)
 # On push to main (infra/ changes): terraform apply
 # ref: ci-cd.INFRA.1, ci-cd.INFRA.2, ci-cd.INFRA.3, ci-cd.INFRA.4
 name: Infra
@@ -9,7 +9,6 @@ name: Infra
 on:
   pull_request:
     branches: [main]
-    paths: ['infra/**']
   push:
     branches: [main]
     paths: ['infra/**']
@@ -17,14 +16,12 @@ on:
 permissions:
   contents: read
   id-token: write
+  issues: write
   pull-requests: write
 
 jobs:
-  # Runs on both PR and push (workflow is already path-filtered to infra/**).
-  # Moved here from pipeline.yml so it benefits from the paths: filter and
-  # stays co-located with plan/apply.
   lint:
-    name: Terraform Lint
+    name: Infra Lint
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:

@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,38 +34,44 @@ func NewStore(db *pgxpool.Pool) *Store {
 }
 
 func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
-	// Build WHERE clause
-	where := "user_id = $1"
-	args := []interface{}{userID}
-	argIdx := 2
-
+	pred := sq.And{sq.Eq{"user_id": userID}}
 	if f.Search != "" {
-		where += fmt.Sprintf(" AND search_vector @@ plainto_tsquery('english', $%d)", argIdx)
-		args = append(args, f.Search)
-		argIdx++
+		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", f.Search))
 	}
 	if f.Category != "" {
-		where += fmt.Sprintf(" AND $%d = ANY(categories)", argIdx)
-		args = append(args, f.Category)
-		argIdx++
+		pred = append(pred, sq.Expr("? = ANY(categories)", f.Category))
 	}
 
-	// Count total
+	countSQL, countArgs, err := sq.Select("COUNT(*)").
+		From("games.games").
+		Where(pred).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, err
+	}
 	var total int
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM games.games WHERE %s", where)
-	if err := s.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch page
 	offset := (f.Page - 1) * f.Limit
-	args = append(args, f.Limit, offset)
-	sql := fmt.Sprintf(`SELECT id, user_id, bgg_id, name, description, year_published, image, thumbnail,
-		min_players, max_players, playtime, categories, mechanics, types, weight, rating,
-		language_dependence, recommended_players, rules_url, created_at, updated_at
-		FROM games.games WHERE %s ORDER BY name LIMIT $%d OFFSET $%d`, where, argIdx, argIdx+1)
+	listSQL, listArgs, err := sq.Select(
+		"id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
+			" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
+			" language_dependence, recommended_players, rules_url, created_at, updated_at").
+		From("games.games").
+		Where(pred).
+		OrderBy("name").
+		Limit(uint64(f.Limit)).
+		Offset(uint64(offset)).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, err
+	}
 
-	rows, err := s.db.Query(ctx, sql, args...)
+	rows, err := s.db.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -280,10 +287,22 @@ func (s *Store) DeleteCollection(ctx context.Context, id int64, userID string) e
 	return nil
 }
 
+// ref: auth.MULTI_TENANCY.3 — game + collection ownership checks and the
+// DELETE/INSERT batch all run in a single pgx.Tx so a partial failure cannot
+// leave the game with a stripped collection set (issue #39).
+// ref: game-detail.VIBE_ASSIGN.1 — saving replaces the full set atomically.
 func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error {
-	// Verify game ownership
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	// Rollback is a no-op after a successful Commit. Ignoring the error
+	// avoids false-positive errcheck reports for the post-commit case
+	// (which always returns ErrTxClosed, the documented sentinel).
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var exists bool
-	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
 		gameID, userID).Scan(&exists); err != nil {
 		return err
 	}
@@ -291,16 +310,13 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 		return apierr.ErrNotFound
 	}
 
-	// Delete existing associations
-	if _, err := s.db.Exec(ctx, `DELETE FROM games.collection_games WHERE game_id = $1`, gameID); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM games.collection_games WHERE game_id = $1`, gameID); err != nil {
 		return err
 	}
 
-	// Insert new associations
 	if len(collectionIDs) > 0 {
-		// Verify all collections belong to user
 		var count int
-		if err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM games.collections WHERE id = ANY($1) AND user_id = $2`,
+		if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM games.collections WHERE id = ANY($1) AND user_id = $2`,
 			collectionIDs, userID).Scan(&count); err != nil {
 			return err
 		}
@@ -308,14 +324,15 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 			return apierr.ErrNotFound
 		}
 
-		for _, colID := range collectionIDs {
-			if _, err := s.db.Exec(ctx, `INSERT INTO games.collection_games (collection_id, game_id) VALUES ($1, $2)`,
-				colID, gameID); err != nil {
-				return err
-			}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO games.collection_games (collection_id, game_id)
+			SELECT unnest($1::bigint[]), $2`,
+			collectionIDs, gameID); err != nil {
+			return err
 		}
 	}
-	return nil
+
+	return tx.Commit(ctx)
 }
 
 type DiscoverFilter struct {
@@ -346,39 +363,47 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 	}
 
 	// Build query for games in this collection
-	where := "g.user_id = $1 AND cg.collection_id = $2"
-	args := []interface{}{userID, f.CollectionID}
-	argIdx := 3
-
+	pred := sq.And{
+		sq.Expr("g.user_id = ?", userID),
+		sq.Expr("cg.collection_id = ?", f.CollectionID),
+	}
 	if f.Category != "" {
-		where += fmt.Sprintf(" AND $%d = ANY(g.categories)", argIdx)
-		args = append(args, f.Category)
-		argIdx++
+		pred = append(pred, sq.Expr("? = ANY(g.categories)", f.Category))
 	}
 	if f.Mechanic != "" {
-		where += fmt.Sprintf(" AND $%d = ANY(g.mechanics)", argIdx)
-		args = append(args, f.Mechanic)
-		argIdx++
+		pred = append(pred, sq.Expr("? = ANY(g.mechanics)", f.Mechanic))
 	}
 
-	// Count total
+	countSQL, countArgs, err := sq.Select("COUNT(*)").
+		From("games.games g").
+		Join("games.collection_games cg ON g.id = cg.game_id").
+		Where(pred).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, nil, err
+	}
 	var total int
-	countSQL := fmt.Sprintf(`SELECT COUNT(*) FROM games.games g
-		INNER JOIN games.collection_games cg ON g.id = cg.game_id
-		WHERE %s`, where)
-	if err := s.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, nil, err
 	}
 
-	// Fetch games
-	sql := fmt.Sprintf(`SELECT g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail,
-		g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating,
-		g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at
-		FROM games.games g
-		INNER JOIN games.collection_games cg ON g.id = cg.game_id
-		WHERE %s ORDER BY g.name LIMIT 100`, where)
+	listSQL, listArgs, err := sq.Select(
+		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail," +
+			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating," +
+			" g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at").
+		From("games.games g").
+		Join("games.collection_games cg ON g.id = cg.game_id").
+		Where(pred).
+		OrderBy("g.name").
+		Limit(100).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, nil, err
+	}
 
-	rows, err := s.db.Query(ctx, sql, args...)
+	rows, err := s.db.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, nil, err
 	}

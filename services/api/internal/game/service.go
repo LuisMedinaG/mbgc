@@ -14,6 +14,7 @@ type gameStore interface {
 	UpdateCollection(ctx context.Context, id int64, userID, name, description string) error
 	DeleteCollection(ctx context.Context, id int64, userID string) error
 	SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
+	UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error
 	Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
@@ -55,6 +56,11 @@ func (s *Service) DeleteCollection(ctx context.Context, id int64, userID string)
 
 func (s *Service) SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error {
 	return s.store.SetGameCollections(ctx, userID, gameID, collectionIDs)
+}
+
+// UpdateRulesURL sets the rules URL for a game after server-side validation.
+func (s *Service) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error {
+	return s.store.UpdateRulesURL(ctx, gameID, userID, rulesURL)
 }
 
 // CreateGame creates a game by BGG ID — called by the importer.

@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth'
-import { resetState } from '../helpers/api-mocks'
+import { mockAll, resetState } from '../helpers/api-mocks'
 
 test.describe('Profile page', () => {
   test.beforeEach(() => { resetState() })
@@ -24,21 +24,10 @@ test.describe('Profile page', () => {
 
   test('failed save shows backend error, not [object Object]', async ({ page }) => {
     resetState()
-    await page.route('**/api/v1/ping', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: { pong: true, username: 't' } }) }))
-    await page.route('**/api/v1/profile', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: { id: 'u1', username: 't', bgg_username: 't', is_admin: false } }) }))
-    await page.route('**/api/v1/games*', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: [], meta: { page: 1, limit: 20, total: 0 } }) }))
-    await page.route('**/api/v1/collections*', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: [], meta: { page: 1, limit: 0, total: 0 } }) }))
-    await page.route('**/api/v1/auth/refresh', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json',
-        body: JSON.stringify({ data: { access_token: 'mock.jwt.refreshed' } }) }))
+    // boot the app and then override the bgg-username endpoint to return 500.
+    // We use the new mockAll() override API for the boot, then layer a
+    // single route on top for the failure case.
+    await mockAll(page, { profile: { bggUsername: 't' }, games: { empty: true }, collections: { empty: true } })
     await page.route('**/api/v1/profile/bgg-username', (route) =>
       route.fulfill({
         status: 500,

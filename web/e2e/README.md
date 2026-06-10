@@ -50,6 +50,27 @@ The mocks hold state in module-local `state` arrays (collections, games)
 so a single test can assert CRUD round-trips without re-mounting the app.
 Call `resetState()` in `beforeEach` to restore defaults.
 
+### Per-test overrides
+
+`mockAll(page, overrides?)` accepts a typed overrides object that tweaks
+a single endpoint without re-registering a route handler (which causes
+LIFO ordering bugs). The available keys:
+
+```ts
+await mockAll(page, {
+  profile:     { bggUsername: 'mybgg', isAdmin: true },  // /api/v1/profile
+  games:       { empty: true },                          // /api/v1/games
+  collections: { empty: true },                          // /api/v1/collections
+  bggSync:     { body: { imported: 5, skipped: 2, failed: 1 } },
+  csvImport:   { previewStatus: 400, previewError: 'CSV must have an objectid column' },
+  auth:        { loginStatus: 401, loginError: 'invalid' },
+})
+```
+
+Any field left out falls back to the default fixture. Use this for every
+test that needs anything other than "happy path with default user" — the
+25-line per-test mock preamble has been eliminated in favour of this.
+
 ## Coverage philosophy
 
 These tests are **broad, not deep**. They verify the major user flows
@@ -70,7 +91,7 @@ The earlier suite missed all of these. The new suite asserts on
 | Spec | Covers |
 |---|---|
 | `auth.spec` | Login success/failure, 401 → token refresh, unauthenticated redirect |
-| `collection.spec` | List renders, search filter narrows, nav to detail, empty state |
+| `collection.spec` | List renders, search filter narrows, category filter narrows, filter chip remove, nav to detail, empty state |
 | `game-detail.spec` | Render + stats, BGG link, vibe edit/cancel, rules URL validation, delete confirm |
 | `vibes.spec` | Create/rename/delete CRUD, discover (browse games in a collection) |
 | `import.spec` | BGG sync (gated by username), full refresh, success/fail, CSV upload → preview → import |
