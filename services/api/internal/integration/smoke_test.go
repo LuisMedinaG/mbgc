@@ -5,7 +5,7 @@
 // calls t.Skip(). This is so the suite stays hermetic in CI while giving
 // developers a single command to exercise real SQL / migration paths:
 //
-//   MBGC_TEST_DATABASE_URL=postgres://user:pass@host:5432/db go test ./internal/integration/...
+//	MBGC_TEST_DATABASE_URL=postgres://user:pass@host:5432/db go test ./internal/integration/...
 //
 // Each test creates a unique throwaway schema (CREATE SCHEMA, then
 // search_path, then migrate into it) and tears it down on cleanup. This means
