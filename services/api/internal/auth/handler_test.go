@@ -110,6 +110,10 @@ func (f fakeStore) EmailByUsername(_ context.Context, _ string) (string, error) 
 	return f.email, f.err
 }
 
+func (f fakeStore) EmailByUserID(_ context.Context, _ string) (string, error) {
+	return f.email, f.err
+}
+
 // ref: auth.LOGIN.1 — accepts username, resolves to email via indexed store lookup
 func TestLogin_WithUsername(t *testing.T) {
 	supa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -284,5 +288,113 @@ func TestPing_NoUser(t *testing.T) {
 	username, _ := resp.Data["username"].(string)
 	if !pong || username != "" {
 		t.Fatalf("expected pong=true, username=\"\", got %+v", resp.Data)
+	}
+}
+
+// --- changePassword ---
+
+// ref: auth.CHANGE_PASSWORD.2 — missing fields returns 400
+func TestChangePassword_MissingFields(t *testing.T) {
+	h := NewHandler(fakeStore{email: "u@example.com"}, "", "", http.DefaultClient)
+	cases := []string{
+		`{}`,
+		`{"current_password":"old"}`,
+		`{"new_password":"newpass1"}`,
+	}
+	for _, body := range cases {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/json")
+		ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
+		r = r.WithContext(ctx)
+		h.changePassword(w, r)
+		if w.Code != http.StatusBadRequest {
+			t.Fatalf("body %s: expected 400, got %d", body, w.Code)
+		}
+	}
+}
+
+// ref: auth.CHANGE_PASSWORD.2 — new password below minimum length returns 400
+func TestChangePassword_ShortNewPassword(t *testing.T) {
+	h := NewHandler(fakeStore{email: "u@example.com"}, "", "", http.DefaultClient)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"oldpass1","new_password":"short"}`))
+	r.Header.Set("Content-Type", "application/json")
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
+	r = r.WithContext(ctx)
+	h.changePassword(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+// ref: auth.CHANGE_PASSWORD.1 — store error (user not found) returns 401
+func TestChangePassword_StoreError(t *testing.T) {
+	h := NewHandler(fakeStore{err: errors.New("no rows")}, "", "", http.DefaultClient)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"oldpass1","new_password":"newpass1"}`))
+	r.Header.Set("Content-Type", "application/json")
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
+	r = r.WithContext(ctx)
+	h.changePassword(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+// ref: auth.CHANGE_PASSWORD.1 — wrong current password returns 401, no internal detail
+func TestChangePassword_WrongCurrentPassword(t *testing.T) {
+	supa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer supa.Close()
+
+	h := NewHandler(fakeStore{email: "u@example.com"}, supa.URL, "fake-key", http.DefaultClient)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"wrongpass","new_password":"newpass99"}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer valid-token")
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
+	r = r.WithContext(ctx)
+	h.changePassword(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+// ref: auth.CHANGE_PASSWORD.1, auth.CHANGE_PASSWORD.3 — success returns 204
+func TestChangePassword_Success(t *testing.T) {
+	reqCount := 0
+	supa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		reqCount++
+		if reqCount == 1 {
+			// token grant — verify current password
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"access_token": "at-ok"})
+			return
+		}
+		// PUT /auth/v1/user — update password
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": "user-1"})
+	}))
+	defer supa.Close()
+
+	h := NewHandler(fakeStore{email: "u@example.com"}, supa.URL, "fake-key", http.DefaultClient)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"oldpass1","new_password":"newpass99"}`))
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Authorization", "Bearer valid-token")
+	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
+	r = r.WithContext(ctx)
+	h.changePassword(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if reqCount != 2 {
+		t.Fatalf("expected 2 Supabase calls, got %d", reqCount)
 	}
 }

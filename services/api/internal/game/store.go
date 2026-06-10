@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,38 +34,44 @@ func NewStore(db *pgxpool.Pool) *Store {
 }
 
 func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
-	// Build WHERE clause
-	where := "user_id = $1"
-	args := []interface{}{userID}
-	argIdx := 2
-
+	pred := sq.And{sq.Eq{"user_id": userID}}
 	if f.Search != "" {
-		where += fmt.Sprintf(" AND search_vector @@ plainto_tsquery('english', $%d)", argIdx)
-		args = append(args, f.Search)
-		argIdx++
+		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", f.Search))
 	}
 	if f.Category != "" {
-		where += fmt.Sprintf(" AND $%d = ANY(categories)", argIdx)
-		args = append(args, f.Category)
-		argIdx++
+		pred = append(pred, sq.Expr("? = ANY(categories)", f.Category))
 	}
 
-	// Count total
+	countSQL, countArgs, err := sq.Select("COUNT(*)").
+		From("games.games").
+		Where(pred).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, err
+	}
 	var total int
-	countSQL := fmt.Sprintf("SELECT COUNT(*) FROM games.games WHERE %s", where)
-	if err := s.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 
-	// Fetch page
 	offset := (f.Page - 1) * f.Limit
-	args = append(args, f.Limit, offset)
-	sql := fmt.Sprintf(`SELECT id, user_id, bgg_id, name, description, year_published, image, thumbnail,
-		min_players, max_players, playtime, categories, mechanics, types, weight, rating,
-		language_dependence, recommended_players, rules_url, created_at, updated_at
-		FROM games.games WHERE %s ORDER BY name LIMIT $%d OFFSET $%d`, where, argIdx, argIdx+1)
+	listSQL, listArgs, err := sq.Select(
+		"id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
+			" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
+			" language_dependence, recommended_players, rules_url, created_at, updated_at").
+		From("games.games").
+		Where(pred).
+		OrderBy("name").
+		Limit(uint64(f.Limit)).
+		Offset(uint64(offset)).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, err
+	}
 
-	rows, err := s.db.Query(ctx, sql, args...)
+	rows, err := s.db.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -346,39 +353,47 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 	}
 
 	// Build query for games in this collection
-	where := "g.user_id = $1 AND cg.collection_id = $2"
-	args := []interface{}{userID, f.CollectionID}
-	argIdx := 3
-
+	pred := sq.And{
+		sq.Expr("g.user_id = ?", userID),
+		sq.Expr("cg.collection_id = ?", f.CollectionID),
+	}
 	if f.Category != "" {
-		where += fmt.Sprintf(" AND $%d = ANY(g.categories)", argIdx)
-		args = append(args, f.Category)
-		argIdx++
+		pred = append(pred, sq.Expr("? = ANY(g.categories)", f.Category))
 	}
 	if f.Mechanic != "" {
-		where += fmt.Sprintf(" AND $%d = ANY(g.mechanics)", argIdx)
-		args = append(args, f.Mechanic)
-		argIdx++
+		pred = append(pred, sq.Expr("? = ANY(g.mechanics)", f.Mechanic))
 	}
 
-	// Count total
+	countSQL, countArgs, err := sq.Select("COUNT(*)").
+		From("games.games g").
+		Join("games.collection_games cg ON g.id = cg.game_id").
+		Where(pred).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, nil, err
+	}
 	var total int
-	countSQL := fmt.Sprintf(`SELECT COUNT(*) FROM games.games g
-		INNER JOIN games.collection_games cg ON g.id = cg.game_id
-		WHERE %s`, where)
-	if err := s.db.QueryRow(ctx, countSQL, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRow(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, nil, err
 	}
 
-	// Fetch games
-	sql := fmt.Sprintf(`SELECT g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail,
-		g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating,
-		g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at
-		FROM games.games g
-		INNER JOIN games.collection_games cg ON g.id = cg.game_id
-		WHERE %s ORDER BY g.name LIMIT 100`, where)
+	listSQL, listArgs, err := sq.Select(
+		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail," +
+			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating," +
+			" g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at").
+		From("games.games g").
+		Join("games.collection_games cg ON g.id = cg.game_id").
+		Where(pred).
+		OrderBy("g.name").
+		Limit(100).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, 0, nil, err
+	}
 
-	rows, err := s.db.Query(ctx, sql, args...)
+	rows, err := s.db.Query(ctx, listSQL, listArgs...)
 	if err != nil {
 		return nil, 0, nil, err
 	}
