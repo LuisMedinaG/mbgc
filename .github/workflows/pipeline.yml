@@ -28,6 +28,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
 
   # ── Change detection ──────────────────────────────────────────────────────
@@ -42,7 +45,7 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -112,28 +115,30 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.work
+          cache: false
       - name: Fmt
         run: |
           if [ -n "$(gofmt -l . | tee /dev/stderr)" ]; then
             echo '::error::gofmt needs to be run (files listed above)'
             exit 1
           fi
-      - name: Cache golangci-lint
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/golangci-lint
-          key: ${{ runner.os }}-golangci-${{ hashFiles('**/*.go','**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-golangci-
       - name: Download modules
         run: go mod download -x
         working-directory: ${{ github.workspace }}
-      - name: Lint
-        uses: golangci/golangci-lint-action@v4
+      - name: Lint (pkg/shared)
+        uses: golangci/golangci-lint-action@v9
         with:
-          version: v1.59.0
-          working-directory: ${{ github.workspace }}
-          args: ./pkg/shared/... ./services/api/... --timeout 5m
+          version: latest
+          install-mode: goinstall
+          working-directory: pkg/shared
+          args: --timeout 5m
+      - name: Lint (services/api)
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: latest
+          install-mode: goinstall
+          working-directory: services/api
+          args: --timeout 5m
       - name: Build
         run: |
           go build ./pkg/shared/...
@@ -164,6 +169,7 @@ jobs:
             coverage-shared.out
             coverage-api.out
           retention-days: 7
+          if-no-files-found: ignore
 
   # ref: ci-cd.BUILD.2
   web:

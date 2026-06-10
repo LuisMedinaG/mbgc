@@ -1,17 +1,18 @@
 run:
   timeout: 5m
-  tests: true
-  out-format: colored-line-number
+
 linters:
+  default: none
   enable:
     - staticcheck
     - errcheck
     - govet
     - gofmt
     - revive
-skip-dirs:
-  - vendor
+
 issues:
-  exclude-use-default: false
-  exclude:
-    - 'error return value not checked.*(Close|Write|Flush)\('
+  exclude-dirs:
+    - vendor
+  exclude-rules:
+    - linters: [errcheck]
+      text: 'error return value not checked.*(Close|Write|Flush)\('
