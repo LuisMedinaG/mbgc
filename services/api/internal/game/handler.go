@@ -23,6 +23,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                         // ref: game-detail.DETAIL_VIEW.1
 	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))                   // ref: game-detail.DELETE.1
 	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections))) // ref: vibes.ASSIGN.1
+	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))        // ref: game-detail.RULES_URL.1
 	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))                // ref: vibes.LIST.1
 	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))              // ref: vibes.CRUD.1
 	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))          // ref: vibes.CRUD.3
@@ -126,6 +127,36 @@ func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ref: game-detail.RULES_URL.1 — server-side allowlist runs in the store;
+// we only parse + truncate here.
+func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	gameID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		httpx.WriteError(w, apierr.ErrBadRequest)
+		return
+	}
+	var body struct {
+		RulesURL string `json:"rules_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		httpx.WriteError(w, apierr.ErrBadRequest)
+		return
+	}
+	body.RulesURL = httpx.Truncate(body.RulesURL, 2048)
+	if err := h.svc.UpdateRulesURL(r.Context(), gameID, userID, body.RulesURL); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, envelope.New(map[string]any{
+		"game_id":   gameID,
+		"rules_url": body.RulesURL,
+	}))
 }
 
 func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {

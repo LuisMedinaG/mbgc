@@ -51,10 +51,11 @@ Single Go API service. Handles JWT validation, profiles, games, collections, and
 ## Commands
 
 ```sh
-make dev          # loads .env; listens on :8080
-make test-v       # go test -v -race ./...
-make migrate-up   # applies all migrations in order
-make migrate-down # reverts all migrations in reverse order
+make dev                 # loads .env; listens on :8080
+make test-v              # go test -v -race ./... (skips integration tests)
+make test-integration    # real-DB smoke tests (requires MBGC_TEST_DATABASE_URL)
+make migrate-up          # applies all migrations in order
+make migrate-down        # reverts all migrations in reverse order
 ```
 
 ## Packages
@@ -74,6 +75,21 @@ Each package defines a store interface consumed by `Service` (e.g. `gameStore`, 
 ```sh
 make test-v       # go test -v -race ./...  ← run before every PR
 ```
+
+### Integration smoke tests (`internal/integration/`)
+
+A separate `make test-integration` target runs the real handlers against a
+real Postgres database. Tests skip by default; opt in by exporting
+`MBGC_TEST_DATABASE_URL=<postgres-url>`. The harness:
+
+- Truncates the affected tables before each test (migrations are expected
+  to be applied already — run `make db-migrate` first)
+- Signs a HS256 JWT with a fixed test secret (no Supabase dependency)
+- Drives the real handler stack via `httptest.NewRecorder`
+
+What these catch (and unit tests cannot): SQL syntax errors, migration
+drift, missing `WHERE user_id` clauses (multi-tenancy leaks), envelope
+shape regressions.
 
 Coverage: auth 78%, importer 72%, game 61%, jwt 60%, profile 59%. CI enforces ≥50% on `services/api`.
 
