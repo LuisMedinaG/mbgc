@@ -287,10 +287,22 @@ func (s *Store) DeleteCollection(ctx context.Context, id int64, userID string) e
 	return nil
 }
 
+// ref: auth.MULTI_TENANCY.3 — game + collection ownership checks and the
+// DELETE/INSERT batch all run in a single pgx.Tx so a partial failure cannot
+// leave the game with a stripped collection set (issue #39).
+// ref: game-detail.VIBE_ASSIGN.1 — saving replaces the full set atomically.
 func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error {
-	// Verify game ownership
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	// Rollback is a no-op after a successful Commit. Ignoring the error
+	// avoids false-positive errcheck reports for the post-commit case
+	// (which always returns ErrTxClosed, the documented sentinel).
+	defer func() { _ = tx.Rollback(ctx) }()
+
 	var exists bool
-	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
+	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
 		gameID, userID).Scan(&exists); err != nil {
 		return err
 	}
@@ -298,16 +310,13 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 		return apierr.ErrNotFound
 	}
 
-	// Delete existing associations
-	if _, err := s.db.Exec(ctx, `DELETE FROM games.collection_games WHERE game_id = $1`, gameID); err != nil {
+	if _, err := tx.Exec(ctx, `DELETE FROM games.collection_games WHERE game_id = $1`, gameID); err != nil {
 		return err
 	}
 
-	// Insert new associations
 	if len(collectionIDs) > 0 {
-		// Verify all collections belong to user
 		var count int
-		if err := s.db.QueryRow(ctx, `SELECT COUNT(*) FROM games.collections WHERE id = ANY($1) AND user_id = $2`,
+		if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM games.collections WHERE id = ANY($1) AND user_id = $2`,
 			collectionIDs, userID).Scan(&count); err != nil {
 			return err
 		}
@@ -315,14 +324,15 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 			return apierr.ErrNotFound
 		}
 
-		for _, colID := range collectionIDs {
-			if _, err := s.db.Exec(ctx, `INSERT INTO games.collection_games (collection_id, game_id) VALUES ($1, $2)`,
-				colID, gameID); err != nil {
-				return err
-			}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO games.collection_games (collection_id, game_id)
+			SELECT unnest($1::bigint[]), $2`,
+			collectionIDs, gameID); err != nil {
+			return err
 		}
 	}
-	return nil
+
+	return tx.Commit(ctx)
 }
 
 type DiscoverFilter struct {
