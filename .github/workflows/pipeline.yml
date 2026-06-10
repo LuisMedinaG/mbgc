@@ -126,14 +126,14 @@ jobs:
         run: go mod download -x
         working-directory: ${{ github.workspace }}
       - name: Lint (pkg/shared)
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           install-mode: goinstall
           working-directory: pkg/shared
           args: --timeout 5m
       - name: Lint (services/api)
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           install-mode: goinstall
