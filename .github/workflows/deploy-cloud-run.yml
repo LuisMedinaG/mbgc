@@ -96,7 +96,6 @@ jobs:
           # to avoid overwriting existing Cloud Run env vars with blank values.
           _env=""
           _add() { if [ -n "$2" ]; then _env="${_env:+$_env,}$1=$2"; fi; }
-          _add PORT                   "8080"
           _add DATABASE_URL              "$DATABASE_URL"
           _add SUPABASE_URL              "$SUPABASE_URL"
           _add SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
