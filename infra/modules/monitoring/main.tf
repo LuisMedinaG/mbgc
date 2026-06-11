@@ -132,7 +132,7 @@ resource "google_monitoring_alert_policy" "panic_spike" {
         | align rate(5m)
         | every 5m
         | group_by []
-        | condition val() > 0.01
+        | condition val() > 0.01 "1/s"
       EOT
       duration = "0s"
     }
@@ -200,7 +200,7 @@ resource "google_monitoring_alert_policy" "auth_probe" {
         | align rate(1m)
         | every 1m
         | group_by []
-        | condition val() > 0.167
+        | condition val() > 0.167 "1/s"
       EOT
       duration = "0s"
     }
@@ -227,7 +227,7 @@ resource "google_monitoring_alert_policy" "rate_limit_flood" {
         | align rate(5m)
         | every 5m
         | group_by []
-        | condition val() > 1.667
+        | condition val() > 1.667 "1/s"
       EOT
       duration = "300s"
     }
