@@ -1,7 +1,7 @@
 package config
 
 import (
-	"log/slog"
+	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -25,14 +25,28 @@ type Config struct {
 	SeedAdminUsername string // optional display name; falls back to email in JWTs if unset
 }
 
-func Load() Config {
+// Load reads configuration from environment variables. Returns an error if any
+// required variable is missing so callers can handle it without os.Exit.
+func Load() (Config, error) {
+	dbURL, err := requireenv("DATABASE_URL") // ref: api-layer.CONFIG.1
+	if err != nil {
+		return Config{}, err
+	}
+	supabaseURL, err := requireenv("SUPABASE_URL") // ref: api-layer.CONFIG.2
+	if err != nil {
+		return Config{}, err
+	}
+	serviceRoleKey, err := requireenv("SUPABASE_SERVICE_ROLE_KEY")
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
-		Port:        getenv("PORT", "8080"),                       // ref: api-layer.CONFIG.3 — defaults to 8080
-		DatabaseURL: sanitizeDatabaseURL(mustenv("DATABASE_URL")), // ref: api-layer.CONFIG.1 — required, panics if missing
-		SupabaseURL: mustenv("SUPABASE_URL"),                      // ref: api-layer.CONFIG.2 — required, panics if missing
+		Port:        getenv("PORT", "8080"), // ref: api-layer.CONFIG.3 — defaults to 8080
+		DatabaseURL: sanitizeDatabaseURL(dbURL),
+		SupabaseURL: supabaseURL,
 		// Optional legacy HS256 shared secret — leave empty for JWKS-only (recommended).
 		JWTSecret:         os.Getenv("SUPABASE_JWT_SECRET"),
-		ServiceRoleKey:    mustenv("SUPABASE_SERVICE_ROLE_KEY"),
+		ServiceRoleKey:    serviceRoleKey,
 		AllowedOrigin:     getenv("ALLOWED_ORIGIN", "http://localhost:5173"), // ref: api-layer.CONFIG.4 — defaults to localhost:5173
 		BGGToken:          os.Getenv("BGG_TOKEN"),                            // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
 		BGGCookie:         os.Getenv("BGG_COOKIE"),                           // ref: api-layer.CONFIG.5
@@ -41,7 +55,7 @@ func Load() Config {
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),
-	}
+	}, nil
 }
 
 func getenv(key, fallback string) string {
@@ -51,13 +65,12 @@ func getenv(key, fallback string) string {
 	return fallback
 }
 
-func mustenv(key string) string {
+func requireenv(key string) (string, error) {
 	v := os.Getenv(key)
 	if v == "" {
-		slog.Error("required env var not set", "key", key)
-		os.Exit(1)
+		return "", fmt.Errorf("required environment variable %q is not set", key)
 	}
-	return v
+	return v, nil
 }
 
 // sanitizeDatabaseURL re-encodes the password in a postgres URL so that
