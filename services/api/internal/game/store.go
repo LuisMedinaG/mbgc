@@ -399,7 +399,7 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 		Where(pred).
 		OrderBy("g.name").
 		Limit(uint64(f.Limit)).
-		Offset(uint64((f.Page-1)*f.Limit)).
+		Offset(uint64((f.Page - 1) * f.Limit)).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {

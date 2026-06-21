@@ -41,7 +41,7 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Port:        getenv("PORT", "8080"),              // ref: api-layer.CONFIG.3 — defaults to 8080
+		Port:        getenv("PORT", "8080"), // ref: api-layer.CONFIG.3 — defaults to 8080
 		DatabaseURL: sanitizeDatabaseURL(dbURL),
 		SupabaseURL: supabaseURL,
 		// Optional legacy HS256 shared secret — leave empty for JWKS-only (recommended).

@@ -278,8 +278,8 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		Total int `json:"total"`
 	}
 	type discoverResponse struct {
-		Collection *Collection `json:"collection"`
-		Data       []Game      `json:"data"`
+		Collection *Collection  `json:"collection"`
+		Data       []Game       `json:"data"`
 		Meta       discoverMeta `json:"meta"`
 	}
 	httpx.WriteJSON(w, http.StatusOK, envelope.New(discoverResponse{
