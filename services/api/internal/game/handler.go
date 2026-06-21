@@ -1,6 +1,7 @@
 package game
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -10,11 +11,27 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-type Handler struct {
-	svc *Service
+type gameStore interface {
+	ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
+	GetGame(ctx context.Context, id int64, userID string) (*Game, error)
+	CreateGame(ctx context.Context, userID string, bggID int) (int64, error)
+	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
+	UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
+	DeleteGame(ctx context.Context, id int64, userID string) error
+	ListCollections(ctx context.Context, userID string) ([]Collection, error)
+	CreateCollection(ctx context.Context, userID, name, description string) (*Collection, error)
+	UpdateCollection(ctx context.Context, id int64, userID, name, description string) error
+	DeleteCollection(ctx context.Context, id int64, userID string) error
+	SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
+	UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error
+	Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
-func NewHandler(svc *Service) *Handler {
+type Handler struct {
+	svc gameStore
+}
+
+func NewHandler(svc gameStore) *Handler {
 	return &Handler{svc: svc}
 }
 
