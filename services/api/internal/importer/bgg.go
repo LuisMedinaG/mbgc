@@ -120,7 +120,11 @@ func (t *throttledTransport) RoundTrip(req *http.Request) (*http.Response, error
 		if err != nil {
 			return nil, err
 		}
-		if resp.StatusCode != http.StatusTooManyRequests || attempt >= t.maxRetry {
+		// Retry on 429, 202 (BGG queued response), and transient 5xx.
+		retryable := resp.StatusCode == http.StatusTooManyRequests ||
+			resp.StatusCode == http.StatusAccepted ||
+			resp.StatusCode >= http.StatusInternalServerError
+		if !retryable || attempt >= t.maxRetry {
 			return resp, nil
 		}
 		wait := parseBGGRetryAfter(resp.Header.Get("Retry-After"))

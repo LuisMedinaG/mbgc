@@ -251,25 +251,40 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
+	page := httpx.QueryInt(r, "page", 1)
+	if page < 1 {
+		page = 1
+	}
+	limit := httpx.QueryInt(r, "limit", 20)
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
 	f := DiscoverFilter{
 		CollectionID: collectionID,
 		Type:         httpx.Truncate(r.URL.Query().Get("type"), 255),
 		Category:     httpx.Truncate(r.URL.Query().Get("category"), 255),
 		Mechanic:     httpx.Truncate(r.URL.Query().Get("mechanic"), 255),
+		Page:         page,
+		Limit:        limit,
 	}
 	games, total, col, err := h.svc.Discover(r.Context(), userID, f)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
+	type discoverMeta struct {
+		Page  int `json:"page"`
+		Limit int `json:"limit"`
+		Total int `json:"total"`
+	}
 	type discoverResponse struct {
-		Data       []Game      `json:"data"`
-		Total      int         `json:"total"`
-		Collection *Collection `json:"collection"`
+		Collection *Collection  `json:"collection"`
+		Data       []Game       `json:"data"`
+		Meta       discoverMeta `json:"meta"`
 	}
 	httpx.WriteJSON(w, http.StatusOK, envelope.New(discoverResponse{
-		Data:       games,
-		Total:      total,
 		Collection: col,
+		Data:       games,
+		Meta:       discoverMeta{Page: page, Limit: limit, Total: total},
 	}))
 }
