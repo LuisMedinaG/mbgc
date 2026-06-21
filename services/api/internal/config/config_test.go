@@ -55,12 +55,16 @@ func TestLoad(t *testing.T) {
 				}
 			}()
 
+			cfg, err := Load()
 			if tt.wantErr {
-				// Skip load test for missing required vars — it calls os.Exit
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
 				return
 			}
-
-			cfg := Load()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			if cfg.DatabaseURL == "" {
 				t.Error("DatabaseURL should not be empty")
 			}

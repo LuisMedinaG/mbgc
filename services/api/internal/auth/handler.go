@@ -34,6 +34,9 @@ type Handler struct {
 }
 
 func NewHandler(store userStore, supabaseURL, apiKey string, client *http.Client) *Handler {
+	if client == nil {
+		client = httpx.DefaultClient
+	}
 	return &Handler{
 		store: store,
 		supabase: &supabaseAuthClient{

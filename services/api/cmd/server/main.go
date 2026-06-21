@@ -83,7 +83,11 @@ func main() {
 		slog.Info("monitoring disabled via MONITORING_DISABLED env var")
 	}
 
-	cfg := config.Load()
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("invalid configuration", "error", err)
+		os.Exit(1)
+	}
 
 	// ref: monitoring.OBSERVABILITY.2 — heartbeat goroutine. Cancelled on
 	// shutdown so it stops cleanly with the rest of the service.
@@ -136,6 +140,8 @@ func main() {
 
 	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
 	rateLimit := httpx.RateLimiter(5, 10)
+	// Global rate limiter: 30 req/s per IP, burst 60 — protects all routes from basic flood attacks.
+	globalRateLimit := httpx.RateLimiter(30, 60)
 
 	mux := http.NewServeMux()
 	authHandler.RegisterRoutes(mux, authMiddleware, rateLimit)
@@ -157,10 +163,12 @@ func main() {
 		Handler: httpx.Chain(mux,
 			// ref: auth.MIDDLEWARE.1 — Logger logs method, path, status, latency via slog
 			httpx.Logger,
+			httpx.Gzip,
 			// ref: auth.MIDDLEWARE.2 — RequestID attaches unique UUID
 			httpx.RequestID,
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500
 			httpx.Recover,
+			globalRateLimit,
 			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
 			httpx.LimitBodySize(1<<20),
 			// ref: api-layer.SEC.7 — rejects wrong Content-Type on body-bearing requests (CSRF text/plain bypass)
