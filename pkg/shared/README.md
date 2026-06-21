@@ -6,9 +6,8 @@ Shared Go module used by `services/api` and any future Go services in this monor
 
 | Package | Purpose |
 |---------|--------|
-| `envelope` | Standard JSON response wrappers (`Response`, `ListResponse`, `ErrorResponse`) |
 | `apierr` | Sentinel errors and machine-readable error codes |
-| `httpx` | HTTP middleware (`Logger`, `Recover`, `RequestID`, `CORS`, `SecurityHeaders`, `RateLimiter`, `LimitBodySize`) and context helpers |
+| `httpx` | HTTP middleware, response envelopes (`New`, `NewList`, `NewError`), and context helpers |
 
 ## Wire format
 
@@ -57,7 +56,6 @@ httpx.Chain(router,
 ```go
 import (
     "github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-    "github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
     "github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -72,7 +70,7 @@ func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
         httpx.WriteError(w, err) // maps sentinel → HTTP status + error code
         return
     }
-    httpx.WriteJSON(w, http.StatusOK, envelope.New(game))
+    httpx.WriteJSON(w, http.StatusOK, httpx.New(game))
 }
 ```
 

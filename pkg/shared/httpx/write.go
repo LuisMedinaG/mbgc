@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 )
 
 // WriteJSON serializes v as JSON with the given HTTP status code.
@@ -47,5 +46,5 @@ func WriteError(w http.ResponseWriter, err error) {
 		status, code, msg = http.StatusInternalServerError, apierr.CodeInternal, "internal server error"
 	}
 
-	WriteJSON(w, status, envelope.NewError(code, msg))
+	WriteJSON(w, status, NewError(code, msg))
 }

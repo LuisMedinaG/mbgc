@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -118,7 +117,7 @@ func TestListGames_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.ListResponse[Game]
+	var resp httpx.ListResponse[Game]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -211,7 +210,7 @@ func TestGetGame_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.Response[Game]
+	var resp httpx.Response[Game]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -368,7 +367,7 @@ func TestListCollections_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.ListResponse[Collection]
+	var resp httpx.ListResponse[Collection]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -404,7 +403,7 @@ func TestCreateCollection_Success(t *testing.T) {
 		t.Fatalf("expected 201, got %d", w.Code)
 	}
 
-	var resp envelope.Response[Collection]
+	var resp httpx.Response[Collection]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}

@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -83,7 +82,7 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(games, f.Page, f.Limit, total))
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(games, f.Page, f.Limit, total))
 }
 
 func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +100,7 @@ func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(game))
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(game))
 }
 
 func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
@@ -170,7 +169,7 @@ func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(map[string]any{
 		"game_id":   gameID,
 		"rules_url": body.RulesURL,
 	}))
@@ -186,7 +185,7 @@ func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(cols, 1, len(cols), len(cols)))
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(cols, 1, len(cols), len(cols)))
 }
 
 func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
@@ -210,7 +209,7 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, envelope.New(col))
+	httpx.WriteJSON(w, http.StatusCreated, httpx.New(col))
 }
 
 func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +283,7 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		Total      int         `json:"total"`
 		Collection *Collection `json:"collection"`
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(discoverResponse{
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(discoverResponse{
 		Data:       games,
 		Total:      total,
 		Collection: col,
