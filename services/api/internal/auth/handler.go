@@ -45,8 +45,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth, rateLimit func(http.H
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
 }
 
 type tokenData struct {
@@ -57,8 +57,8 @@ type tokenData struct {
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest))
+	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 
@@ -100,13 +100,13 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 type refreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RefreshToken == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: missing refresh_token", apierr.ErrBadRequest))
+	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 
@@ -154,23 +154,15 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 type changePasswordRequest struct {
-	CurrentPassword string `json:"current_password"`
-	NewPassword     string `json:"new_password"`
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
 }
 
 // ref: auth.CHANGE_PASSWORD.1 — verifies current password then updates via Supabase user endpoint
 func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	var req changePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteError(w, fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest))
-		return
-	}
-	if req.CurrentPassword == "" || req.NewPassword == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: current_password and new_password are required", apierr.ErrBadRequest))
-		return
-	}
-	if len(req.NewPassword) < 8 {
-		httpx.WriteError(w, fmt.Errorf("%w: new_password must be at least 8 characters", apierr.ErrBadRequest))
+	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 
