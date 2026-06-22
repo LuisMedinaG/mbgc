@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/go-playground/validator/v10"
 )
 
 // DecodeJSON decodes the request body into v, returning a wrapped ErrBadRequest on failure.
