@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/google/uuid"
 )
 
@@ -75,7 +74,7 @@ func Recover(next http.Handler) http.Handler {
 					"value", v,
 					"stack", string(debug.Stack()),
 				)
-				WriteJSON(w, http.StatusInternalServerError, envelope.NewError(apierr.CodeInternal, "internal server error"))
+				WriteJSON(w, http.StatusInternalServerError, NewError(apierr.CodeInternal, "internal server error"))
 			}
 		}()
 		next.ServeHTTP(w, r)

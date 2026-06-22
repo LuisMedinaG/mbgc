@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -94,7 +93,7 @@ func newUnauthenticatedRequest(method, path string) *http.Request {
 // --- ListGames ---
 
 func TestListGames_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("GET", "/api/v1/games")
 	h.ListGames(w, r)
@@ -109,7 +108,7 @@ func TestListGames_Success(t *testing.T) {
 			return []Game{{ID: 1, Name: "Catan"}}, 1, nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/games?page=1&limit=20", "")
 	h.ListGames(w, r)
@@ -118,7 +117,7 @@ func TestListGames_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.ListResponse[Game]
+	var resp httpx.ListResponse[Game]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -136,7 +135,7 @@ func TestListGames_StoreError(t *testing.T) {
 			return nil, 0, apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/games", "")
 	h.ListGames(w, r)
@@ -155,7 +154,7 @@ func TestListGames_ClampsPageAndLimit(t *testing.T) {
 			return nil, 0, nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/games?page=-5&limit=99999", "")
 	h.ListGames(w, r)
@@ -174,7 +173,7 @@ func TestListGames_ClampsPageAndLimit(t *testing.T) {
 // --- GetGame ---
 
 func TestGetGame_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("GET", "/api/v1/games/1")
 	h.GetGame(w, r)
@@ -184,7 +183,7 @@ func TestGetGame_Unauthenticated(t *testing.T) {
 }
 
 func TestGetGame_InvalidID(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/games/abc", "")
 	r.SetPathValue("id", "abc")
@@ -201,7 +200,7 @@ func TestGetGame_Success(t *testing.T) {
 			return &Game{ID: 1, Name: "Catan"}, nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/games/1", "")
 	r.SetPathValue("id", "1")
@@ -211,7 +210,7 @@ func TestGetGame_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.Response[Game]
+	var resp httpx.Response[Game]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -226,7 +225,7 @@ func TestGetGame_NotFound(t *testing.T) {
 			return nil, apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/games/1", "")
 	r.SetPathValue("id", "1")
@@ -240,7 +239,7 @@ func TestGetGame_NotFound(t *testing.T) {
 // --- DeleteGame ---
 
 func TestDeleteGame_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("DELETE", "/api/v1/games/1")
 	h.DeleteGame(w, r)
@@ -255,7 +254,7 @@ func TestDeleteGame_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("DELETE", "/api/v1/games/1", "")
 	r.SetPathValue("id", "1")
@@ -272,7 +271,7 @@ func TestDeleteGame_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("DELETE", "/api/v1/games/1", "")
 	r.SetPathValue("id", "1")
@@ -286,7 +285,7 @@ func TestDeleteGame_NotFound(t *testing.T) {
 // --- SetGameCollections ---
 
 func TestSetGameCollections_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("POST", "/api/v1/games/1/collections")
 	h.SetGameCollections(w, r)
@@ -296,7 +295,7 @@ func TestSetGameCollections_Unauthenticated(t *testing.T) {
 }
 
 func TestSetGameCollections_InvalidBody(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("POST", "/api/v1/games/1/collections", "not json")
 	r.SetPathValue("id", "1")
@@ -313,7 +312,7 @@ func TestSetGameCollections_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("POST", "/api/v1/games/1/collections", `{"collection_ids":[1,2]}`)
 	r.SetPathValue("id", "1")
@@ -330,7 +329,7 @@ func TestSetGameCollections_StoreError(t *testing.T) {
 			return errors.New("db error")
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("POST", "/api/v1/games/1/collections", `{"collection_ids":[1]}`)
 	r.SetPathValue("id", "1")
@@ -344,7 +343,7 @@ func TestSetGameCollections_StoreError(t *testing.T) {
 // --- ListCollections ---
 
 func TestListCollections_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("GET", "/api/v1/collections")
 	h.ListCollections(w, r)
@@ -359,7 +358,7 @@ func TestListCollections_Success(t *testing.T) {
 			return []Collection{{ID: 1, Name: "Favorites"}}, nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("GET", "/api/v1/collections", "")
 	h.ListCollections(w, r)
@@ -368,7 +367,7 @@ func TestListCollections_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.ListResponse[Collection]
+	var resp httpx.ListResponse[Collection]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -380,7 +379,7 @@ func TestListCollections_Success(t *testing.T) {
 // --- CreateCollection ---
 
 func TestCreateCollection_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("POST", "/api/v1/collections")
 	h.CreateCollection(w, r)
@@ -395,7 +394,7 @@ func TestCreateCollection_Success(t *testing.T) {
 			return &Collection{ID: 1, Name: name}, nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("POST", "/api/v1/collections", `{"name":"Favorites","description":"top games"}`)
 	h.CreateCollection(w, r)
@@ -404,7 +403,7 @@ func TestCreateCollection_Success(t *testing.T) {
 		t.Fatalf("expected 201, got %d", w.Code)
 	}
 
-	var resp envelope.Response[Collection]
+	var resp httpx.Response[Collection]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -414,7 +413,7 @@ func TestCreateCollection_Success(t *testing.T) {
 }
 
 func TestCreateCollection_InvalidBody(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("POST", "/api/v1/collections", "bad json")
 	h.CreateCollection(w, r)
@@ -427,7 +426,7 @@ func TestCreateCollection_InvalidBody(t *testing.T) {
 // --- UpdateCollection ---
 
 func TestUpdateCollection_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("PUT", "/api/v1/collections/1")
 	h.UpdateCollection(w, r)
@@ -442,7 +441,7 @@ func TestUpdateCollection_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("PUT", "/api/v1/collections/1", `{"name":"Updated"}`)
 	r.SetPathValue("id", "1")
@@ -459,7 +458,7 @@ func TestUpdateCollection_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("PUT", "/api/v1/collections/1", `{"name":"Updated"}`)
 	r.SetPathValue("id", "1")
@@ -473,7 +472,7 @@ func TestUpdateCollection_NotFound(t *testing.T) {
 // --- DeleteCollection ---
 
 func TestDeleteCollection_Unauthenticated(t *testing.T) {
-	h := NewHandler(NewService(&mockGameStore{}))
+	h := NewHandler(&mockGameStore{})
 	w := httptest.NewRecorder()
 	r := newUnauthenticatedRequest("DELETE", "/api/v1/collections/1")
 	h.DeleteCollection(w, r)
@@ -488,7 +487,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("DELETE", "/api/v1/collections/1", "")
 	r.SetPathValue("id", "1")
@@ -505,7 +504,7 @@ func TestDeleteCollection_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(NewService(store))
+	h := NewHandler(store)
 	w := httptest.NewRecorder()
 	r := newAuthenticatedRequest("DELETE", "/api/v1/collections/1", "")
 	r.SetPathValue("id", "1")

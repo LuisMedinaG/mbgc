@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 )
@@ -144,7 +143,7 @@ func TestSync_Success(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.Response[SyncResult]
+	var resp httpx.Response[SyncResult]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -224,7 +223,7 @@ func TestCSVPreview_ValidCSV(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.ListResponse[CSVPreviewRow]
+	var resp httpx.ListResponse[CSVPreviewRow]
 	json.NewDecoder(w.Body).Decode(&resp)
 	if len(resp.Data) != 2 || resp.Data[0].BGGID != 174430 || resp.Data[0].Name != "Gloomhaven" {
 		t.Fatalf("unexpected: %+v", resp)
@@ -247,7 +246,7 @@ func TestCSVPreview_AltColumnNames(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.ListResponse[CSVPreviewRow]
+	var resp httpx.ListResponse[CSVPreviewRow]
 	json.NewDecoder(w.Body).Decode(&resp)
 	if len(resp.Data) != 1 || resp.Data[0].BGGID != 12345 {
 		t.Fatalf("unexpected: %+v", resp)
@@ -270,7 +269,7 @@ func TestCSVPreview_SkipsInvalidRows(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.ListResponse[CSVPreviewRow]
+	var resp httpx.ListResponse[CSVPreviewRow]
 	json.NewDecoder(w.Body).Decode(&resp)
 	if len(resp.Data) != 2 {
 		t.Fatalf("expected 2 valid rows, got %d", len(resp.Data))
@@ -336,7 +335,7 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.Response[SyncResult]
+	var resp httpx.Response[SyncResult]
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Data.Imported != 1 || resp.Data.Skipped != 1 {
 		t.Fatalf("expected 1 imported + 1 skipped, got %+v", resp.Data)
@@ -356,7 +355,7 @@ func TestCSVImport_AllNew(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.Response[SyncResult]
+	var resp httpx.Response[SyncResult]
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Data.Imported != 3 {
 		t.Fatalf("expected 3 imported, got %d", resp.Data.Imported)
@@ -376,7 +375,7 @@ func TestCSVImport_CreateFails(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	var resp envelope.Response[SyncResult]
+	var resp httpx.Response[SyncResult]
 	json.NewDecoder(w.Body).Decode(&resp)
 	if resp.Data.Imported != 0 || len(resp.Data.Failed) != 2 {
 		t.Fatalf("expected 0 imported + 2 failed, got %+v", resp.Data)

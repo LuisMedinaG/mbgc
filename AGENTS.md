@@ -1,72 +1,9 @@
 # AGENTS.md — mbgc monorepo
 
-## Acai — Spec-Driven Development
-
-This project uses [acai.sh](https://acai.sh) for spec-driven development. All features are specified in `features/*.feature.yaml`. Code is annotated with ACID references (e.g. `// ref: auth.JWT_VALIDATION.1`).
-
-### Quick commands for agents
-
-```sh
-# Learn the acai workflow (run once per session)
-npx @acai.sh/cli skill
-
-# See current feature status
-npx @acai.sh/cli features --json
-
-# Inspect a specific feature
-npx @acai.sh/cli feature auth --json --include-refs
-
-# Push specs + ACID refs to the dashboard
-npx @acai.sh/cli push --all
-
-# Mark requirements as completed (status must be a JSON object)
-npx @acai.sh/cli set-status '{"auth.JWT_VALIDATION.1":{"status":"completed"}}'
-```
-
-### Development workflow
-
-1. **Before starting work** (MANDATORY): run `npx @acai.sh/cli features --json` to see what's pending. Review the status of all features before writing any code.
-2. **While implementing**: add `// ref: feature.COMPONENT.N` comments in code next to the implementation. Tests should include the ACID in their describe/it names.
-3. **After implementing**: 
-   ```sh
-   npx @acai.sh/cli set-status --product mbgc --impl dev '{"feature.COMPONENT.1":{"status":"completed"}}'
-   npx @acai.sh/cli push --all
-   ```
-4. **Review**: check dashboard at https://app.acai.sh — jump to ACID refs in code
-5. **QA accepted**: update status to `"accepted"`
-
-### Agent hooks (automatic behavior)
+## Agent hooks
 
 When given a task, agents MUST:
-- **Before any code changes**: run `npx @acai.sh/cli features --json` and review pending requirements
 - **Before debugging errors**: search the runbook for known fixes — `rg "<error text>" docs/runbook/`. If no match, document the fix after resolving by loading the `add-runbook` skill.
-- **While coding**: annotate every implementation block with `// ref: <ACID>` comments
-- **After completing work**: run `acai set-status` for each completed ACID, then `acai push --all`
-- **When specs change**: re-align code to spec, update ACID references, push changes
-
-### Spec to code traceability
-
-Every requirement has an ACID (Acceptance Criteria ID) in the format `<feature>.<COMPONENT>.<NUMBER>`. Code references these in comments:
-
-```
-// ref: auth.JWT_VALIDATION.1 — fetches JWKS at boot
-// ref: importer.BGG_SYNC.9 — admin-only full refresh
-// ref: vibes.CRUD.1 — create collection
-```
-
-When implementing a feature, annotate new code with the relevant ACIDs. When modifying existing specs, also update affected ACID references in code.
-
-### Active features
-
-| Feature | File | Status |
-|---|---|---|
-| auth | `features/auth.feature.yaml` | Core login, JWT validation, token refresh, multi-tenancy |
-| collection | `features/collection.feature.yaml` | Game list/grid, search, filters, pagination |
-| game-detail | `features/game-detail.feature.yaml` | Detail view, player aids, rules URL, vibe assign, delete |
-| vibes | `features/vibes.feature.yaml` | Collection CRUD, assign, discover |
-| importer | `features/importer.feature.yaml` | BGG sync, CSV import, rate limiting |
-| profile | `features/profile.feature.yaml` | Profile view, BGG username, change password, admin flag |
-| api-layer | `features/api-layer.feature.yaml` | Shared error handling, envelope, middleware, config |
 
 ## Setup & Build
 
@@ -195,7 +132,7 @@ refactor/*
 - Use `pkg/shared/apierr` sentinels for all error paths
 - Validate JWT in `services/api/internal/jwt/` middleware — never skip or trust forwarded headers from untrusted callers
 - Run `make test-v` before opening a PR
-- Define store interfaces per package — `Service` depends on the interface, not concrete `*Store` (enables `httptest` handler tests without DB)
+- Define store interfaces per package — `Handler` depends on the interface, not concrete `*Store` (enables `httptest` handler tests without DB)
 
 **Ask first:**
 - Any change to `pkg/shared` exported types (`services/api` depends on it)

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -34,6 +33,9 @@ type Handler struct {
 }
 
 func NewHandler(store userStore, supabaseURL, apiKey string, client *http.Client) *Handler {
+	if client == nil {
+		client = httpx.DefaultClient
+	}
 	return &Handler{
 		store: store,
 		supabase: &supabaseAuthClient{
@@ -162,7 +164,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, envelope.Response[tokenData]{Data: result})
+	httpx.WriteJSON(w, http.StatusOK, httpx.Response[tokenData]{Data: result})
 }
 
 type refreshRequest struct {
@@ -196,7 +198,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, envelope.Response[tokenData]{Data: result})
+	httpx.WriteJSON(w, http.StatusOK, httpx.Response[tokenData]{Data: result})
 }
 
 type logoutRequest struct {
@@ -280,7 +282,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ping(w http.ResponseWriter, r *http.Request) {
 	username := httpx.UsernameFromContext(r.Context())
 
-	httpx.WriteJSON(w, http.StatusOK, envelope.Response[map[string]interface{}]{
+	httpx.WriteJSON(w, http.StatusOK, httpx.Response[map[string]interface{}]{
 		Data: map[string]interface{}{
 			"pong":     true,
 			"username": username,

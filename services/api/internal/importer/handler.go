@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -48,7 +47,7 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(result))
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(result))
 }
 
 // ref: importer.CSV_IMPORT.1 — CSV file uploaded for preview before import is confirmed
@@ -72,7 +71,7 @@ func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, fmt.Errorf("%w: %s", apierr.ErrBadRequest, err.Error()))
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(rows, 1, len(rows), len(rows)))
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(rows, 1, len(rows), len(rows)))
 }
 
 // ref: importer.CSV_IMPORT.3 — user selects which games to import from the preview list
@@ -101,5 +100,5 @@ func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(result))
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(result))
 }

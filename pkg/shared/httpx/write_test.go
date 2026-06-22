@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -47,7 +46,7 @@ func TestWriteError(t *testing.T) {
 			if w.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", w.Code, tt.wantStatus)
 			}
-			var resp envelope.ErrorResponse
+			var resp httpx.ErrorResponse
 			if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 				t.Fatalf("decode: %v", err)
 			}

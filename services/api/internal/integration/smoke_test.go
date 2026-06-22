@@ -235,8 +235,7 @@ func (h *testHarness) mux() http.Handler {
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
 	gameStore := game.NewStore(h.pool)
-	gameSvc := game.NewService(gameStore)
-	gameHandler := game.NewHandler(gameSvc)
+	gameHandler := game.NewHandler(gameStore)
 	profileHandler.RegisterRoutes(mux, h.verifier.requireAuth)
 	gameHandler.RegisterRoutes(mux, h.verifier.requireAuth)
 	return mux
