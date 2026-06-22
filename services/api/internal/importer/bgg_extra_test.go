@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 )
 
 // ref: importer.BGG_SYNC.5 — tests the no-bgg-username graceful no-op
@@ -181,7 +181,7 @@ func TestImportBGGIDs_HappyPath(t *testing.T) {
 	var seen []int
 	gs := &mockGameService{
 		gameExistsFn: func(_ context.Context, _ string, _ int) (bool, error) { return false, nil },
-		upsertBGGGameFn: func(_ context.Context, _ string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(_ context.Context, _ string, g catalog.BGGGameData) (int64, bool, error) {
 			seen = append(seen, g.BGGID)
 			return int64(g.BGGID), true, nil
 		},

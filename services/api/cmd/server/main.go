@@ -20,8 +20,8 @@ import (
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/auth"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/logging"
@@ -141,12 +141,12 @@ func main() {
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
 
-	gameStore := game.NewStore(pool)
-	gameHandler := game.NewHandler(gameStore)
+	catalogStore := catalog.NewStore(pool)
+	catalogHandler := catalog.NewHandler(catalogStore)
 
 	bggClient := importer.NewClient(cfg.BGGToken, cfg.BGGCookie)
 	importStore := importer.NewStore(pool)
-	importSvc := importer.NewService(importStore, bggClient, gameStore, profileSvc)
+	importSvc := importer.NewService(importStore, bggClient, catalogStore, profileSvc)
 	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
 
 	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
@@ -157,7 +157,7 @@ func main() {
 	mux := http.NewServeMux()
 	authHandler.RegisterRoutes(mux, authMiddleware, rateLimit)
 	profileHandler.RegisterRoutes(mux, authMiddleware)
-	gameHandler.RegisterRoutes(mux, authMiddleware)
+	catalogHandler.RegisterRoutes(mux, authMiddleware)
 	importHandler.RegisterRoutes(mux, authMiddleware)
 	// ref: api-layer.HEALTH.1 — liveness probe, no deps, always 200 if process is up
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {

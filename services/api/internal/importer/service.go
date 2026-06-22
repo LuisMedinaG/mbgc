@@ -13,7 +13,7 @@ import (
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 )
 
 type importerStore interface {
@@ -30,7 +30,7 @@ type bggClient interface {
 
 type gameService interface {
 	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
-	UpsertBGGGame(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
+	UpsertBGGGame(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error)
 }
 
 type profileService interface {
@@ -164,8 +164,8 @@ func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefr
 	return result, nil
 }
 
-func bggGameToGameData(g BGGGame) game.BGGGameData {
-	data := game.BGGGameData{
+func bggGameToGameData(g BGGGame) catalog.BGGGameData {
+	data := catalog.BGGGameData{
 		BGGID:       g.BGGID,
 		Name:        g.Name,
 		Description: g.Description,

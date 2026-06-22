@@ -15,7 +15,7 @@ import (
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 )
 
 type mockImporterStore struct {
@@ -56,7 +56,7 @@ func (m *mockBGGClient) FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame
 
 type mockGameService struct {
 	gameExistsFn    func(ctx context.Context, userID string, bggID int) (bool, error)
-	upsertBGGGameFn func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
+	upsertBGGGameFn func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error)
 }
 
 func (m *mockGameService) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
@@ -65,7 +65,7 @@ func (m *mockGameService) GameExistsByBGGID(ctx context.Context, userID string, 
 	}
 	return false, nil
 }
-func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 	if m.upsertBGGGameFn != nil {
 		return m.upsertBGGGameFn(ctx, userID, g)
 	}
@@ -325,7 +325,7 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) {
 			return bggID == 174430, nil
 		},
-		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 			return int64(g.BGGID), true, nil
 		},
 	}
@@ -345,7 +345,7 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 func TestCSVImport_AllNew(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
-		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 			return int64(g.BGGID), true, nil
 		},
 	}
@@ -365,7 +365,7 @@ func TestCSVImport_AllNew(t *testing.T) {
 func TestCSVImport_CreateFails(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
-		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 			return 0, false, apierr.ErrInternal
 		},
 	}

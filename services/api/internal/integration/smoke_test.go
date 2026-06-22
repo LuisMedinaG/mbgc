@@ -39,7 +39,7 @@ import (
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 )
 
@@ -234,10 +234,10 @@ func (h *testHarness) mux() http.Handler {
 	profileStore := profile.NewStore(h.pool)
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
-	gameStore := game.NewStore(h.pool)
-	gameHandler := game.NewHandler(gameStore)
+	catalogStore := catalog.NewStore(h.pool)
+	catalogHandler := catalog.NewHandler(catalogStore)
 	profileHandler.RegisterRoutes(mux, h.verifier.requireAuth)
-	gameHandler.RegisterRoutes(mux, h.verifier.requireAuth)
+	catalogHandler.RegisterRoutes(mux, h.verifier.requireAuth)
 	return mux
 }
 
