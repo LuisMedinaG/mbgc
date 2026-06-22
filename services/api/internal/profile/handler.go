@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -35,7 +34,7 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(profile))
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(profile))
 }
 
 // ref: profile.BGG_USERNAME.1 — set/update/clear BGG username via PUT /api/v1/profile/bgg-username
@@ -63,5 +62,5 @@ func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(profile))
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(profile))
 }

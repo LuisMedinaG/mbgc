@@ -1,20 +1,36 @@
 package game
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-type Handler struct {
-	svc *Service
+type gameStore interface {
+	ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error)
+	GetGame(ctx context.Context, id int64, userID string) (*Game, error)
+	CreateGame(ctx context.Context, userID string, bggID int) (int64, error)
+	GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error)
+	UpsertBGGGame(ctx context.Context, userID string, g BGGGameData) (int64, bool, error)
+	DeleteGame(ctx context.Context, id int64, userID string) error
+	ListCollections(ctx context.Context, userID string) ([]Collection, error)
+	CreateCollection(ctx context.Context, userID, name, description string) (*Collection, error)
+	UpdateCollection(ctx context.Context, id int64, userID, name, description string) error
+	DeleteCollection(ctx context.Context, id int64, userID string) error
+	SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
+	UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error
+	Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 }
 
-func NewHandler(svc *Service) *Handler {
+type Handler struct {
+	svc gameStore
+}
+
+func NewHandler(svc gameStore) *Handler {
 	return &Handler{svc: svc}
 }
 
@@ -66,7 +82,7 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(games, f.Page, f.Limit, total))
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(games, f.Page, f.Limit, total))
 }
 
 func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
@@ -84,7 +100,7 @@ func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(game))
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(game))
 }
 
 func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +169,7 @@ func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(map[string]any{
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(map[string]any{
 		"game_id":   gameID,
 		"rules_url": body.RulesURL,
 	}))
@@ -169,7 +185,7 @@ func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.NewList(cols, 1, len(cols), len(cols)))
+	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(cols, 1, len(cols), len(cols)))
 }
 
 func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
@@ -193,7 +209,7 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, envelope.New(col))
+	httpx.WriteJSON(w, http.StatusCreated, httpx.New(col))
 }
 
 func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +298,7 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		Data       []Game       `json:"data"`
 		Meta       discoverMeta `json:"meta"`
 	}
-	httpx.WriteJSON(w, http.StatusOK, envelope.New(discoverResponse{
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(discoverResponse{
 		Collection: col,
 		Data:       games,
 		Meta:       discoverMeta{Page: page, Limit: limit, Total: total},

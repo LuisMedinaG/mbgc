@@ -11,7 +11,6 @@ import (
 	jwtlib "github.com/golang-jwt/jwt/v5"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -116,13 +115,13 @@ func (v *Verifier) RequireAuth(next http.Handler) http.Handler {
 		auth := r.Header.Get("Authorization")
 		if !strings.HasPrefix(auth, "Bearer ") {
 			httpx.WriteJSON(w, http.StatusUnauthorized,
-				envelope.NewError(apierr.CodeUnauthorized, "missing or malformed token"))
+				httpx.NewError(apierr.CodeUnauthorized, "missing or malformed token"))
 			return
 		}
 		c, err := v.parse(strings.TrimPrefix(auth, "Bearer "))
 		if err != nil {
 			httpx.WriteJSON(w, http.StatusUnauthorized,
-				envelope.NewError(apierr.CodeUnauthorized, "invalid token"))
+				httpx.NewError(apierr.CodeUnauthorized, "invalid token"))
 			return
 		}
 		ctx := httpx.SetGatewayUser(r.Context(), c.Subject, c.username(), c.isAdmin())

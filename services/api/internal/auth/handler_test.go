@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/envelope"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
@@ -79,7 +78,7 @@ func TestLogin_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.Response[tokenData]
+	var resp httpx.Response[tokenData]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -136,7 +135,7 @@ func TestLogin_WithUsername(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.Response[tokenData]
+	var resp httpx.Response[tokenData]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -259,7 +258,7 @@ func TestPing_WithUser(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.Response[map[string]interface{}]
+	var resp httpx.Response[map[string]interface{}]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -280,7 +279,7 @@ func TestPing_NoUser(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	var resp envelope.Response[map[string]interface{}]
+	var resp httpx.Response[map[string]interface{}]
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
