@@ -2,67 +2,71 @@
   "hooks": {
     "PostToolUse": [
       {
+        "matcher": ".*",
         "hooks": [
           {
-            "command": "lean-ctx hook observe",
-            "type": "command"
+            "type": "command",
+            "command": "lean-ctx hook observe"
           }
-        ],
-        "matcher": ".*"
+        ]
       }
     ],
     "PreCompact": [
       {
+        "matcher": ".*",
         "hooks": [
           {
-            "command": "lean-ctx hook observe",
-            "type": "command"
+            "type": "command",
+            "command": "lean-ctx hook observe"
           }
-        ],
-        "matcher": ".*"
+        ]
       }
     ],
     "PreToolUse": [
       {
+        "matcher": "Bash|bash",
         "hooks": [
           {
-            "command": "lean-ctx hook rewrite",
-            "type": "command"
+            "type": "command",
+            "command": "lean-ctx hook rewrite"
           }
-        ],
-        "matcher": "Bash|bash"
+        ]
       },
       {
+        "matcher": "Read|read|ReadFile|read_file|View|view|Grep|grep|Search|search|ListFiles|list_files|ListDirectory|list_directory",
         "hooks": [
           {
-            "command": "lean-ctx hook redirect",
-            "type": "command"
+            "type": "command",
+            "command": "lean-ctx hook redirect"
           }
-        ],
-        "matcher": "Read|read|ReadFile|read_file|View|view|Grep|grep|Search|search|ListFiles|list_files|ListDirectory|list_directory"
+        ]
       }
     ],
     "Stop": [
       {
+        "matcher": ".*",
         "hooks": [
           {
-            "command": "lean-ctx hook observe",
-            "type": "command"
+            "type": "command",
+            "command": "lean-ctx hook observe"
           }
-        ],
-        "matcher": ".*"
+        ]
       }
     ],
     "UserPromptSubmit": [
       {
+        "matcher": ".*",
         "hooks": [
           {
-            "command": "lean-ctx hook observe",
-            "type": "command"
+            "type": "command",
+            "command": "lean-ctx hook observe"
           }
-        ],
-        "matcher": ".*"
+        ]
       }
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "claude-mem",
+    "supabase"
+  ]
 }
