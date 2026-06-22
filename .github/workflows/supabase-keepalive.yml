@@ -1,0 +1,42 @@
+# supabase-keepalive.yml — prevents free-tier Supabase dev project from pausing.
+#
+# Supabase pauses free projects after 7 days of no database activity. This
+# workflow runs a no-op query (SELECT 1) against the dev database twice a week
+# (Mon + Thu) to reset the inactivity timer before it expires.
+#
+# If the project is ALREADY paused this workflow will fail (hostname won't
+# resolve). Restore it manually from https://supabase.com/dashboard, then
+# this job will keep it alive going forward.
+#
+# To disable: comment out or delete this file. The dev project will then
+# pause again after 7 days of inactivity.
+name: Supabase Dev Keepalive
+
+on:
+  schedule:
+    # Mon and Thu at 09:00 UTC — twice a week, well within the 7-day window.
+    - cron: '0 9 * * 1'
+    - cron: '0 9 * * 4'
+  workflow_dispatch: # allow manual trigger to test / recover
+
+permissions:
+  contents: read
+
+jobs:
+  keepalive:
+    name: Ping dev database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+    steps:
+      - name: Install postgresql-client
+        run: sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Ping dev Supabase database
+        env:
+          DATABASE_URL: ${{ secrets.DEV_API_DATABASE_URL }}
+        run: |
+          echo "Pinging dev database to prevent Supabase free-tier pause..."
+          psql "$DATABASE_URL" --no-password -c "SELECT 1 AS keepalive;" -t
+          echo "Done."
