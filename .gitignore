@@ -206,3 +206,5 @@ tags
 
 # lean-ctx local state
 .lean-ctx/
+
+.handoff/
