@@ -50,6 +50,7 @@ func (c *claims) isAdmin() bool {
 type Verifier struct {
 	keyfunc jwtlib.Keyfunc
 	issuer  string
+	jwksURL string
 }
 
 // NewVerifier initialises the JWKS client and returns a ready Verifier.
@@ -83,7 +84,24 @@ func NewVerifier(ctx context.Context, supabaseURL, jwtSecret string) (*Verifier,
 		return jwks.Keyfunc(t)
 	}
 
-	return &Verifier{keyfunc: kf, issuer: issuer}, nil
+	return &Verifier{keyfunc: kf, issuer: issuer, jwksURL: jwksURL}, nil
+}
+
+// Ping verifies the JWKS endpoint is reachable. Used by /readyz.
+func (v *Verifier) Ping(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.jwksURL, nil)
+	if err != nil {
+		return fmt.Errorf("build jwks request: %w", err)
+	}
+	resp, err := httpx.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("jwks unreachable: %w", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("jwks returned %d", resp.StatusCode)
+	}
+	return nil
 }
 
 // ref: auth.JWT_VALIDATION.5 — validates exp claim

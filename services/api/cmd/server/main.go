@@ -147,9 +147,27 @@ func main() {
 	profileHandler.RegisterRoutes(mux, authMiddleware)
 	gameHandler.RegisterRoutes(mux, authMiddleware)
 	importHandler.RegisterRoutes(mux, authMiddleware)
+	// ref: api-layer.HEALTH.1 — liveness probe, no deps, always 200 if process is up
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
+	// ref: api-layer.HEALTH.2 — readiness probe: DB ping + JWKS reachability, 503 on failure
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
+			slog.Warn("readyz: db ping failed", "error", err)
+			httpx.WriteJSON(w, http.StatusServiceUnavailable,
+				httpx.NewError("service_unavailable", "database unavailable"))
+			return
+		}
+		if err := verifier.Ping(ctx); err != nil {
+			slog.Warn("readyz: jwks ping failed", "error", err)
+			httpx.WriteJSON(w, http.StatusServiceUnavailable,
+				httpx.NewError("service_unavailable", "auth service unavailable"))
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
 	origins := []string{}
