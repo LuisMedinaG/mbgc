@@ -277,7 +277,6 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 	}
 	f := DiscoverFilter{
 		CollectionID: collectionID,
-		Type:         httpx.Truncate(r.URL.Query().Get("type"), 255),
 		Category:     httpx.Truncate(r.URL.Query().Get("category"), 255),
 		Mechanic:     httpx.Truncate(r.URL.Query().Get("mechanic"), 255),
 		Page:         page,

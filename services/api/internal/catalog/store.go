@@ -25,8 +25,7 @@ func validateRulesURL(url string) error {
 }
 
 type Store struct {
-	db      *pgxpool.Pool
-	dataDir string
+	db *pgxpool.Pool
 }
 
 func NewStore(db *pgxpool.Pool) *Store {
@@ -337,15 +336,8 @@ func (s *Store) SetGameCollections(ctx context.Context, userID string, gameID in
 
 type DiscoverFilter struct {
 	CollectionID int64
-	Type         string
 	Category     string
 	Mechanic     string
-	Players      string
-	Playtime     string
-	Weight       string
-	Rating       string
-	Lang         string
-	RecPlayers   string
 	Page         int
 	Limit        int
 }

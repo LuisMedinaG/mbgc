@@ -36,15 +36,3 @@ var (
 	ErrValidation           = errors.New("validation failed")
 	ErrWrongPassword        = errors.New("wrong password")
 )
-
-func IsBadRequest(err error) bool { return errors.Is(err, ErrBadRequest) }
-func IsDuplicate(err error) bool  { return errors.Is(err, ErrDuplicate) }
-func IsForbidden(err error) bool  { return errors.Is(err, ErrForbidden) }
-func IsNotFound(err error) bool   { return errors.Is(err, ErrNotFound) }
-func IsRateLimit(err error) bool  { return errors.Is(err, ErrRateLimit) }
-func IsValidation(err error) bool { return errors.Is(err, ErrValidation) }
-
-// IsUnauthorized reports whether err is or wraps ErrUnauthorized or ErrWrongPassword.
-func IsUnauthorized(err error) bool {
-	return errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrWrongPassword)
-}
