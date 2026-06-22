@@ -20,10 +20,7 @@ Single Go API service. Handles JWT validation, profiles, games, collections, and
 | `GET` | `/api/v1/games/{id}` | catalog.GetGame |
 | `DELETE` | `/api/v1/games/{id}` | catalog.DeleteGame |
 | `POST` | `/api/v1/games/{id}/collections` | catalog.SetGameCollections |
-| `POST` | `/api/v1/games/bulk-collections` | catalog.BulkCollections |
 | `PUT` | `/api/v1/games/{id}/rules-url` | catalog.UpdateRulesURL |
-| `POST` | `/api/v1/games/{id}/player-aids` | catalog.UploadPlayerAid |
-| `DELETE` | `/api/v1/games/{id}/player-aids/{aid_id}` | catalog.DeletePlayerAid |
 | `GET` | `/api/v1/collections` | catalog.ListCollections |
 | `POST` | `/api/v1/collections` | catalog.CreateCollection |
 | `PUT` | `/api/v1/collections/{id}` | catalog.UpdateCollection |

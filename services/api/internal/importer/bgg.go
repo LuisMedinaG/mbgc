@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/fzerorubigd/gobgg"
 )
 
@@ -409,6 +408,3 @@ func parseRecommendedPlayers(polls []bggPollXML) []int {
 	}
 	return nil
 }
-
-// silence unused import warning for httpx
-var _ = httpx.DefaultClient
