@@ -1,7 +1,7 @@
-// Package observe wires the API's logging path: a fail-open slog handler that
+// Package logging wires the API's logging path: a fail-open slog handler that
 // emits JSON to stdout (Cloud Logging ingests stdout in Cloud Run) and a
 // background heartbeat that proves the service is alive.
-package observe
+package logging
 
 import (
 	"context"
