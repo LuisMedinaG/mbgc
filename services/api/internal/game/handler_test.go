@@ -537,3 +537,201 @@ func TestQueryInt_Invalid(t *testing.T) {
 		t.Fatalf("expected fallback 1, got %d", v)
 	}
 }
+
+// --- UpdateRulesURL ---
+
+func TestUpdateRulesURL_Unauthenticated(t *testing.T) {
+	h := NewHandler(&mockGameStore{})
+	w := httptest.NewRecorder()
+	r := newUnauthenticatedRequest("PUT", "/api/v1/games/1/rules-url")
+	h.UpdateRulesURL(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestUpdateRulesURL_InvalidID(t *testing.T) {
+	h := NewHandler(&mockGameStore{})
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("PUT", "/api/v1/games/abc/rules-url", `{"rules_url":""}`)
+	r.SetPathValue("id", "abc")
+	h.UpdateRulesURL(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestUpdateRulesURL_InvalidBody(t *testing.T) {
+	h := NewHandler(&mockGameStore{})
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("PUT", "/api/v1/games/1/rules-url", "not json")
+	r.SetPathValue("id", "1")
+	h.UpdateRulesURL(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestUpdateRulesURL_Success(t *testing.T) {
+	store := &mockGameStore{
+		updateRulesURLFn: func(ctx context.Context, gameID int64, userID, rulesURL string) error {
+			return nil
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("PUT", "/api/v1/games/1/rules-url",
+		`{"rules_url":"https://drive.google.com/file/d/abc"}`)
+	r.SetPathValue("id", "1")
+	h.UpdateRulesURL(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestUpdateRulesURL_NotFound(t *testing.T) {
+	store := &mockGameStore{
+		updateRulesURLFn: func(ctx context.Context, gameID int64, userID, rulesURL string) error {
+			return apierr.ErrNotFound
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("PUT", "/api/v1/games/1/rules-url",
+		`{"rules_url":"https://drive.google.com/file/d/abc"}`)
+	r.SetPathValue("id", "1")
+	h.UpdateRulesURL(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+// ref: game-detail.RULES_URL.1 — server rejects non-allowlist URLs
+func TestUpdateRulesURL_InvalidURL(t *testing.T) {
+	store := &mockGameStore{
+		updateRulesURLFn: func(ctx context.Context, gameID int64, userID, rulesURL string) error {
+			return apierr.ErrValidation
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("PUT", "/api/v1/games/1/rules-url",
+		`{"rules_url":"https://evil.com/malware"}`)
+	r.SetPathValue("id", "1")
+	h.UpdateRulesURL(w, r)
+	if w.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422, got %d", w.Code)
+	}
+}
+
+// --- Discover ---
+
+func TestDiscover_Unauthenticated(t *testing.T) {
+	h := NewHandler(&mockGameStore{})
+	w := httptest.NewRecorder()
+	r := newUnauthenticatedRequest("GET", "/api/v1/discover?collection_id=1")
+	h.Discover(w, r)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
+	}
+}
+
+func TestDiscover_MissingCollectionID(t *testing.T) {
+	h := NewHandler(&mockGameStore{})
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("GET", "/api/v1/discover", "")
+	h.Discover(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestDiscover_InvalidCollectionID(t *testing.T) {
+	h := NewHandler(&mockGameStore{})
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("GET", "/api/v1/discover?collection_id=abc", "")
+	h.Discover(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", w.Code)
+	}
+}
+
+func TestDiscover_CollectionNotFound(t *testing.T) {
+	store := &mockGameStore{
+		discoverFn: func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
+			return nil, 0, nil, apierr.ErrNotFound
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("GET", "/api/v1/discover?collection_id=99", "")
+	h.Discover(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", w.Code)
+	}
+}
+
+func TestDiscover_Success(t *testing.T) {
+	col := &Collection{ID: 1, Name: "Weekend Games"}
+	store := &mockGameStore{
+		discoverFn: func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
+			return []Game{{ID: 1, Name: "Catan"}}, 1, col, nil
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("GET", "/api/v1/discover?collection_id=1&page=1&limit=20", "")
+	h.Discover(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	var resp struct {
+		Data struct {
+			Collection *Collection `json:"collection"`
+			Data       []Game      `json:"data"`
+			Meta       struct {
+				Page  int `json:"page"`
+				Limit int `json:"limit"`
+				Total int `json:"total"`
+			} `json:"meta"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.Data.Collection.Name != "Weekend Games" {
+		t.Fatalf("unexpected collection: %+v", resp.Data.Collection)
+	}
+	if len(resp.Data.Data) != 1 || resp.Data.Data[0].Name != "Catan" {
+		t.Fatalf("unexpected games: %+v", resp.Data.Data)
+	}
+	if resp.Data.Meta.Total != 1 {
+		t.Fatalf("expected total=1, got %d", resp.Data.Meta.Total)
+	}
+}
+
+// ref: vibes.DISCOVER.1 — page/limit clamped to safe bounds
+func TestDiscover_ClampsPageAndLimit(t *testing.T) {
+	var got DiscoverFilter
+	store := &mockGameStore{
+		discoverFn: func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
+			got = f
+			return nil, 0, &Collection{}, nil
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := newAuthenticatedRequest("GET", "/api/v1/discover?collection_id=1&page=-1&limit=999", "")
+	h.Discover(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if got.Page != 1 {
+		t.Fatalf("expected page clamped to 1, got %d", got.Page)
+	}
+	if got.Limit != 20 {
+		t.Fatalf("expected limit clamped to 20, got %d", got.Limit)
+	}
+}
