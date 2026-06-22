@@ -3,9 +3,11 @@ package httpx
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 )
 
@@ -13,6 +15,27 @@ import (
 func DecodeJSON(r *http.Request, v any) error {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		return fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest)
+	}
+	return nil
+}
+
+// DecodeValidate decodes a JSON body and validates the struct using go-playground/validator.
+// Returns a human-readable validation error mapped to ErrBadRequest.
+func DecodeValidate[T any](body io.Reader, dst *T) error {
+	if err := json.NewDecoder(body).Decode(dst); err != nil {
+		return fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest)
+	}
+
+	validate := validator.New()
+	if err := validate.Struct(dst); err != nil {
+		var msgs string
+		for _, validationErr := range err.(validator.ValidationErrors) {
+			msgs = fmt.Sprintf("%s, %s", msgs, validationErr.Field()+" is "+validationErr.Tag())
+		}
+		if msgs != "" {
+			msgs = msgs[2:] // strip leading ", "
+		}
+		return fmt.Errorf("%w: %s", apierr.ErrBadRequest, msgs)
 	}
 	return nil
 }
