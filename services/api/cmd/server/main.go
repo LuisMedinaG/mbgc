@@ -182,16 +182,13 @@ func main() {
 		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	origins := []string{}
-	if cfg.AllowedOrigin != "" {
-		origins = append(origins, cfg.AllowedOrigin)
-	}
-
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: httpx.Chain(mux,
 			// ref: auth.MIDDLEWARE.1 — Logger logs method, path, status, latency via slog
 			httpx.Logger,
+			// ref: api-layer.CLIENT_INFO.1 — extracts X-Client-Version/X-Platform into context
+			httpx.ClientInfo,
 			httpx.Gzip,
 			// ref: auth.MIDDLEWARE.2 — RequestID attaches unique UUID
 			httpx.RequestID,
@@ -204,8 +201,8 @@ func main() {
 			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
-			// ref: auth.MIDDLEWARE.5 — CORS validates origin
-			httpx.CORS(origins),
+			// ref: auth.MIDDLEWARE.5 — CORS validates origin; comma-separated ALLOWED_ORIGINS env var
+			httpx.CORS(cfg.AllowedOrigins),
 		),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 120 * time.Second,
