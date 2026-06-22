@@ -24,7 +24,7 @@ import (
 	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/observe"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/logging"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
 	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
@@ -73,7 +73,7 @@ func main() {
 	// ref: monitoring.OBSERVABILITY.1, monitoring.FAIL_OPEN.1 — install the
 	// fail-open JSON handler before any slog call. Must be the first line of
 	// main so config-load failures are also captured as structured events.
-	slog.SetDefault(slog.New(observe.NewHandler()))
+	slog.SetDefault(slog.New(logging.NewHandler()))
 
 	// ref: monitoring.OBSERVABILITY.3 — kill switch. When set, Record becomes
 	// a no-op and log ingestion from this service drops to zero. Flip on the
@@ -93,7 +93,7 @@ func main() {
 	// shutdown so it stops cleanly with the rest of the service.
 	hbCtx, hbCancel := context.WithCancel(context.Background())
 	defer hbCancel()
-	go observe.Heartbeat(hbCtx, 5*time.Minute)
+	go logging.Heartbeat(hbCtx, 5*time.Minute)
 
 	if os.Getenv("SKIP_MIGRATIONS") != "true" {
 		if err := runMigrations(cfg.DatabaseURL); err != nil {
@@ -102,7 +102,19 @@ func main() {
 		}
 	}
 
-	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	// ref: api-layer.INFRA.1 — explicit pool config: 10 conns/instance, 2 warm,
+	// 30min lifetime (Supabase preference), 5min idle, 1min health check.
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("failed to parse database URL", "error", err)
+		os.Exit(1)
+	}
+	poolCfg.MaxConns = 10
+	poolCfg.MinConns = 2
+	poolCfg.MaxConnLifetime = 30 * time.Minute
+	poolCfg.MaxConnIdleTime = 5 * time.Minute
+	poolCfg.HealthCheckPeriod = 1 * time.Minute
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)

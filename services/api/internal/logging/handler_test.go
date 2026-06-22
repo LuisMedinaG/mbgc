@@ -1,4 +1,4 @@
-package observe
+package logging
 
 import (
 	"bytes"
