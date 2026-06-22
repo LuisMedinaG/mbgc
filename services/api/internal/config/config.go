@@ -48,10 +48,10 @@ func Load() (Config, error) {
 		JWTSecret:         os.Getenv("SUPABASE_JWT_SECRET"),
 		ServiceRoleKey:    serviceRoleKey,
 		AllowedOrigins:    getenvList("ALLOWED_ORIGINS", "http://localhost:5173"), // ref: api-layer.CONFIG.4 — comma-separated; defaults to localhost:5173
-		BGGToken:          os.Getenv("BGG_TOKEN"),                            // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
-		BGGCookie:         os.Getenv("BGG_COOKIE"),                           // ref: api-layer.CONFIG.5
-		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),                   // ref: api-layer.CONFIG.6 — defaults to 3
-		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),                 // ref: api-layer.CONFIG.6 — defaults to 20
+		BGGToken:          os.Getenv("BGG_TOKEN"),                                 // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
+		BGGCookie:         os.Getenv("BGG_COOKIE"),                                // ref: api-layer.CONFIG.5
+		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),                        // ref: api-layer.CONFIG.6 — defaults to 3
+		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),                      // ref: api-layer.CONFIG.6 — defaults to 20
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),
