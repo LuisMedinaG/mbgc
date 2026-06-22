@@ -34,6 +34,18 @@ func SecurityHeaders(next http.Handler) http.Handler {
 	})
 }
 
+// ClientInfo reads X-Client-Version and X-Platform request headers and stores
+// them in context. Missing headers are stored as empty strings — no request
+// is rejected. Used for per-version logging and future server-side feature flags.
+// ref: api-layer.CLIENT_INFO.1
+func ClientInfo(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		version := strings.TrimSpace(r.Header.Get("X-Client-Version"))
+		platform := strings.TrimSpace(r.Header.Get("X-Platform"))
+		next.ServeHTTP(w, r.WithContext(withClientInfo(r.Context(), version, platform)))
+	})
+}
+
 // CORS applies CORS headers for the given list of allowed origins.
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	allowed := make(map[string]struct{}, len(allowedOrigins))
@@ -52,7 +64,7 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
 				h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID")
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID, X-Client-Version, X-Platform")
 				h.Set("Access-Control-Max-Age", "86400")
 			}
 			if r.Method == http.MethodOptions {
@@ -116,10 +128,14 @@ func Logger(next http.Handler) http.Handler {
 			level = slog.LevelInfo
 		}
 
-		Record(r, event, level,
-			"status", rw.status,
-			"latency_ms", time.Since(start).Milliseconds(),
-		)
+		attrs := []any{"status", rw.status, "latency_ms", time.Since(start).Milliseconds()}
+		if v := ClientVersionFromContext(r.Context()); v != "" {
+			attrs = append(attrs, "client_version", v)
+		}
+		if p := ClientPlatformFromContext(r.Context()); p != "" {
+			attrs = append(attrs, "client_platform", p)
+		}
+		Record(r, event, level, attrs...)
 	})
 }
 

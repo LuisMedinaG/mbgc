@@ -17,16 +17,18 @@ import (
 //
 // ref: monitoring.REDACTION.5
 var allowedAttrs = map[string]struct{}{
-	"request_id": {}, // helper-managed (always set, last-write-wins)
-	"method":     {}, // helper-managed
-	"path":       {}, // helper-managed
-	"event":      {}, // helper-managed
-	"status":     {},
-	"latency_ms": {},
-	"error_code": {},
-	"stack":      {},
-	"sync_kind":  {},
-	"game_count": {},
+	"request_id":      {}, // helper-managed (always set, last-write-wins)
+	"method":          {}, // helper-managed
+	"path":            {}, // helper-managed
+	"event":           {}, // helper-managed
+	"status":          {},
+	"latency_ms":      {},
+	"error_code":      {},
+	"stack":           {},
+	"sync_kind":       {},
+	"game_count":      {},
+	"client_version":  {},
+	"client_platform": {},
 }
 
 // Disabled is a kill switch for the entire monitoring pipeline. When true,

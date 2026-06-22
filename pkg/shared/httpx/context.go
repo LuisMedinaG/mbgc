@@ -10,6 +10,8 @@ const (
 	ctxUserID
 	ctxUsername
 	ctxIsAdmin
+	ctxClientVersion
+	ctxClientPlatform
 )
 
 // SetGatewayUser stores the user identity injected by the gateway into ctx.
@@ -45,5 +47,23 @@ func withRequestID(ctx context.Context, id string) context.Context {
 // RequestIDFromContext returns the request ID for the current request.
 func RequestIDFromContext(ctx context.Context) string {
 	v, _ := ctx.Value(ctxRequestID).(string)
+	return v
+}
+
+func withClientInfo(ctx context.Context, version, platform string) context.Context {
+	ctx = context.WithValue(ctx, ctxClientVersion, version)
+	ctx = context.WithValue(ctx, ctxClientPlatform, platform)
+	return ctx
+}
+
+// ClientVersionFromContext returns the X-Client-Version header value set by ClientInfo middleware.
+func ClientVersionFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(ctxClientVersion).(string)
+	return v
+}
+
+// ClientPlatformFromContext returns the X-Platform header value set by ClientInfo middleware.
+func ClientPlatformFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(ctxClientPlatform).(string)
 	return v
 }

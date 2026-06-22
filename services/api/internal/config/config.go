@@ -14,7 +14,7 @@ type Config struct {
 	SupabaseURL    string
 	JWTSecret      string
 	ServiceRoleKey string
-	AllowedOrigin  string
+	AllowedOrigins []string
 	BGGToken       string
 	BGGCookie      string
 	SyncLimitUser  int
@@ -47,11 +47,11 @@ func Load() (Config, error) {
 		// Optional legacy HS256 shared secret — leave empty for JWKS-only (recommended).
 		JWTSecret:         os.Getenv("SUPABASE_JWT_SECRET"),
 		ServiceRoleKey:    serviceRoleKey,
-		AllowedOrigin:     getenv("ALLOWED_ORIGIN", "http://localhost:5173"), // ref: api-layer.CONFIG.4 — defaults to localhost:5173
-		BGGToken:          os.Getenv("BGG_TOKEN"),                            // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
-		BGGCookie:         os.Getenv("BGG_COOKIE"),                           // ref: api-layer.CONFIG.5
-		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),                   // ref: api-layer.CONFIG.6 — defaults to 3
-		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),                 // ref: api-layer.CONFIG.6 — defaults to 20
+		AllowedOrigins:    getenvList("ALLOWED_ORIGINS", "http://localhost:5173"), // ref: api-layer.CONFIG.4 — comma-separated; defaults to localhost:5173
+		BGGToken:          os.Getenv("BGG_TOKEN"),                                 // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
+		BGGCookie:         os.Getenv("BGG_COOKIE"),                                // ref: api-layer.CONFIG.5
+		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),                        // ref: api-layer.CONFIG.6 — defaults to 3
+		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),                      // ref: api-layer.CONFIG.6 — defaults to 20
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),
@@ -111,6 +111,21 @@ func sanitizeDatabaseURL(rawURL string) string {
 		RawQuery: rawQuery,
 	}
 	return u.String()
+}
+
+func getenvList(key, fallback string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		v = fallback
+	}
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func getenvInt(key string, fallback int) int {
