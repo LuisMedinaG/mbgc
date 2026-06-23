@@ -103,7 +103,12 @@ defer func() {
 
 ### E2E Tests (Playwright)
 
-Full stack required: `make dev` + `make test-e2e`
+Mocked by default — no backend needed. `make test-e2e` spins up its own
+isolated Vite server (port 9999) so it never touches a real backend or a
+dev server you have running on `:5173`. See `web/e2e/README.md`.
+
+**First-time setup:** `npx playwright install chromium` (downloads the
+browser binary — not pulled in by `bun install`).
 
 Tests in `web/e2e/tests/*.spec.ts` cover user flows:
 - Auth (login, logout, token refresh)
@@ -135,7 +140,7 @@ make test
 go test -coverprofile=/tmp/cov.out ./services/api/... ./pkg/shared/...
 go tool cover -func=/tmp/cov.out
 
-# Run frontend E2E tests (full stack must be running)
+# Run frontend E2E tests (mocked, no backend needed)
 make test-e2e
 
 # Quick smoke test before PR

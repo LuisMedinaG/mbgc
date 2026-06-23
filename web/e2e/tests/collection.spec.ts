@@ -70,6 +70,21 @@ test.describe('Collection page', () => {
     await expect(page.getByText('Gloomhaven')).not.toBeVisible()
   })
 
+  // ref: collection.API.1 — players filter sends ?players= and narrows the list
+  test('selecting a players filter sends ?players=5plus and narrows to games supporting 5+', async ({ authenticatedPage: page }) => {
+    const reqPromise = page.waitForRequest(
+      (req) => req.url().includes('/api/v1/games') && req.url().includes('players=5plus'),
+    )
+    await goToCollection(page)
+    await page.locator('select.filter-select').nth(1).selectOption('5plus')
+    const req = await reqPromise
+    expect(new URL(req.url()).searchParams.get('players')).toBe('5plus')
+    // Only Terraforming Mars supports up to 5 players in the fixture.
+    await expect(page.getByText('Terraforming Mars').first()).toBeVisible({ timeout: 5000 })
+    await expect(page.getByText('Gloomhaven')).not.toBeVisible()
+    await expect(page.getByText('Pandemic Legacy')).not.toBeVisible()
+  })
+
   // ref: collection.ACTIVE_FILTERS.1 — clicking × on a filter chip clears it
   // and the list re-renders with the unfiltered set.
   // Note: TanStack Query dedupes identical query keys, so a "refetch" may

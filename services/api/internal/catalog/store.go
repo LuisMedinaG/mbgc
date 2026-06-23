@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -34,7 +35,13 @@ func NewStore(db *pgxpool.Pool) *Store {
 
 const gameColumns = "id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
 	" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
-	" language_dependence, recommended_players, rules_url, created_at, updated_at"
+	" language_dependence, recommended_players, rules_url," +
+	" (SELECT COALESCE(json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name), '[]'::json)" +
+	"  FROM games.collection_games cg JOIN games.collections c ON c.id = cg.collection_id" +
+	"  WHERE cg.game_id = games.games.id) AS vibes," +
+	" (SELECT COALESCE(json_agg(json_build_object('id', pa.id, 'game_id', pa.game_id, 'filename', pa.filename, 'label', pa.label, 'created_at', pa.created_at) ORDER BY pa.created_at), '[]'::json)" +
+	"  FROM games.player_aids pa WHERE pa.game_id = games.games.id) AS player_aids," +
+	" created_at, updated_at"
 
 // scanner is satisfied by both pgx.Rows (Query) and pgx.Row (QueryRow).
 type scanner interface {
@@ -43,11 +50,22 @@ type scanner interface {
 
 func scanGame(s scanner) (Game, error) {
 	var g Game
+	var vibesJSON []byte
+	var aidsJSON []byte
 	err := s.Scan(&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
 		&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
 		&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
-		&g.RecommendedPlayers, &g.RulesURL, &g.CreatedAt, &g.UpdatedAt)
-	return g, err
+		&g.RecommendedPlayers, &g.RulesURL, &vibesJSON, &aidsJSON, &g.CreatedAt, &g.UpdatedAt)
+	if err != nil {
+		return g, err
+	}
+	if err := json.Unmarshal(vibesJSON, &g.Vibes); err != nil {
+		return g, err
+	}
+	if err := json.Unmarshal(aidsJSON, &g.PlayerAids); err != nil {
+		return g, err
+	}
+	return g, nil
 }
 
 func scanCollection(s scanner) (Collection, error) {
@@ -62,19 +80,49 @@ func scanPlayerAid(s scanner) (PlayerAid, error) {
 	return a, err
 }
 
-func gamePredicates(userID string, search, category string) sq.And {
+func gamePredicates(userID string, f GameFilter) sq.And {
 	pred := sq.And{sq.Eq{"user_id": userID}}
-	if search != "" {
-		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", search))
+	if f.Search != "" {
+		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", f.Search))
 	}
-	if category != "" {
-		pred = append(pred, sq.Expr("? = ANY(categories)", category))
+	if f.Category != "" {
+		pred = append(pred, sq.Expr("? = ANY(categories)", f.Category))
+	}
+	switch f.Players {
+	case "1":
+		pred = append(pred, sq.LtOrEq{"min_players": 1})
+	case "2":
+		pred = append(pred, sq.LtOrEq{"min_players": 2})
+	case "2only":
+		pred = append(pred, sq.LtOrEq{"min_players": 2}, sq.GtOrEq{"max_players": 2})
+	case "3":
+		pred = append(pred, sq.LtOrEq{"min_players": 3})
+	case "4":
+		pred = append(pred, sq.LtOrEq{"min_players": 4})
+	case "5plus":
+		pred = append(pred, sq.GtOrEq{"max_players": 5})
+	}
+	switch f.Playtime {
+	case "short":
+		pred = append(pred, sq.Lt{"playtime": 30})
+	case "medium":
+		pred = append(pred, sq.GtOrEq{"playtime": 30}, sq.LtOrEq{"playtime": 60})
+	case "long":
+		pred = append(pred, sq.Gt{"playtime": 60})
+	}
+	switch f.Weight {
+	case "light":
+		pred = append(pred, sq.Lt{"weight": 2})
+	case "medium":
+		pred = append(pred, sq.GtOrEq{"weight": 2}, sq.LtOrEq{"weight": 3.5})
+	case "heavy":
+		pred = append(pred, sq.Gt{"weight": 3.5})
 	}
 	return pred
 }
 
 func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
-	pred := gamePredicates(userID, f.Search, f.Category)
+	pred := gamePredicates(userID, f)
 
 	countSQL, countArgs, err := sq.Select("COUNT(*)").
 		From("games.games").
@@ -109,43 +157,16 @@ func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]G
 	defer rows.Close()
 
 	var games []Game
-	var gameIDs []int64
 	for rows.Next() {
 		g, err := scanGame(rows)
 		if err != nil {
 			return nil, 0, err
 		}
 		games = append(games, g)
-		gameIDs = append(gameIDs, g.ID)
 	}
 	if games == nil {
 		games = []Game{}
 	}
-
-	if len(gameIDs) > 0 {
-		vibes, err := s.getVibesForGames(ctx, userID, gameIDs)
-		if err != nil {
-			return nil, 0, err
-		}
-		aids, err := s.getPlayerAidsForGames(ctx, userID, gameIDs)
-		if err != nil {
-			return nil, 0, err
-		}
-		for i := range games {
-			v, ok := vibes[games[i].ID]
-			if !ok {
-				v = []Collection{}
-			}
-			games[i].Vibes = v
-
-			a, ok := aids[games[i].ID]
-			if !ok {
-				a = []PlayerAid{}
-			}
-			games[i].PlayerAids = a
-		}
-	}
-
 	return games, total, rows.Err()
 }
 
@@ -155,109 +176,7 @@ func (s *Store) GetGame(ctx context.Context, id int64, userID string) (*Game, er
 	if err != nil {
 		return nil, apierr.ErrNotFound
 	}
-
-	vibes, err := s.getVibesForGames(ctx, userID, []int64{id})
-	if err != nil {
-		return nil, err
-	}
-	g.Vibes = vibes[id]
-	if g.Vibes == nil {
-		g.Vibes = []Collection{}
-	}
-
-	aids, err := s.getPlayerAidsForGames(ctx, userID, []int64{id})
-	if err != nil {
-		return nil, err
-	}
-	g.PlayerAids = aids[id]
-	if g.PlayerAids == nil {
-		g.PlayerAids = []PlayerAid{}
-	}
-
 	return &g, nil
-}
-
-func (s *Store) getVibesForGames(ctx context.Context, userID string, gameIDs []int64) (map[int64][]Collection, error) {
-	rows, err := s.db.Query(ctx, `
-		SELECT cg.game_id, c.id, c.user_id, c.name, c.description, 0 as game_count, c.created_at, c.updated_at
-		FROM games.collections c
-		JOIN games.collection_games cg ON c.id = cg.collection_id
-		WHERE cg.game_id = ANY($1) AND c.user_id = $2
-		ORDER BY c.name`, gameIDs, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	res := make(map[int64][]Collection)
-	for rows.Next() {
-		var gameID int64
-		var c Collection
-		if err := rows.Scan(&gameID, &c.ID, &c.UserID, &c.Name, &c.Description, &c.GameCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		res[gameID] = append(res[gameID], c)
-	}
-	return res, rows.Err()
-}
-
-func (s *Store) getPlayerAidsForGames(ctx context.Context, userID string, gameIDs []int64) (map[int64][]PlayerAid, error) {
-	rows, err := s.db.Query(ctx, `
-		SELECT pa.id, pa.game_id, pa.filename, pa.label, pa.created_at
-		FROM games.player_aids pa
-		JOIN games.games g ON pa.game_id = g.id
-		WHERE pa.game_id = ANY($1) AND g.user_id = $2
-		ORDER BY pa.created_at`, gameIDs, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	res := make(map[int64][]PlayerAid)
-	for rows.Next() {
-		pa, err := scanPlayerAid(rows)
-		if err != nil {
-			return nil, err
-		}
-		res[pa.GameID] = append(res[pa.GameID], pa)
-	}
-	return res, rows.Err()
-}
-
-func (s *Store) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
-	var exists bool
-	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
-		gameID, userID).Scan(&exists); err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, apierr.ErrNotFound
-	}
-
-	var pa PlayerAid
-	err := s.db.QueryRow(ctx, `
-		INSERT INTO games.player_aids (game_id, filename, label)
-		VALUES ($1, $2, $3)
-		RETURNING id, game_id, filename, label, created_at`,
-		gameID, filename, label).Scan(&pa.ID, &pa.GameID, &pa.Filename, &pa.Label, &pa.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &pa, nil
-}
-
-func (s *Store) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
-	tag, err := s.db.Exec(ctx, `
-		DELETE FROM games.player_aids
-		WHERE id = $1 AND game_id = $2 AND game_id IN (SELECT id FROM games.games WHERE user_id = $3)`,
-		aidID, gameID, userID)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return apierr.ErrNotFound
-	}
-	return nil
 }
 
 func (s *Store) CreateGame(ctx context.Context, userID string, bggID int) (int64, error) {
@@ -424,6 +343,42 @@ func (s *Store) UpdateCollection(ctx context.Context, id int64, userID, name, de
 	return nil
 }
 
+func (s *Store) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+	var exists bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
+		gameID, userID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, apierr.ErrNotFound
+	}
+
+	var pa PlayerAid
+	err := s.db.QueryRow(ctx, `
+		INSERT INTO games.player_aids (game_id, filename, label)
+		VALUES ($1, $2, $3)
+		RETURNING id, game_id, filename, label, created_at`,
+		gameID, filename, label).Scan(&pa.ID, &pa.GameID, &pa.Filename, &pa.Label, &pa.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &pa, nil
+}
+
+func (s *Store) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
+	tag, err := s.db.Exec(ctx, `
+		DELETE FROM games.player_aids
+		WHERE id = $1 AND game_id = $2 AND game_id IN (SELECT id FROM games.games WHERE user_id = $3)`,
+		aidID, gameID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apierr.ErrNotFound
+	}
+	return nil
+}
+
 // ref: auth.MULTI_TENANCY.3 — verifies user_id before deleting collection
 func (s *Store) DeleteCollection(ctx context.Context, id int64, userID string) error {
 	tag, err := s.db.Exec(ctx,
@@ -533,7 +488,13 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 	listSQL, listArgs, err := sq.Select(
 		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail," +
 			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating," +
-			" g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at").
+			" g.language_dependence, g.recommended_players, g.rules_url," +
+			" (SELECT COALESCE(json_agg(json_build_object('id', c2.id, 'name', c2.name) ORDER BY c2.name), '[]'::json)" +
+			"  FROM games.collection_games cg2 JOIN games.collections c2 ON c2.id = cg2.collection_id" +
+			"  WHERE cg2.game_id = g.id) AS vibes," +
+	" (SELECT COALESCE(json_agg(json_build_object('id', pa.id, 'game_id', pa.game_id, 'filename', pa.filename, 'label', pa.label, 'created_at', pa.created_at) ORDER BY pa.created_at), '[]'::json)" +
+	"  FROM games.player_aids pa WHERE pa.game_id = g.id) AS player_aids," +
+			" g.created_at, g.updated_at").
 		From("games.games g").
 		Join("games.collection_games cg ON g.id = cg.game_id").
 		Where(pred).

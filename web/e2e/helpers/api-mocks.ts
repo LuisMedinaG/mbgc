@@ -21,7 +21,7 @@ export const FIXTURE_GAMES = [
     play_time: 120, categories: ['Adventure'], mechanics: ['Deck Building'],
     types: ['Board Game'], weight: 3.86, rating: 8.8,
     language_dependence: 2, recommended_players: [2, 3, 4],
-    rules_url: null, vibes: [], player_aids: [],
+    rules_url: null, vibes: [] as { id: number; name: string }[], player_aids: [],
   },
   {
     id: 2, bgg_id: 161936, name: 'Pandemic Legacy: Season 1',
@@ -30,7 +30,7 @@ export const FIXTURE_GAMES = [
     play_time: 60, categories: ['Medical'], mechanics: ['Co-op'],
     types: ['Board Game'], weight: 2.83, rating: 8.6,
     language_dependence: 3, recommended_players: [4],
-    rules_url: null, vibes: [], player_aids: [],
+    rules_url: null, vibes: [] as { id: number; name: string }[], player_aids: [],
   },
   {
     id: 3, bgg_id: 167791, name: 'Terraforming Mars',
@@ -39,7 +39,7 @@ export const FIXTURE_GAMES = [
     play_time: 120, categories: ['Science Fiction'], mechanics: ['Card Drafting'],
     types: ['Board Game'], weight: 3.27, rating: 8.3,
     language_dependence: 2, recommended_players: [2, 3],
-    rules_url: null, vibes: [], player_aids: [],
+    rules_url: null, vibes: [] as { id: number; name: string }[], player_aids: [],
   },
 ]
 
@@ -82,6 +82,40 @@ function collectCategories(games: typeof FIXTURE_GAMES): string[] {
     for (const c of g.categories ?? []) set.add(c)
   }
   return Array.from(set).sort()
+}
+
+// applyGameFilters mirrors the backend predicates in
+// services/api/internal/catalog/store.go (gamePredicates) so e2e tests
+// assert against realistic filtering behaviour.
+function applyGameFilters(games: typeof FIXTURE_GAMES, params: URLSearchParams): typeof FIXTURE_GAMES {
+  const q = params.get('q')?.toLowerCase() ?? ''
+  const category = params.get('category') ?? ''
+  const players = params.get('players') ?? ''
+  const playtime = params.get('playtime') ?? ''
+  const weight = params.get('weight') ?? ''
+  return games.filter((g) => {
+    if (q && !g.name.toLowerCase().includes(q)) return false
+    if (category && !(g.categories ?? []).includes(category)) return false
+    switch (players) {
+      case '1': if (g.min_players > 1) return false; break
+      case '2': if (g.min_players > 2) return false; break
+      case '2only': if (g.min_players > 2 || g.max_players < 2) return false; break
+      case '3': if (g.min_players > 3) return false; break
+      case '4': if (g.min_players > 4) return false; break
+      case '5plus': if (g.max_players < 5) return false; break
+    }
+    switch (playtime) {
+      case 'short': if (!(g.play_time < 30)) return false; break
+      case 'medium': if (!(g.play_time >= 30 && g.play_time <= 60)) return false; break
+      case 'long': if (!(g.play_time > 60)) return false; break
+    }
+    switch (weight) {
+      case 'light': if (!(g.weight < 2)) return false; break
+      case 'medium': if (!(g.weight >= 2 && g.weight <= 3.5)) return false; break
+      case 'heavy': if (!(g.weight > 3.5)) return false; break
+    }
+    return true
+  })
 }
 
 // ── Individual mock helpers ────────────────────────────────────────────────────
@@ -164,13 +198,7 @@ export async function mockListGames(page: Page): Promise<void> {
     // does the same with Postgres FTS; we just substring-match here so
     // search/filter e2e tests assert against realistic responses.
     const params = new URL(route.request().url()).searchParams
-    const q = params.get('q')?.toLowerCase() ?? ''
-    const category = params.get('category') ?? ''
-    const filtered = state.games.filter((g) => {
-      if (q && !g.name.toLowerCase().includes(q)) return false
-      if (category && !(g.categories ?? []).includes(category)) return false
-      return true
-    })
+    const filtered = applyGameFilters(state.games, params)
 
     return route.fulfill({
       status: 200,
@@ -207,8 +235,17 @@ export async function mockGetGame(page: Page): Promise<void> {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { ...game, player_aids: [], vibeCollectionIds: [] } }),
+        body: JSON.stringify({ data: { ...game, player_aids: [] } }),
       })
+    }
+    if (route.request().method() === 'POST' && /\/collections$/.test(url)) {
+      const body = JSON.parse(route.request().postData() ?? '{}')
+      const ids: number[] = body.collection_ids ?? []
+      game.vibes = ids
+        .map((cid) => state.collections.find((c) => c.id === cid))
+        .filter((c): c is typeof state.collections[number] => Boolean(c))
+        .map((c) => ({ id: c.id, name: c.name }))
+      return route.fulfill({ status: 204 })
     }
     return route.fallback()
   })
@@ -468,15 +505,9 @@ async function mockListGamesWithOverride(
     const url = route.request().url()
     if (/\/api\/v1\/games\/\d+/.test(url)) return route.fallback()
     // Apply the same query filter as the default mock so override data
-    // still responds realistically to ?q= and ?category=.
+    // still responds realistically to ?q=, ?category=, ?players=, etc.
     const params = new URL(url).searchParams
-    const q = params.get('q')?.toLowerCase() ?? ''
-    const category = params.get('category') ?? ''
-    const filtered = data.filter((g) => {
-      if (q && !g.name.toLowerCase().includes(q)) return false
-      if (category && !(g.categories ?? []).includes(category)) return false
-      return true
-    })
+    const filtered = applyGameFilters(data, params)
     return route.fulfill({
       status: 200,
       contentType: 'application/json',

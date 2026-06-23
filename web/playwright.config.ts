@@ -25,7 +25,11 @@ export default defineConfig({
   webServer: {
     command: 'bun dev',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
+    // Always launch a fresh server, even locally. Reusing whatever happens
+    // to already be listening on :5173 (e.g. a `make dev` session, or any
+    // other tool's Vite server) silently skips the VITE_API_BASE_URL=9999
+    // override below, letting real backend responses race the mocks.
+    reuseExistingServer: false,
     timeout: 60_000,
     // Point the app's API calls to port 9999 — a port that Vite's proxy does NOT
     // forward. Playwright's page.route() intercepts those browser-level requests

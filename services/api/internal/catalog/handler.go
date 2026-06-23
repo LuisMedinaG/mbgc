@@ -57,8 +57,11 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 	}
 	page, limit := httpx.Pagination(r, 20, 100)
 	f := GameFilter{
-		Search:   httpx.Truncate(r.URL.Query().Get("search"), 255),
+		Search:   httpx.Truncate(r.URL.Query().Get("q"), 255),
 		Category: httpx.Truncate(r.URL.Query().Get("category"), 255),
+		Players:  httpx.Truncate(r.URL.Query().Get("players"), 16),
+		Playtime: httpx.Truncate(r.URL.Query().Get("playtime"), 16),
+		Weight:   httpx.Truncate(r.URL.Query().Get("weight"), 16),
 		Page:     page,
 		Limit:    limit,
 	}
