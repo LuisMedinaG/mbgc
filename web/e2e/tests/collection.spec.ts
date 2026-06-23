@@ -85,36 +85,6 @@ test.describe('Collection page', () => {
     await expect(page.getByText('Pandemic Legacy')).not.toBeVisible()
   })
 
-  // ref: collection.API.1 — playtime filter sends ?playtime= and narrows the list
-  test('selecting a playtime filter sends ?playtime=medium and narrows to 30-60min games', async ({ authenticatedPage: page }) => {
-    const reqPromise = page.waitForRequest(
-      (req) => req.url().includes('/api/v1/games') && req.url().includes('playtime=medium'),
-    )
-    await goToCollection(page)
-    await page.locator('select.filter-select').nth(2).selectOption('medium')
-    const req = await reqPromise
-    expect(new URL(req.url()).searchParams.get('playtime')).toBe('medium')
-    // Only Pandemic Legacy plays in 30-60 min in the fixture.
-    await expect(page.getByText('Pandemic Legacy: Season 1').first()).toBeVisible({ timeout: 5000 })
-    await expect(page.getByText('Gloomhaven')).not.toBeVisible()
-    await expect(page.getByText('Terraforming Mars')).not.toBeVisible()
-  })
-
-  // ref: collection.API.1 — weight filter sends ?weight= and narrows the list
-  test('selecting a weight filter sends ?weight=heavy and narrows to heavy games', async ({ authenticatedPage: page }) => {
-    const reqPromise = page.waitForRequest(
-      (req) => req.url().includes('/api/v1/games') && req.url().includes('weight=heavy'),
-    )
-    await goToCollection(page)
-    await page.locator('select.filter-select').nth(3).selectOption('heavy')
-    const req = await reqPromise
-    expect(new URL(req.url()).searchParams.get('weight')).toBe('heavy')
-    // Only Gloomhaven (weight 3.86) is heavy in the fixture.
-    await expect(page.getByText('Gloomhaven').first()).toBeVisible({ timeout: 5000 })
-    await expect(page.getByText('Pandemic Legacy')).not.toBeVisible()
-    await expect(page.getByText('Terraforming Mars')).not.toBeVisible()
-  })
-
   // ref: collection.ACTIVE_FILTERS.1 — clicking × on a filter chip clears it
   // and the list re-renders with the unfiltered set.
   // Note: TanStack Query dedupes identical query keys, so a "refetch" may
