@@ -396,8 +396,8 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 	}
 
 	listSQL, listArgs, err := sq.Select(
-		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail,"+
-			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating,"+
+		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail," +
+			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating," +
 			" g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at").
 		From("games.games g").
 		Join("games.collection_games cg ON g.id = cg.game_id").

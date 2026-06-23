@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
@@ -101,7 +102,7 @@ func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
 }
 
 type collectionRequest struct {
-	Name        string `json:"name" validate:"required"`
+	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
@@ -183,6 +184,10 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
+	if body.Name == "" {
+		httpx.WriteError(w, fmt.Errorf("%w: name is required", apierr.ErrBadRequest))
+		return
+	}
 	body.Name = httpx.Truncate(body.Name, 255)
 	body.Description = httpx.Truncate(body.Description, 255)
 	col, err := h.svc.CreateCollection(r.Context(), userID, body.Name, body.Description)
@@ -258,10 +263,14 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, struct {
-		Collection *Collection            `json:"collection"`
-		httpx.ListResponse[Game]
+		Collection *Collection    `json:"collection"`
+		Data       []Game         `json:"data"`
+		Meta       httpx.PageMeta `json:"meta"`
+		Total      int            `json:"total"`
 	}{
-		Collection:   col,
-		ListResponse: httpx.NewList(games, page, limit, total),
+		Collection: col,
+		Data:       games,
+		Meta:       httpx.PageMeta{Page: page, Limit: limit, Total: total},
+		Total:      total,
 	})
 }

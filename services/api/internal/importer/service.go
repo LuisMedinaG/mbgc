@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 type importerStore interface {

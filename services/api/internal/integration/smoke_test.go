@@ -38,8 +38,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 )
 

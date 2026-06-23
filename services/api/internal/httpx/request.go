@@ -21,7 +21,14 @@ func DecodeValidate[T any](body io.Reader, dst *T) error {
 	}
 
 	if err := validate.Struct(dst); err != nil {
-		return fmt.Errorf("%w: %s", apierr.ErrBadRequest, err.Error())
+		var msgs string
+		for _, validationErr := range err.(validator.ValidationErrors) {
+			msgs = fmt.Sprintf("%s, %s", msgs, validationErr.Field()+" is "+validationErr.Tag())
+		}
+		if msgs != "" {
+			msgs = msgs[2:] // strip leading ", "
+		}
+		return fmt.Errorf("%w: %s", apierr.ErrBadRequest, msgs)
 	}
 	return nil
 }

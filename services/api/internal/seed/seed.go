@@ -13,8 +13,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 // AdminUser creates a Supabase Auth user + admin profile row if neither exists.

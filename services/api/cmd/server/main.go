@@ -18,10 +18,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/auth"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
@@ -203,6 +203,8 @@ func main() {
 			globalRateLimit,
 			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
 			httpx.LimitBodySize(1<<20),
+			// ref: api-layer.SEC.7 — rejects wrong Content-Type on body-bearing requests (CSRF text/plain bypass)
+			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
 			// ref: auth.MIDDLEWARE.5 — CORS validates origin; comma-separated ALLOWED_ORIGINS env var
