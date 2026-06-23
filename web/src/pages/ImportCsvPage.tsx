@@ -1,48 +1,42 @@
 import { useState, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { api, ApiError, type CSVPreviewRow, type CSVPreviewResult, type CSVImportResult } from '../lib/api'
+import { ApiError, type CSVPreviewRow, type CSVPreviewResult, type CSVImportResult } from '../lib/api'
+import { useCsvImport } from '../hooks/useCsvImport'
 
 type Step = 'upload' | 'preview' | 'done'
 
 export default function ImportCsvPage() {
   const [step, setStep] = useState<Step>('upload')
   const [file, setFile] = useState<File | null>(null)
-  const [previewing, setPreviewing] = useState(false)
+  const { previewCSV, importCSV } = useCsvImport()
   const [preview, setPreview] = useState<CSVPreviewResult | null>(null)
   const [previewError, setPreviewError] = useState<string | null>(null)
-  const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<CSVImportResult | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handlePreview() {
     if (!file) return
-    setPreviewing(true)
     setPreviewError(null)
     try {
-      const r = await api.csvPreview(file)
+      const r = await previewCSV.mutateAsync(file)
       setPreview(r)
       setStep('preview')
     } catch (e) {
       setPreviewError(e instanceof ApiError ? e.message : 'Preview failed')
-    } finally {
-      setPreviewing(false)
     }
   }
 
   async function handleImport() {
     if (!preview) return
-    setImporting(true)
     setImportError(null)
     try {
       const ids = preview.rows.filter(r => !r.already_owned).map(r => r.bgg_id)
-      const r = await api.csvImport(ids)
+      const r = await importCSV.mutateAsync(ids)
       setResult(r)
       setStep('done')
     } catch (e) {
       setImportError(e instanceof ApiError ? e.message : 'Import failed')
-    } finally {
-      setImporting(false)
     }
   }
 
@@ -102,10 +96,10 @@ export default function ImportCsvPage() {
           {previewError && <div className="alert-error">{previewError}</div>}
           <button
             onClick={handlePreview}
-            disabled={!file || previewing}
+            disabled={!file || previewCSV.isPending}
             className="pressable btn btn-primary self-start disabled:opacity-50"
           >
-            {previewing ? 'Loading preview…' : 'Preview'}
+            {previewCSV.isPending ? 'Loading preview…' : 'Preview'}
           </button>
         </section>
       )}
@@ -150,10 +144,10 @@ export default function ImportCsvPage() {
           <div className="flex gap-3 flex-wrap">
             <button
               onClick={handleImport}
-              disabled={importing || newRows.length === 0}
+              disabled={importCSV.isPending || newRows.length === 0}
               className="pressable btn btn-primary disabled:opacity-50"
             >
-              {importing ? 'Importing…' : `Import ${newRows.length} game${newRows.length !== 1 ? 's' : ''}`}
+              {importCSV.isPending ? 'Importing…' : `Import ${newRows.length} game${newRows.length !== 1 ? 's' : ''}`}
             </button>
             <button onClick={reset} className="pressable btn btn-secondary">Cancel</button>
           </div>

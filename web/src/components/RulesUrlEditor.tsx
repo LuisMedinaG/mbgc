@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../lib/api'
+import { useRulesUrl } from '../hooks/useRulesUrl'
 
 const DRIVE_RE = /^https:\/\/(drive|docs)\.google\.com\//
 
@@ -12,22 +12,19 @@ export default function RulesUrlEditor({ gameId, initial }: Props) {
   const [url, setUrl] = useState(initial)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(initial)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const { updateRulesUrl } = useRulesUrl(gameId)
 
   async function handleSave() {
     const trimmed = draft.trim()
     if (trimmed && !DRIVE_RE.test(trimmed)) { setError('Must be a Google Drive or Docs URL'); return }
-    setSaving(true)
     setError('')
     try {
-      await api.updateRulesUrl(gameId, trimmed)
+      await updateRulesUrl.mutateAsync(trimmed)
       setUrl(trimmed)
       setEditing(false)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed')
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -41,9 +38,9 @@ export default function RulesUrlEditor({ gameId, initial }: Props) {
           placeholder="https://drive.google.com/…" autoFocus className="form-input" />
         {error && <div className="alert-error mt-1">{error}</div>}
         <div className="flex gap-2 mt-2">
-          <button onClick={handleSave} disabled={saving}
+          <button onClick={handleSave} disabled={updateRulesUrl.isPending}
             className="btn btn-primary pressable text-[0.85rem] px-3.5 py-1.5">
-            {saving ? 'Saving…' : 'Save'}
+            {updateRulesUrl.isPending ? 'Saving…' : 'Save'}
           </button>
           <button onClick={handleCancel} className="btn btn-secondary pressable text-[0.85rem] px-3.5 py-1.5">
             Cancel
