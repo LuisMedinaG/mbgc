@@ -12,11 +12,11 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-const testUserID = "test-user-id"
+const TestUserID = "test-user-id"
 
 // NewAuthRequest builds an authenticated request with the default test user ID.
 func NewAuthRequest(t *testing.T, method, path, body string) *http.Request {
-	return NewAuthRequestAs(t, method, path, body, testUserID, false)
+	return NewAuthRequestAs(t, method, path, body, TestUserID, false)
 }
 
 // NewAuthRequestAs builds an authenticated request with a specific user ID and admin flag.
@@ -52,7 +52,7 @@ func AssertStatus(t *testing.T, w *httptest.ResponseRecorder, want int) {
 
 // TestUserID returns the default test user ID.
 func TestUserID() string {
-	return testUserID
+	return TestUserID
 }
 
 // CaptureSlog swaps slog.Default to a JSON handler writing to a buffer for

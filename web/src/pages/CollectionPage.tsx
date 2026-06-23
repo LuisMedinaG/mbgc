@@ -7,7 +7,6 @@ import ViewModeToggle from '../components/ViewModeToggle'
 import LoadingSkeleton from '../components/LoadingSkeleton'
 import ErrorMessage from '../components/ErrorMessage'
 import GameList from '../components/GameList'
-import GameGrid from '../components/GameGrid'
 import EmptyState from '../components/EmptyState'
 
 const EMPTY_FILTERS: FilterState = {
@@ -64,10 +63,8 @@ export default function CollectionPage() {
       {!loading && !error && (
         games.length === 0 ? (
           <EmptyState />
-        ) : viewMode === 'list' ? (
-          <GameList games={games} />
         ) : (
-          <GameGrid games={games} />
+          <GameList games={games} mode={viewMode} />
         )
       )}
     </div>
