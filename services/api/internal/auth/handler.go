@@ -78,7 +78,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 
 	status, respBody, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=password",
-		map[string]string{"email": authEmail, "password": req.Password})
+		map[string]string{"email": authEmail, "password": req.Password}, "")
 
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -112,7 +112,7 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 
 	status, respBody, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=refresh_token",
-		map[string]string{"refresh_token": req.RefreshToken})
+		map[string]string{"refresh_token": req.RefreshToken}, "")
 
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -143,7 +143,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 
 	_, _, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/logout?scope=global",
-		map[string]string{"refresh_token": req.RefreshToken})
+		map[string]string{"refresh_token": req.RefreshToken}, "")
 
 	// logout is best-effort; errors are not actionable to client
 	if err != nil {
@@ -176,7 +176,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	// Verify current password via token grant before allowing update.
 	status, _, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=password",
-		map[string]string{"email": email, "password": req.CurrentPassword})
+		map[string]string{"email": email, "password": req.CurrentPassword}, "")
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
@@ -187,7 +187,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bearerToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	status, _, err = h.supabase.DoRequestWithBearer(r.Context(), http.MethodPut,
+	status, _, err = h.supabase.DoRequest(r.Context(), http.MethodPut,
 		"/auth/v1/user",
 		map[string]string{"password": req.NewPassword},
 		bearerToken)

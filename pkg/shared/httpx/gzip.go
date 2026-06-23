@@ -7,7 +7,6 @@ import (
 )
 
 // Gzip compresses responses for clients that advertise gzip support.
-// Only compresses responses larger than 1KB to avoid overhead on tiny payloads.
 func Gzip(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
