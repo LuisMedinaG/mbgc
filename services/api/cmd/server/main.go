@@ -86,7 +86,7 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
 	if os.Getenv("MONITORING_DISABLED") == "true" {
-		httpx.Disabled = true
+		httpx.Disabled.Store(true)
 		slog.Info("monitoring disabled via MONITORING_DISABLED env var")
 	}
 

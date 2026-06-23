@@ -134,7 +134,7 @@ dlv attach <PID>
 ### Breakpoint on HTTP handler
 
 ```go
-// services/api/internal/game/handler.go
+// services/api/internal/catalog/handler.go
 func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
     // Set breakpoint here
     ctx := r.Context()
@@ -145,8 +145,8 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 ### Breakpoint on store layer
 
 ```go
-// services/api/internal/game/store.go
-func (s *Store) ListGames(ctx context.Context, userID uuid.UUID, filter game.ListFilter) ([]game.Game, int, error) {
+// services/api/internal/catalog/store.go
+func (s *Store) ListGames(ctx context.Context, userID uuid.UUID, filter catalog.ListFilter) ([]catalog.Game, int, error) {
     // Set breakpoint here to see SQL queries
     // ...
 }

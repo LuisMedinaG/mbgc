@@ -207,4 +207,7 @@ tags
 # lean-ctx local state
 .lean-ctx/
 
+# understand-anything generated artifacts
+.understand-anything/
+
 .handoff/
