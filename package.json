@@ -12,6 +12,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "supabase": "^2.105.0"
+    "supabase": "^2.105.0",
+    "xcodebuildmcp": "^2.6.2"
   }
 }
