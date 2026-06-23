@@ -12,7 +12,7 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 
 | Package | Contents |
 |---|---|
-| `apierr` | Sentinel errors (`ErrNotFound`, `ErrDuplicate`, …) + machine-readable codes + `Is*` helpers |
+| `apierr` | Sentinel errors (`ErrNotFound`, `ErrDuplicate`, …) + machine-readable codes |
 | `httpx` | HTTP middleware + `WriteJSON` / `WriteError` + response envelopes (`New`, `NewList`, `NewError`, `Response[T]`, `ListResponse[T]`, `ErrorResponse`) + context accessors + `DefaultClient` |
 
 ## Wire format
@@ -44,7 +44,7 @@ github.com/LuisMedinaG/mbgc/pkg/shared
 ## Key rules
 
 - Never expose raw errors (DB, OS, network) to API consumers — wrap with a sentinel.
-- Use `errors.Is` / `apierr.Is*` helpers for sentinel checks; wrap with `fmt.Errorf("%w", ...)` to add context.
+- Use `errors.Is` for sentinel checks; wrap with `fmt.Errorf("%w", ...)` to add context.
 - Middleware chain order for `services/api`: `Logger → RequestID → Recover → SecurityHeaders → CORS → LimitBodySize → router` (auth middleware wraps individual routes, not the global chain).
 - `httpx.DefaultClient` — `*http.Client` with 10s timeout. Use instead of `http.DefaultClient` for all outbound HTTP calls.
 - `httpx.RateLimiter(ratePerSec, burst)` — per-IP token bucket; returns 429 via `apierr.ErrRateLimit`. Background cleanup every 5 min.
