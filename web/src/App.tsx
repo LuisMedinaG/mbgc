@@ -1,14 +1,16 @@
+import { lazy, Suspense } from 'react'
 import { Navigate, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { useAuth } from './hooks/useAuth'
 import Layout from './components/Layout'
-import CollectionPage from './pages/CollectionPage'
-import GameDetailPage from './pages/GameDetailPage'
-import VibesPage from './pages/VibesPage'
-import ImportPage from './pages/ImportPage'
-import ImportCsvPage from './pages/ImportCsvPage'
-import ProfilePage from './pages/ProfilePage'
-import LoginPage from './pages/LoginPage'
+
+const CollectionPage = lazy(() => import('./pages/CollectionPage'))
+const GameDetailPage = lazy(() => import('./pages/GameDetailPage'))
+const VibesPage = lazy(() => import('./pages/VibesPage'))
+const ImportPage = lazy(() => import('./pages/ImportPage'))
+const ImportCsvPage = lazy(() => import('./pages/ImportCsvPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -33,12 +35,12 @@ function AppRoutes() {
           </RequireAuth>
         }
       >
-        <Route index element={<CollectionPage />} />
-        <Route path="games/:id" element={<GameDetailPage />} />
-        <Route path="vibes" element={<VibesPage />} />
-        <Route path="import" element={<ImportPage />} />
-        <Route path="import/csv" element={<ImportCsvPage />} />
-        <Route path="profile" element={<ProfilePage />} />
+        <Route index element={<Suspense fallback={null}><CollectionPage /></Suspense>} />
+        <Route path="games/:id" element={<Suspense fallback={null}><GameDetailPage /></Suspense>} />
+        <Route path="vibes" element={<Suspense fallback={null}><VibesPage /></Suspense>} />
+        <Route path="import" element={<Suspense fallback={null}><ImportPage /></Suspense>} />
+        <Route path="import/csv" element={<Suspense fallback={null}><ImportCsvPage /></Suspense>} />
+        <Route path="profile" element={<Suspense fallback={null}><ProfilePage /></Suspense>} />
       </Route>
     </Routes>
   )
