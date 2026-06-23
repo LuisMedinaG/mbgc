@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 )
 
 // ref: game-detail.RULES_URL.1 — server-side allowlist must reject javascript: URIs
