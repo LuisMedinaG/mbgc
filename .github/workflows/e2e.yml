@@ -79,6 +79,7 @@ jobs:
         env:
           CI: true
           PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.DEV_API_URL }}
+          TEST_TOKEN: ${{ secrets.TEST_TOKEN }}
 
       - uses: actions/upload-artifact@v4
         if: failure()

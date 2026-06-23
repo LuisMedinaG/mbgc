@@ -159,23 +159,17 @@ is uploaded as `playwright-report` (7-day retention).
 1. Get a token as described in [Getting a TEST_TOKEN](#getting-a-test_token-live-mode) above.
 2. Add it as a repo secret: **Settings → Secrets and variables → Actions →
    New repository secret**, name `TEST_TOKEN`
-   (or `gh secret set TEST_TOKEN --repo <owner>/<repo>`).
-3. Pass it via `env:` on the test step in `.github/workflows/e2e.yml`:
+   (or `gh secret set TEST_TOKEN --repo lumedinda/mbgc`).
+3. Already wired up — `.github/workflows/e2e.yml` passes `TEST_TOKEN: ${{ secrets.TEST_TOKEN }}`
+   to the test step unconditionally. No `if:` guard needed: when the secret
+   isn't set, GitHub Actions resolves it to an empty string, and `seedAuth`
+   (`fixtures/auth.ts`) treats an empty `TEST_TOKEN` the same as unset —
+   falling back to mocked mode.
 
-   ```yaml
-   - name: Run E2E tests
-     run: bunx playwright test --project=${{ inputs.browser || 'chromium' }}
-     working-directory: web
-     env:
-       CI: true
-       PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.DEV_API_URL }}
-       TEST_TOKEN: ${{ secrets.TEST_TOKEN }}
-   ```
-
-Since CI tokens expire in 15 minutes (see above), this only works for
+Since CI tokens expire in 15 minutes (see above), live mode only works for
 short-lived manual (`workflow_dispatch`) runs against a live `base_url` —
-not for the scheduled/PR-triggered run, where the token would likely be
-stale by the time the job starts.
+not for the PR-triggered run, where the token would likely be stale by the
+time the job starts.
 
 ## Conventions
 
