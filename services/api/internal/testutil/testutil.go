@@ -10,13 +10,13 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-const testUserID = "test-user-id"
+const TestUserID = "test-user-id"
 
 // NewAuthRequest builds an authenticated httptest.Request with userID in context.
 func NewAuthRequest(t *testing.T, method, path, body string) *http.Request {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	ctx := httpx.SetGatewayUser(r.Context(), testUserID, "testuser", false)
+	ctx := httpx.SetGatewayUser(r.Context(), TestUserID, "testuser", false)
 	return r.WithContext(ctx)
 }
 
@@ -43,7 +43,3 @@ func AssertStatus(t *testing.T, w *httptest.ResponseRecorder, want int) {
 	}
 }
 
-// TestUserID returns the user ID set in authenticated test requests.
-func TestUserID() string {
-	return testUserID
-}

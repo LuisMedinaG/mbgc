@@ -29,8 +29,9 @@ func New(baseURL, apiKey string, hc *http.Client) *Client {
 	}
 }
 
-// DoRequest calls a Supabase endpoint with apikey auth only.
-func (c *Client) DoRequest(ctx context.Context, method, path string, body map[string]string) (int, []byte, error) {
+// DoRequest calls a Supabase endpoint. Pass a non-empty bearer to include
+// Authorization: Bearer (required for user-scoped endpoints like PUT /auth/v1/user).
+func (c *Client) DoRequest(ctx context.Context, method, path string, body map[string]string, bearer string) (int, []byte, error) {
 	payload, err := json.Marshal(body)
 	if err != nil {
 		return 0, nil, fmt.Errorf("marshal request: %w", err)
@@ -42,36 +43,9 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body map[st
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("apikey", c.apiKey)
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return 0, nil, err
+	if bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("read response: %w", err)
-	}
-
-	return resp.StatusCode, respBody, nil
-}
-
-// DoRequestWithBearer calls a Supabase endpoint with apikey + user JWT auth.
-// Used for endpoints that require the user's own token (e.g. PUT /auth/v1/user).
-func (c *Client) DoRequestWithBearer(ctx context.Context, method, path string, body map[string]string, bearerToken string) (int, []byte, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return 0, nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, c.url+path, bytes.NewReader(payload))
-	if err != nil {
-		return 0, nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("apikey", c.apiKey)
-	req.Header.Set("Authorization", "Bearer "+bearerToken)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
