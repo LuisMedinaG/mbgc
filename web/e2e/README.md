@@ -150,11 +150,32 @@ The earlier suite missed all of these. The new suite asserts on
 
 ## CI
 
-The `e2e` job in `.github/workflows/ci.yml` runs the full suite in mocked mode.
-On failure the Playwright report is uploaded as `playwright-report` (7-day retention).
+The `e2e` job in `.github/workflows/e2e.yml` runs the suite against a live
+environment (mocked mode is not used in CI). On failure the Playwright report
+is uploaded as `playwright-report` (7-day retention).
 
-To run with a real Supabase token in CI, add `TEST_TOKEN` as a GitHub Actions
-secret and pass it via `env:` in the workflow step.
+### Adding `TEST_TOKEN` for live-mode CI runs
+
+1. Get a token as described in [Getting a TEST_TOKEN](#getting-a-test_token-live-mode) above.
+2. Add it as a repo secret: **Settings → Secrets and variables → Actions →
+   New repository secret**, name `TEST_TOKEN`
+   (or `gh secret set TEST_TOKEN --repo <owner>/<repo>`).
+3. Pass it via `env:` on the test step in `.github/workflows/e2e.yml`:
+
+   ```yaml
+   - name: Run E2E tests
+     run: bunx playwright test --project=${{ inputs.browser || 'chromium' }}
+     working-directory: web
+     env:
+       CI: true
+       PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.DEV_API_URL }}
+       TEST_TOKEN: ${{ secrets.TEST_TOKEN }}
+   ```
+
+Since CI tokens expire in 15 minutes (see above), this only works for
+short-lived manual (`workflow_dispatch`) runs against a live `base_url` —
+not for the scheduled/PR-triggered run, where the token would likely be
+stale by the time the job starts.
 
 ## Conventions
 
