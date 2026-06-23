@@ -7,7 +7,7 @@ iOS SwiftUI app for MBGC backend. Swift 6.2 / iOS 17+ / SwiftData / URLSession.
 - Native URLSession async/await for networking
 - XcodeGen for project generation
 - Bun for all npm/node operations
-- Supabase Auth via hosted webview
+- Auth: native login form → Go API `POST /api/v1/auth/login` (no Supabase webview/SDK)
 
 ## Directory
 - `ios/MBGC/` — all Swift source
