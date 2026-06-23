@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "supabase:start",
+            "type": "shell",
+            "command": "supabase start",
+            "problemMatcher": []
+        },
+        {
+            "label": "database:migrate-and-seed",
+            "type": "shell",
+            "command": "make db-migrate",
+            "problemMatcher": [],
+            "dependsOrder": "sequence",
+            "dependsOn": ["supabase:start"]
+        }
+    ]
+}

@@ -8,67 +8,66 @@ Install the [Go extension](https://marketplace.visualstudio.com/items?itemName=g
 
 ### 2. Launch Config
 
-Create `.vscode/launch.json` in `services/api/`:
+The `.vscode/` folder is at the project root (`/Users/lumedina/Documents/Projects/mbgc/.vscode/`).
+
+**`.vscode/launch.json`**:
 
 ```json
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Debug API",
-      "type": "go",
-      "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/cmd/server",
-      "env": {
-        "ENV": "local",
-        "LOG_LEVEL": "debug"
-      },
-      "envFile": "${workspaceFolder}/.env",
-      "preLaunchTask": "database:migrate-and-seed",
-      "serverReadyAction": {
-        "pattern": "Starting server on port (\\d+)",
-        "uriFilter": "https?://localhost:(\\d+)",
-        "action": "openExternally"
-      }
-    },
-    {
-      "name": "Debug API (no migrate)",
-      "type": "go",
-      "request": "launch",
-      "mode": "debug",
-      "program": "${workspaceFolder}/cmd/server",
-      "env": {
-        "ENV": "local",
-        "LOG_LEVEL": "debug"
-      },
-      "envFile": "${workspaceFolder}/.env"
-    }
-  ]
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug API",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "cwd": "${workspaceFolder}/services/api",
+            "program": "${workspaceFolder}/services/api/cmd/server",
+            "env": {
+                "ENV": "local",
+                "LOG_LEVEL": "debug"
+            },
+            "envFile": "${workspaceFolder}/services/api/.env",
+            "preLaunchTask": "database:migrate-and-seed"
+        },
+        {
+            "name": "Debug API (no migrate)",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "cwd": "${workspaceFolder}/services/api",
+            "program": "${workspaceFolder}/services/api/cmd/server",
+            "env": {
+                "ENV": "local",
+                "LOG_LEVEL": "debug"
+            },
+            "envFile": "${workspaceFolder}/services/api/.env"
+        }
+    ]
 }
 ```
 
-### 3. Tasks for pre-launch
-
-Create `.vscode/tasks.json` in `services/api/`:
+**`.vscode/tasks.json`**:
 
 ```json
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "database:migrate-and-seed",
-      "type": "shell",
-      "command": "cd ${workspaceFolder}/../.. && make db-migrate",
-      "problemMatcher": []
-    },
-    {
-      "label": "supabase:start",
-      "type": "shell",
-      "command": "supabase start",
-      "problemMatcher": []
-    }
-  ]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "supabase:start",
+            "type": "shell",
+            "command": "supabase start",
+            "problemMatcher": []
+        },
+        {
+            "label": "database:migrate-and-seed",
+            "type": "shell",
+            "command": "make db-migrate",
+            "problemMatcher": [],
+            "dependsOrder": "sequence",
+            "dependsOn": ["supabase:start"]
+        }
+    ]
 }
 ```
 
@@ -77,14 +76,14 @@ Create `.vscode/tasks.json` in `services/api/`:
 ### Starting the environment
 
 ```sh
-# Terminal 1: Start Supabase
+# Terminal 1: Start Supabase (first time only, or if stopped)
 supabase start
 
-# Terminal 2: Run migrations + seed
+# Run migrations + seed
 make db-migrate
 ```
 
-### Attaching debugger
+### Using VSCode debugger
 
 1. Set breakpoints in your code
 2. Press `F5` or use the Debug panel
@@ -93,12 +92,41 @@ make db-migrate
 
 ### Debugging with dlv directly
 
-```sh
-# Attach to running process
-dlv attach $(pgrep -f "go run ./cmd/server")
+**Headless debug server** (run from `services/api/`):
 
-# Headless debug server
+```sh
+cd services/api
 dlv debug ./cmd/server --listen=127.0.0.1:2345
+```
+
+Then in VSCode, use a "Attach to Process" configuration:
+
+```json
+{
+    "name": "Attach to dlv",
+    "type": "go",
+    "request": "attach",
+    "mode": "remote",
+    "remoteStackTracePath": "",
+    "showGlobalVariables": true,
+    "host": "127.0.0.1",
+    "port": 2345
+}
+```
+
+**Attach to running process**:
+
+First find the PID:
+
+```sh
+pgrep -a -f "services/api"
+```
+
+Then attach:
+
+```sh
+cd services/api
+dlv attach <PID>
 ```
 
 ## Common Scenarios
@@ -146,7 +174,7 @@ func ParseThing(xmlReader io.Reader) (*ThingResponse, error) {
 
 - **Hot reload**: Use `delve` or set `dlv` as the debugger for live reloading
 - **Environment**: Ensure `.env` is loaded (see `go run ./cmd/server` vs `make dev`)
-- **Race conditions**: Use "Debug API" with race detector enabled via `go test -race`
+- **Race conditions**: Use race detector via `go test -race`
 - **Logs**: Check `slog` output in Debug Console for structured logs
 - **Remote debug**: For Cloud Run, use [cloud-debug-go](https://cloud.google.com/blog/products/devops-sre/analyzing-go-programs-with-cloud-debugger)
 
@@ -166,3 +194,5 @@ func ParseThing(xmlReader io.Reader) (*ThingResponse, error) {
 | "Cannot find process" | Check `.env` is loading correctly; verify `ENV=local` |
 | Debug console empty | Set `LOG_LEVEL=debug` in launch config |
 | Slow stepping | Disable source maps optimization in VSCode settings |
+| `dlv debug` "directory not found" | Must `cd services/api` first — `cmd/server` is relative to that dir |
+| `dlv attach` "you must provide a PID" | Use `pgrep -a -f "services/api"` to find PID; process must be running |
