@@ -1,0 +1,13 @@
+#!/bin/bash
+# Ponytail: prevents agents from editing .pbxproj files — the most destructive iOS mistake
+# This hook blocks ANY write attempt to .pbxproj or .xcodeproj/ contents.
+
+BLOCKED_PATTERN="\.xcodeproj/|\\.pbxproj"
+BLOCKED_MSG="BLOCKED: .pbxproj modification is never allowed. Run 'xcodegen generate' instead."
+
+for arg in "$@"; do
+  if echo "$arg" | grep -qE "$BLOCKED_PATTERN"; then
+    echo "ERROR: $BLOCKED_MSG" >&2
+    exit 1
+  fi
+done
