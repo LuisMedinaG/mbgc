@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 type Handler struct {
@@ -32,9 +32,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 // ref: importer.BGG_SYNC.3 — rate-limited per user
 // ref: importer.BGG_SYNC.7 — response includes imported, skipped, failed counts
 func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpx.UserIDFromContext(r.Context())
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
-		httpx.WriteError(w, apierr.ErrUnauthorized)
 		return
 	}
 	isAdmin := httpx.IsAdminFromContext(r.Context())
@@ -82,9 +81,8 @@ func (h *Handler) CSVPreview(w http.ResponseWriter, r *http.Request) {
 const maxImportBatch = 100
 
 func (h *Handler) CSVImport(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpx.UserIDFromContext(r.Context())
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
-		httpx.WriteError(w, apierr.ErrUnauthorized)
 		return
 	}
 	var body struct {

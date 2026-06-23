@@ -16,19 +16,16 @@ Single Go API service. Handles JWT validation, profiles, games, collections, and
 |---|---|---|
 | `GET` | `/api/v1/profile` | profile.GetProfile |
 | `PUT` | `/api/v1/profile/bgg-username` | profile.SetBGGUsername |
-| `GET` | `/api/v1/games` | game.ListGames |
-| `GET` | `/api/v1/games/{id}` | game.GetGame |
-| `DELETE` | `/api/v1/games/{id}` | game.DeleteGame |
-| `POST` | `/api/v1/games/{id}/collections` | game.SetGameCollections |
-| `POST` | `/api/v1/games/bulk-collections` | game.BulkCollections |
-| `PUT` | `/api/v1/games/{id}/rules-url` | game.UpdateRulesURL |
-| `POST` | `/api/v1/games/{id}/player-aids` | game.UploadPlayerAid |
-| `DELETE` | `/api/v1/games/{id}/player-aids/{aid_id}` | game.DeletePlayerAid |
-| `GET` | `/api/v1/collections` | game.ListCollections |
-| `POST` | `/api/v1/collections` | game.CreateCollection |
-| `PUT` | `/api/v1/collections/{id}` | game.UpdateCollection |
-| `DELETE` | `/api/v1/collections/{id}` | game.DeleteCollection |
-| `GET` | `/api/v1/discover` | game.Discover |
+| `GET` | `/api/v1/games` | catalog.ListGames |
+| `GET` | `/api/v1/games/{id}` | catalog.GetGame |
+| `DELETE` | `/api/v1/games/{id}` | catalog.DeleteGame |
+| `POST` | `/api/v1/games/{id}/collections` | catalog.SetGameCollections |
+| `PUT` | `/api/v1/games/{id}/rules-url` | catalog.UpdateRulesURL |
+| `GET` | `/api/v1/collections` | catalog.ListCollections |
+| `POST` | `/api/v1/collections` | catalog.CreateCollection |
+| `PUT` | `/api/v1/collections/{id}` | catalog.UpdateCollection |
+| `DELETE` | `/api/v1/collections/{id}` | catalog.DeleteCollection |
+| `GET` | `/api/v1/discover` | catalog.Discover |
 | `POST` | `/api/v1/import/sync` | importer.Sync |
 | `POST` | `/api/v1/import/csv/preview` | importer.CSVPreview |
 | `POST` | `/api/v1/import/csv` | importer.CSVImport |
@@ -64,7 +61,7 @@ make migrate-down        # reverts all migrations in reverse order
 internal/config/    — env var loading (mustenv panics on missing required vars)
 internal/jwt/       — JWKS+HS256 verifier; RequireAuth middleware → httpx.SetGatewayUser
 internal/profile/   — profile.users table (BGG username, admin flag)
-internal/game/      — games.games, games.collections, games.player_aids tables
+internal/catalog/  — games.games, games.collections, games.player_aids tables
 internal/importer/  — importer.rate_limits, importer.sync_log; BGG client
 ```
 
@@ -91,7 +88,7 @@ What these catch (and unit tests cannot): SQL syntax errors, migration
 drift, missing `WHERE user_id` clauses (multi-tenancy leaks), envelope
 shape regressions.
 
-Coverage: auth 78%, importer 72%, game 61%, jwt 60%, profile 59%. CI enforces ≥50% on `services/api`.
+Coverage: auth 78%, importer 72%, catalog 61%, jwt 60%, profile 59%. CI enforces ≥50% on `services/api`.
 
 ## Security middleware
 

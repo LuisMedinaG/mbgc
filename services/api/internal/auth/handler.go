@@ -1,24 +1,17 @@
 package auth
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/supabase"
 )
-
-type supabaseAuthClient struct {
-	url    string
-	apiKey string
-	client *http.Client
-}
 
 // userStore resolves identifiers to emails. Handler depends on the
 // interface (not *Store) so handler tests can run without a database.
@@ -29,7 +22,7 @@ type userStore interface {
 
 type Handler struct {
 	store    userStore
-	supabase *supabaseAuthClient
+	supabase *supabase.Client
 }
 
 func NewHandler(store userStore, supabaseURL, apiKey string, client *http.Client) *Handler {
@@ -37,70 +30,9 @@ func NewHandler(store userStore, supabaseURL, apiKey string, client *http.Client
 		client = httpx.DefaultClient
 	}
 	return &Handler{
-		store: store,
-		supabase: &supabaseAuthClient{
-			url:    strings.TrimSuffix(supabaseURL, "/"),
-			apiKey: apiKey,
-			client: client,
-		},
+		store:    store,
+		supabase: supabase.New(supabaseURL, apiKey, client),
 	}
-}
-
-func (s *supabaseAuthClient) doRequest(ctx context.Context, method, path string, body map[string]string) (int, []byte, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return 0, nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, s.url+path, bytes.NewReader(payload))
-	if err != nil {
-		return 0, nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("apikey", s.apiKey)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("read response: %w", err)
-	}
-
-	return resp.StatusCode, respBody, nil
-}
-
-// doRequestWithBearer is like doRequest but also sets Authorization: Bearer for
-// endpoints that require the user's own JWT (e.g. PUT /auth/v1/user).
-func (s *supabaseAuthClient) doRequestWithBearer(ctx context.Context, method, path string, body map[string]string, bearerToken string) (int, []byte, error) {
-	payload, err := json.Marshal(body)
-	if err != nil {
-		return 0, nil, fmt.Errorf("marshal request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, method, s.url+path, bytes.NewReader(payload))
-	if err != nil {
-		return 0, nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("apikey", s.apiKey)
-	req.Header.Set("Authorization", "Bearer "+bearerToken)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp.StatusCode, nil, fmt.Errorf("read response: %w", err)
-	}
-
-	return resp.StatusCode, respBody, nil
 }
 
 // ref: api-layer.SEC.5 — rateLimit middleware applied to login/refresh/logout (not auth'd)
@@ -113,8 +45,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth, rateLimit func(http.H
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
 }
 
 type tokenData struct {
@@ -125,8 +57,8 @@ type tokenData struct {
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	var req loginRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest))
+	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 
@@ -144,9 +76,9 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		authEmail = email
 	}
 
-	status, respBody, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+	status, respBody, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=password",
-		map[string]string{"email": authEmail, "password": req.Password})
+		map[string]string{"email": authEmail, "password": req.Password}, "")
 
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -168,19 +100,19 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 }
 
 type refreshRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 	var req refreshRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.RefreshToken == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: missing refresh_token", apierr.ErrBadRequest))
+	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 
-	status, respBody, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+	status, respBody, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=refresh_token",
-		map[string]string{"refresh_token": req.RefreshToken})
+		map[string]string{"refresh_token": req.RefreshToken}, "")
 
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -209,9 +141,9 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	var req logoutRequest
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	_, _, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+	_, _, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/logout?scope=global",
-		map[string]string{"refresh_token": req.RefreshToken})
+		map[string]string{"refresh_token": req.RefreshToken}, "")
 
 	// logout is best-effort; errors are not actionable to client
 	if err != nil {
@@ -222,23 +154,15 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 }
 
 type changePasswordRequest struct {
-	CurrentPassword string `json:"current_password"`
-	NewPassword     string `json:"new_password"`
+	CurrentPassword string `json:"current_password" validate:"required"`
+	NewPassword     string `json:"new_password" validate:"required,min=8"`
 }
 
 // ref: auth.CHANGE_PASSWORD.1 — verifies current password then updates via Supabase user endpoint
 func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	var req changePasswordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httpx.WriteError(w, fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest))
-		return
-	}
-	if req.CurrentPassword == "" || req.NewPassword == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: current_password and new_password are required", apierr.ErrBadRequest))
-		return
-	}
-	if len(req.NewPassword) < 8 {
-		httpx.WriteError(w, fmt.Errorf("%w: new_password must be at least 8 characters", apierr.ErrBadRequest))
+	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 
@@ -250,9 +174,9 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify current password via token grant before allowing update.
-	status, _, err := h.supabase.doRequest(r.Context(), http.MethodPost,
+	status, _, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=password",
-		map[string]string{"email": email, "password": req.CurrentPassword})
+		map[string]string{"email": email, "password": req.CurrentPassword}, "")
 	if err != nil {
 		httpx.WriteError(w, err)
 		return
@@ -263,7 +187,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	bearerToken := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-	status, _, err = h.supabase.doRequestWithBearer(r.Context(), http.MethodPut,
+	status, _, err = h.supabase.DoRequest(r.Context(), http.MethodPut,
 		"/auth/v1/user",
 		map[string]string{"password": req.NewPassword},
 		bearerToken)

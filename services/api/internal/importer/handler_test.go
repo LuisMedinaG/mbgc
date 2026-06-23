@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -13,9 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/testutil"
 )
 
 type mockImporterStore struct {
@@ -56,7 +56,7 @@ func (m *mockBGGClient) FetchGames(ctx context.Context, bggIDs []int) ([]BGGGame
 
 type mockGameService struct {
 	gameExistsFn    func(ctx context.Context, userID string, bggID int) (bool, error)
-	upsertBGGGameFn func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error)
+	upsertBGGGameFn func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error)
 }
 
 func (m *mockGameService) GameExistsByBGGID(ctx context.Context, userID string, bggID int) (bool, error) {
@@ -65,7 +65,7 @@ func (m *mockGameService) GameExistsByBGGID(ctx context.Context, userID string, 
 	}
 	return false, nil
 }
-func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 	if m.upsertBGGGameFn != nil {
 		return m.upsertBGGGameFn(ctx, userID, g)
 	}
@@ -91,13 +91,6 @@ func okStore() *mockImporterStore {
 	}
 }
 
-func authReq(method, path, body string, isAdmin bool) *http.Request {
-	r := httptest.NewRequest(method, path, strings.NewReader(body))
-	r.Header.Set("Content-Type", "application/json")
-	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "bgguser", isAdmin)
-	return r.WithContext(ctx)
-}
-
 func mkHandler(store importerStore, bgg bggClient, gs gameService) *Handler {
 	return NewHandler(NewService(store, bgg, gs, &mockProfileService{}), 3, 20)
 }
@@ -114,7 +107,7 @@ func TestSync_Unauthenticated(t *testing.T) {
 func TestSync_BGGNotConfigured(t *testing.T) {
 	h := mkHandler(okStore(), &mockBGGClient{available: false}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
@@ -130,7 +123,7 @@ func TestSync_RateLimited(t *testing.T) {
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", w.Code)
 	}
@@ -139,7 +132,7 @@ func TestSync_RateLimited(t *testing.T) {
 func TestSync_Success(t *testing.T) {
 	h := mkHandler(okStore(), &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -161,7 +154,7 @@ func TestSync_FullRefreshNonAdmin(t *testing.T) {
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync?full_refresh=true", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync?full_refresh=true", "", "user-1", false))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -182,7 +175,7 @@ func TestSync_FullRefreshAdmin(t *testing.T) {
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync?full_refresh=true", "", true))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync?full_refresh=true", "", "user-1", true))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -290,7 +283,7 @@ func TestCSVImport_Unauthenticated(t *testing.T) {
 func TestCSVImport_InvalidBody(t *testing.T) {
 	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", "bad", false))
+	h.CSVImport(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/csv", "bad", "user-1", false))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -299,7 +292,7 @@ func TestCSVImport_InvalidBody(t *testing.T) {
 func TestCSVImport_EmptyIDs(t *testing.T) {
 	h := mkHandler(&mockImporterStore{}, &mockBGGClient{}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[]}`, false))
+	h.CSVImport(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/csv", `{"bgg_ids":[]}`, "user-1", false))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
 	}
@@ -314,7 +307,7 @@ func TestCSVImport_RejectsOversizedBatch(t *testing.T) {
 		ids = append(ids, i+1)
 	}
 	body, _ := json.Marshal(map[string]any{"bgg_ids": ids})
-	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", string(body), false))
+	h.CSVImport(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/csv", string(body), "user-1", false))
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for 101 ids, got %d", w.Code)
 	}
@@ -325,13 +318,13 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) {
 			return bggID == 174430, nil
 		},
-		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 			return int64(g.BGGID), true, nil
 		},
 	}
 	h := mkHandler(&mockImporterStore{}, &mockBGGClient{available: true}, gs)
 	w := httptest.NewRecorder()
-	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[174430,167791]}`, false))
+	h.CSVImport(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/csv", `{"bgg_ids":[174430,167791]}`, "user-1", false))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -345,13 +338,13 @@ func TestCSVImport_DeduplicatesExisting(t *testing.T) {
 func TestCSVImport_AllNew(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
-		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 			return int64(g.BGGID), true, nil
 		},
 	}
 	h := mkHandler(&mockImporterStore{}, &mockBGGClient{available: true}, gs)
 	w := httptest.NewRecorder()
-	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[1,2,3]}`, false))
+	h.CSVImport(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/csv", `{"bgg_ids":[1,2,3]}`, "user-1", false))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -365,13 +358,13 @@ func TestCSVImport_AllNew(t *testing.T) {
 func TestCSVImport_CreateFails(t *testing.T) {
 	gs := &mockGameService{
 		gameExistsFn: func(ctx context.Context, userID string, bggID int) (bool, error) { return false, nil },
-		upsertBGGGameFn: func(ctx context.Context, userID string, g game.BGGGameData) (int64, bool, error) {
+		upsertBGGGameFn: func(ctx context.Context, userID string, g catalog.BGGGameData) (int64, bool, error) {
 			return 0, false, apierr.ErrInternal
 		},
 	}
 	h := mkHandler(&mockImporterStore{}, &mockBGGClient{available: true}, gs)
 	w := httptest.NewRecorder()
-	h.CSVImport(w, authReq("POST", "/api/v1/import/csv", `{"bgg_ids":[1,2]}`, false))
+	h.CSVImport(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/csv", `{"bgg_ids":[1,2]}`, "user-1", false))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
@@ -416,32 +409,9 @@ func TestTruncateToDay(t *testing.T) {
 // ref: monitoring.SINK.5 — capture slog JSON output for sink assertions
 // captureSlog swaps slog.Default to a JSON handler writing to a buffer for
 // the duration of the test, then restores the previous default.
-func captureSlog(t *testing.T) *bytes.Buffer {
-	t.Helper()
-	buf := &bytes.Buffer{}
-	prev := slog.Default()
-	slog.SetDefault(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
-	t.Cleanup(func() { slog.SetDefault(prev) })
-	return buf
-}
 
 // ref: monitoring.SINK.6 — decode newline-delimited JSON log records
 // decodeLines parses every JSON line in buf.
-func decodeLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
-	t.Helper()
-	var out []map[string]any
-	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
-		if line == "" {
-			continue
-		}
-		var m map[string]any
-		if err := json.Unmarshal([]byte(line), &m); err != nil {
-			t.Fatalf("failed to parse log line %q: %v", line, err)
-		}
-		out = append(out, m)
-	}
-	return out
-}
 
 // ref: monitoring.SINK.7 — find first log record for a given event
 func findEvent(records []map[string]any, event string) map[string]any {
@@ -455,15 +425,15 @@ func findEvent(records []map[string]any, event string) map[string]any {
 
 // ref: monitoring.SINK.5 — successful sync emits sync_start and sync_ok with sync_kind
 func TestSync_EmitsSyncStartAndSyncOk(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	h := mkHandler(okStore(), &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	recs := decodeLines(t, buf)
+	recs := testutil.DecodeLogLines(t, buf)
 	start := findEvent(recs, "sync_start")
 	if start == nil {
 		t.Fatalf("expected sync_start event, got %d records: %s", len(recs), buf.String())
@@ -496,15 +466,15 @@ func TestSync_EmitsSyncStartAndSyncOk(t *testing.T) {
 
 // ref: monitoring.SINK.5 — full_refresh sync_kind flows through to the event
 func TestSync_FullRefreshEmitsFullRefreshKind(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	h := mkHandler(okStore(), &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync?full_refresh=true", "", true))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync?full_refresh=true", "", "user-1", true))
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	recs := decodeLines(t, buf)
+	recs := testutil.DecodeLogLines(t, buf)
 	start := findEvent(recs, "sync_start")
 	if start == nil || start["sync_kind"] != "full_refresh" {
 		t.Errorf("expected sync_start sync_kind=full_refresh, got %v", start)
@@ -518,15 +488,15 @@ func TestSync_FullRefreshEmitsFullRefreshKind(t *testing.T) {
 // ref: monitoring.SINK.5 — BGG unconfigured emits sync_error at error level,
 // no sync_start fires (the rejection happens before sync begins).
 func TestSync_EmitsSyncErrorOnBGGUnconfigured(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	h := mkHandler(okStore(), &mockBGGClient{available: false}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
 
-	recs := decodeLines(t, buf)
+	recs := testutil.DecodeLogLines(t, buf)
 	errEv := findEvent(recs, "sync_error")
 	if errEv == nil {
 		t.Fatalf("expected sync_error event, got: %s", buf.String())
@@ -548,7 +518,7 @@ func TestSync_EmitsSyncErrorOnBGGUnconfigured(t *testing.T) {
 // ref: monitoring.SINK.5 — rate-limit emits sync_error at warn level
 // (per-handoff: rate-limit is abuse signal, not a server fault).
 func TestSync_EmitsSyncErrorOnRateLimited(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
 		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
 			return apierr.ErrRateLimit
@@ -558,12 +528,12 @@ func TestSync_EmitsSyncErrorOnRateLimited(t *testing.T) {
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d", w.Code)
 	}
 
-	recs := decodeLines(t, buf)
+	recs := testutil.DecodeLogLines(t, buf)
 	errEv := findEvent(recs, "sync_error")
 	if errEv == nil {
 		t.Fatalf("expected sync_error event, got: %s", buf.String())
@@ -579,7 +549,7 @@ func TestSync_EmitsSyncErrorOnRateLimited(t *testing.T) {
 // ref: monitoring.SINK.5 — non-rate-limit store failure during CheckRateLimit
 // emits sync_error at error level (real server fault, not abuse).
 func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
 		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
 			return apierr.ErrInternal
@@ -589,12 +559,12 @@ func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
 
-	recs := decodeLines(t, buf)
+	recs := testutil.DecodeLogLines(t, buf)
 	errEv := findEvent(recs, "sync_error")
 	if errEv == nil {
 		t.Fatalf("expected sync_error event, got: %s", buf.String())
@@ -607,7 +577,7 @@ func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
 // ref: monitoring.SINK.5 — store-layer failure after sync_start fires
 // sync_error at error level and suppresses sync_ok.
 func TestSync_EmitsSyncErrorOnStoreFailure(t *testing.T) {
-	buf := captureSlog(t)
+	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
 		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
 		recordSyncFn:     func(ctx context.Context, userID string) error { return apierr.ErrInternal },
@@ -615,12 +585,12 @@ func TestSync_EmitsSyncErrorOnStoreFailure(t *testing.T) {
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()
-	h.Sync(w, authReq("POST", "/api/v1/import/sync", "", false))
+	h.Sync(w, testutil.NewAuthRequestAs(t, "POST", "/api/v1/import/sync", "", "user-1", false))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("expected 500, got %d", w.Code)
 	}
 
-	recs := decodeLines(t, buf)
+	recs := testutil.DecodeLogLines(t, buf)
 	if findEvent(recs, "sync_start") == nil {
 		t.Errorf("expected sync_start before store failure, got: %s", buf.String())
 	}

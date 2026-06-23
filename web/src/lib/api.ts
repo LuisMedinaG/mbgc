@@ -388,10 +388,7 @@ export const api = {
   },
 
   async setBGGUsername(bggUsername: string) {
-    const r = await request<{ data: { bgg_username: string } }>(
-      'PUT', '/profile/bgg-username', { bgg_username: bggUsername },
-    )
-    return r.data
+    return request<void>('PUT', '/profile/bgg-username', { bgg_username: bggUsername })
   },
 
   async changePassword(currentPassword: string, newPassword: string) {

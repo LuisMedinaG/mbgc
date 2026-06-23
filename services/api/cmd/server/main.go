@@ -18,17 +18,30 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/auth"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/game"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/observe"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
 	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
 )
+
+func heartbeat(ctx context.Context, interval time.Duration) {
+	httpx.Record(nil, "heartbeat", slog.LevelInfo)
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			httpx.Record(nil, "heartbeat", slog.LevelInfo)
+		}
+	}
+}
 
 func runMigrations(databaseURL string) error {
 	db, err := sql.Open("pgx", databaseURL)
@@ -70,14 +83,8 @@ func runMigrations(databaseURL string) error {
 }
 
 func main() {
-	// ref: monitoring.OBSERVABILITY.1, monitoring.FAIL_OPEN.1 — install the
-	// fail-open JSON handler before any slog call. Must be the first line of
-	// main so config-load failures are also captured as structured events.
-	slog.SetDefault(slog.New(observe.NewHandler()))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	// ref: monitoring.OBSERVABILITY.3 — kill switch. When set, Record becomes
-	// a no-op and log ingestion from this service drops to zero. Flip on the
-	// next deploy with: gcloud run services update mbgc-api --update-env-vars MONITORING_DISABLED=true
 	if os.Getenv("MONITORING_DISABLED") == "true" {
 		httpx.Disabled.Store(true)
 		slog.Info("monitoring disabled via MONITORING_DISABLED env var")
@@ -93,7 +100,7 @@ func main() {
 	// shutdown so it stops cleanly with the rest of the service.
 	hbCtx, hbCancel := context.WithCancel(context.Background())
 	defer hbCancel()
-	go observe.Heartbeat(hbCtx, 5*time.Minute)
+	go heartbeat(hbCtx, 5*time.Minute)
 
 	if os.Getenv("SKIP_MIGRATIONS") != "true" {
 		if err := runMigrations(cfg.DatabaseURL); err != nil {
@@ -102,7 +109,19 @@ func main() {
 		}
 	}
 
-	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	// ref: api-layer.INFRA.1 — explicit pool config: 10 conns/instance, 2 warm,
+	// 30min lifetime (Supabase preference), 5min idle, 1min health check.
+	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("failed to parse database URL", "error", err)
+		os.Exit(1)
+	}
+	poolCfg.MaxConns = 10
+	poolCfg.MinConns = 2
+	poolCfg.MaxConnLifetime = 30 * time.Minute
+	poolCfg.MaxConnIdleTime = 5 * time.Minute
+	poolCfg.HealthCheckPeriod = 1 * time.Minute
+	pool, err := pgxpool.NewWithConfig(context.Background(), poolCfg)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -129,12 +148,12 @@ func main() {
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
 
-	gameStore := game.NewStore(pool)
-	gameHandler := game.NewHandler(gameStore)
+	catalogStore := catalog.NewStore(pool)
+	catalogHandler := catalog.NewHandler(catalogStore)
 
 	bggClient := importer.NewClient(cfg.BGGToken, cfg.BGGCookie)
 	importStore := importer.NewStore(pool)
-	importSvc := importer.NewService(importStore, bggClient, gameStore, profileSvc)
+	importSvc := importer.NewService(importStore, bggClient, catalogStore, profileSvc)
 	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
 
 	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
@@ -145,24 +164,38 @@ func main() {
 	mux := http.NewServeMux()
 	authHandler.RegisterRoutes(mux, authMiddleware, rateLimit)
 	profileHandler.RegisterRoutes(mux, authMiddleware)
-	gameHandler.RegisterRoutes(mux, authMiddleware)
+	catalogHandler.RegisterRoutes(mux, authMiddleware)
 	importHandler.RegisterRoutes(mux, authMiddleware)
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+	// ref: api-layer.HEALTH.1 — liveness probe, no deps, always 200 if process is up
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-
-	origins := []string{}
-	if cfg.AllowedOrigin != "" {
-		origins = append(origins, cfg.AllowedOrigin)
-	}
+	// ref: api-layer.HEALTH.2 — readiness probe: DB ping + JWKS reachability, 503 on failure
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := pool.Ping(ctx); err != nil {
+			slog.Warn("readyz: db ping failed", "error", err)
+			httpx.WriteJSON(w, http.StatusServiceUnavailable,
+				httpx.NewError("service_unavailable", "database unavailable"))
+			return
+		}
+		if err := verifier.Ping(ctx); err != nil {
+			slog.Warn("readyz: jwks ping failed", "error", err)
+			httpx.WriteJSON(w, http.StatusServiceUnavailable,
+				httpx.NewError("service_unavailable", "auth service unavailable"))
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	})
 
 	srv := &http.Server{
 		Addr: ":" + cfg.Port,
 		Handler: httpx.Chain(mux,
 			// ref: auth.MIDDLEWARE.1 — Logger logs method, path, status, latency via slog
 			httpx.Logger,
-			httpx.Gzip,
+			// ref: api-layer.CLIENT_INFO.1 — extracts X-Client-Version/X-Platform into context
+			httpx.ClientInfo,
 			// ref: auth.MIDDLEWARE.2 — RequestID attaches unique UUID
 			httpx.RequestID,
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500
@@ -174,8 +207,8 @@ func main() {
 			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
-			// ref: auth.MIDDLEWARE.5 — CORS validates origin
-			httpx.CORS(origins),
+			// ref: auth.MIDDLEWARE.5 — CORS validates origin; comma-separated ALLOWED_ORIGINS env var
+			httpx.CORS(cfg.AllowedOrigins),
 		),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 120 * time.Second,

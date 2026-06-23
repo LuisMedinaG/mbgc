@@ -109,6 +109,8 @@ jobs:
             --project "$PROJECT" \
             --service-account "$RUNTIME_SA" \
             ${_env:+--update-env-vars "$_env"} \
+            --liveness-probe=httpGet.path=/healthz,initialDelaySeconds=10,timeoutSeconds=2,periodSeconds=30,failureThreshold=3 \
+            --startup-probe=httpGet.path=/readyz,initialDelaySeconds=0,timeoutSeconds=3,periodSeconds=10,failureThreshold=30 \
             --verbosity=warning
         env:
           SERVICE: ${{ inputs.service_name }}

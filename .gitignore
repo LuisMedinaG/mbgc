@@ -94,7 +94,7 @@ backend.hcl
 ##############################################################################
 # Supabase
 ##############################################################################
-supabase/
+/supabase/
 
 ##############################################################################
 # Cloudflare / Wrangler
@@ -206,3 +206,8 @@ tags
 
 # lean-ctx local state
 .lean-ctx/
+
+# understand-anything generated artifacts
+.understand-anything/
+
+.handoff/

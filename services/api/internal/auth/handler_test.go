@@ -9,13 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 // --- login ---
 
 func TestLogin_InvalidBody(t *testing.T) {
-	h := NewHandler(nil, "", "", http.DefaultClient)
+	h := NewHandler(nil, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader("bad json"))
 	r.Header.Set("Content-Type", "application/json")
@@ -27,7 +27,7 @@ func TestLogin_InvalidBody(t *testing.T) {
 }
 
 func TestLogin_MissingFields(t *testing.T) {
-	h := NewHandler(nil, "", "", http.DefaultClient)
+	h := NewHandler(nil, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":""}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -46,7 +46,7 @@ func TestLogin_SupabaseFailure(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u@example.com","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -68,7 +68,7 @@ func TestLogin_Success(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u@example.com","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -88,7 +88,7 @@ func TestLogin_Success(t *testing.T) {
 }
 
 func TestLogin_SupabaseUnreachable(t *testing.T) {
-	h := NewHandler(nil, "http://127.0.0.1:1", "fake-key", http.DefaultClient)
+	h := NewHandler(nil, "http://127.0.0.1:1", "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"u@example.com","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -125,7 +125,7 @@ func TestLogin_WithUsername(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(fakeStore{email: "test@example.com"}, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(fakeStore{email: "test@example.com"}, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"testuser","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -146,7 +146,7 @@ func TestLogin_WithUsername(t *testing.T) {
 
 // ref: auth.LOGIN.3 — unknown username returns generic error (no enumeration)
 func TestLogin_UnknownUsername(t *testing.T) {
-	h := NewHandler(fakeStore{err: errors.New("no rows")}, "http://unused", "fake-key", http.DefaultClient)
+	h := NewHandler(fakeStore{err: errors.New("no rows")}, "http://unused", "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/login", strings.NewReader(`{"username":"ghost","password":"p"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -160,7 +160,7 @@ func TestLogin_UnknownUsername(t *testing.T) {
 // --- refresh ---
 
 func TestRefresh_MissingToken(t *testing.T) {
-	h := NewHandler(nil, "", "", http.DefaultClient)
+	h := NewHandler(nil, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -178,7 +178,7 @@ func TestRefresh_SupabaseFailure(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{"refresh_token":"rt"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -200,7 +200,7 @@ func TestRefresh_Success(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{"refresh_token":"rt"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -220,7 +220,7 @@ func TestLogout_AlwaysSucceeds(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(nil, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/logout", strings.NewReader(`{"refresh_token":"rt"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -233,7 +233,7 @@ func TestLogout_AlwaysSucceeds(t *testing.T) {
 }
 
 func TestLogout_WithoutToken(t *testing.T) {
-	h := NewHandler(nil, "", "", http.DefaultClient)
+	h := NewHandler(nil, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/api/v1/auth/logout", strings.NewReader(`{}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -247,7 +247,7 @@ func TestLogout_WithoutToken(t *testing.T) {
 // --- ping ---
 
 func TestPing_WithUser(t *testing.T) {
-	h := NewHandler(nil, "", "", http.DefaultClient)
+	h := NewHandler(nil, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/v1/ping", nil)
 	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "alice", false)
@@ -270,7 +270,7 @@ func TestPing_WithUser(t *testing.T) {
 }
 
 func TestPing_NoUser(t *testing.T) {
-	h := NewHandler(nil, "", "", http.DefaultClient)
+	h := NewHandler(nil, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/api/v1/ping", nil)
 	h.ping(w, r)
@@ -294,7 +294,7 @@ func TestPing_NoUser(t *testing.T) {
 
 // ref: auth.CHANGE_PASSWORD.2 — missing fields returns 400
 func TestChangePassword_MissingFields(t *testing.T) {
-	h := NewHandler(fakeStore{email: "u@example.com"}, "", "", http.DefaultClient)
+	h := NewHandler(fakeStore{email: "u@example.com"}, "", "", httpx.DefaultClient)
 	cases := []string{
 		`{}`,
 		`{"current_password":"old"}`,
@@ -315,7 +315,7 @@ func TestChangePassword_MissingFields(t *testing.T) {
 
 // ref: auth.CHANGE_PASSWORD.2 — new password below minimum length returns 400
 func TestChangePassword_ShortNewPassword(t *testing.T) {
-	h := NewHandler(fakeStore{email: "u@example.com"}, "", "", http.DefaultClient)
+	h := NewHandler(fakeStore{email: "u@example.com"}, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"oldpass1","new_password":"short"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -330,7 +330,7 @@ func TestChangePassword_ShortNewPassword(t *testing.T) {
 
 // ref: auth.CHANGE_PASSWORD.1 — store error (user not found) returns 401
 func TestChangePassword_StoreError(t *testing.T) {
-	h := NewHandler(fakeStore{err: errors.New("no rows")}, "", "", http.DefaultClient)
+	h := NewHandler(fakeStore{err: errors.New("no rows")}, "", "", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"oldpass1","new_password":"newpass1"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -350,7 +350,7 @@ func TestChangePassword_WrongCurrentPassword(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(fakeStore{email: "u@example.com"}, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(fakeStore{email: "u@example.com"}, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"wrongpass","new_password":"newpass99"}`))
 	r.Header.Set("Content-Type", "application/json")
@@ -381,7 +381,7 @@ func TestChangePassword_Success(t *testing.T) {
 	}))
 	defer supa.Close()
 
-	h := NewHandler(fakeStore{email: "u@example.com"}, supa.URL, "fake-key", http.DefaultClient)
+	h := NewHandler(fakeStore{email: "u@example.com"}, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("PUT", "/api/v1/auth/password", strings.NewReader(`{"current_password":"oldpass1","new_password":"newpass99"}`))
 	r.Header.Set("Content-Type", "application/json")
