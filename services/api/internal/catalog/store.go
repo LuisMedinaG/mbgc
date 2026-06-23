@@ -56,6 +56,12 @@ func scanCollection(s scanner) (Collection, error) {
 	return c, err
 }
 
+func scanPlayerAid(s scanner) (PlayerAid, error) {
+	var a PlayerAid
+	err := s.Scan(&a.ID, &a.GameID, &a.Filename, &a.Label, &a.CreatedAt)
+	return a, err
+}
+
 func gamePredicates(userID string, search, category string) sq.And {
 	pred := sq.And{sq.Eq{"user_id": userID}}
 	if search != "" {
@@ -103,16 +109,43 @@ func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]G
 	defer rows.Close()
 
 	var games []Game
+	var gameIDs []int64
 	for rows.Next() {
 		g, err := scanGame(rows)
 		if err != nil {
 			return nil, 0, err
 		}
 		games = append(games, g)
+		gameIDs = append(gameIDs, g.ID)
 	}
 	if games == nil {
 		games = []Game{}
 	}
+
+	if len(gameIDs) > 0 {
+		vibes, err := s.getVibesForGames(ctx, userID, gameIDs)
+		if err != nil {
+			return nil, 0, err
+		}
+		aids, err := s.getPlayerAidsForGames(ctx, userID, gameIDs)
+		if err != nil {
+			return nil, 0, err
+		}
+		for i := range games {
+			v, ok := vibes[games[i].ID]
+			if !ok {
+				v = []Collection{}
+			}
+			games[i].Vibes = v
+
+			a, ok := aids[games[i].ID]
+			if !ok {
+				a = []PlayerAid{}
+			}
+			games[i].PlayerAids = a
+		}
+	}
+
 	return games, total, rows.Err()
 }
 
@@ -122,7 +155,109 @@ func (s *Store) GetGame(ctx context.Context, id int64, userID string) (*Game, er
 	if err != nil {
 		return nil, apierr.ErrNotFound
 	}
+
+	vibes, err := s.getVibesForGames(ctx, userID, []int64{id})
+	if err != nil {
+		return nil, err
+	}
+	g.Vibes = vibes[id]
+	if g.Vibes == nil {
+		g.Vibes = []Collection{}
+	}
+
+	aids, err := s.getPlayerAidsForGames(ctx, userID, []int64{id})
+	if err != nil {
+		return nil, err
+	}
+	g.PlayerAids = aids[id]
+	if g.PlayerAids == nil {
+		g.PlayerAids = []PlayerAid{}
+	}
+
 	return &g, nil
+}
+
+func (s *Store) getVibesForGames(ctx context.Context, userID string, gameIDs []int64) (map[int64][]Collection, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT cg.game_id, c.id, c.user_id, c.name, c.description, 0 as game_count, c.created_at, c.updated_at
+		FROM games.collections c
+		JOIN games.collection_games cg ON c.id = cg.collection_id
+		WHERE cg.game_id = ANY($1) AND c.user_id = $2
+		ORDER BY c.name`, gameIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[int64][]Collection)
+	for rows.Next() {
+		var gameID int64
+		var c Collection
+		if err := rows.Scan(&gameID, &c.ID, &c.UserID, &c.Name, &c.Description, &c.GameCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		res[gameID] = append(res[gameID], c)
+	}
+	return res, rows.Err()
+}
+
+func (s *Store) getPlayerAidsForGames(ctx context.Context, userID string, gameIDs []int64) (map[int64][]PlayerAid, error) {
+	rows, err := s.db.Query(ctx, `
+		SELECT pa.id, pa.game_id, pa.filename, pa.label, pa.created_at
+		FROM games.player_aids pa
+		JOIN games.games g ON pa.game_id = g.id
+		WHERE pa.game_id = ANY($1) AND g.user_id = $2
+		ORDER BY pa.created_at`, gameIDs, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	res := make(map[int64][]PlayerAid)
+	for rows.Next() {
+		pa, err := scanPlayerAid(rows)
+		if err != nil {
+			return nil, err
+		}
+		res[pa.GameID] = append(res[pa.GameID], pa)
+	}
+	return res, rows.Err()
+}
+
+func (s *Store) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+	var exists bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
+		gameID, userID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, apierr.ErrNotFound
+	}
+
+	var pa PlayerAid
+	err := s.db.QueryRow(ctx, `
+		INSERT INTO games.player_aids (game_id, filename, label)
+		VALUES ($1, $2, $3)
+		RETURNING id, game_id, filename, label, created_at`,
+		gameID, filename, label).Scan(&pa.ID, &pa.GameID, &pa.Filename, &pa.Label, &pa.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &pa, nil
+}
+
+func (s *Store) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
+	tag, err := s.db.Exec(ctx, `
+		DELETE FROM games.player_aids
+		WHERE id = $1 AND game_id = $2 AND game_id IN (SELECT id FROM games.games WHERE user_id = $3)`,
+		aidID, gameID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apierr.ErrNotFound
+	}
+	return nil
 }
 
 func (s *Store) CreateGame(ctx context.Context, userID string, bggID int) (int64, error) {

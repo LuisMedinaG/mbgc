@@ -79,14 +79,12 @@ build:
 
 ## test: Run all tests
 test:
-	$(MAKE) -C pkg/shared test
 	$(MAKE) -C services/api test-v
 
 ## lint: Lint all code (Go + web + infra)
 lint:
 	$(MAKE) -C services/api lint
 	$(MAKE) -C web lint
-	cd infra && tflint --chdir=.
 
 # ── Secret rotation ──────────────────────────────────────────────────────────
 

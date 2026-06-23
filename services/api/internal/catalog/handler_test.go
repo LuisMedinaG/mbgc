@@ -1,9 +1,11 @@
 package catalog
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -28,6 +30,8 @@ type mockGameStore struct {
 	setGameCollectionsFn func(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
 	updateRulesURLFn     func(ctx context.Context, gameID int64, userID, rulesURL string) error
 	discoverFn           func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
+	createPlayerAidFn    func(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error)
+	deletePlayerAidFn    func(ctx context.Context, userID string, gameID, aidID int64) error
 }
 
 func (m *mockGameStore) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
@@ -77,6 +81,67 @@ func (m *mockGameStore) Discover(ctx context.Context, userID string, f DiscoverF
 		return m.discoverFn(ctx, userID, f)
 	}
 	return nil, 0, nil, apierr.ErrNotFound
+}
+func (m *mockGameStore) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+	return m.createPlayerAidFn(ctx, userID, gameID, filename, label)
+}
+func (m *mockGameStore) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
+	return m.deletePlayerAidFn(ctx, userID, gameID, aidID)
+}
+
+// --- PlayerAids ---
+
+func TestUploadPlayerAid_Success(t *testing.T) {
+	store := &mockGameStore{
+		createPlayerAidFn: func(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+			return &PlayerAid{ID: 1, GameID: gameID, Filename: filename, Label: label}, nil
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+
+	// Build multipart form
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, _ := writer.CreateFormFile("file", "test.pdf")
+	part.Write([]byte("fake pdf content"))
+	writer.WriteField("label", "Rules")
+	writer.Close()
+
+	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/games/1/player-aids", body.String(), "user-1", false)
+	r.Header.Set("Content-Type", writer.FormDataContentType())
+	r.SetPathValue("id", "1")
+
+	h.UploadPlayerAid(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp httpx.Response[PlayerAid]
+	json.NewDecoder(w.Body).Decode(&resp)
+	if resp.Data.Filename != "test.pdf" || *resp.Data.Label != "Rules" {
+		t.Fatalf("unexpected response: %+v", resp.Data)
+	}
+}
+
+func TestDeletePlayerAid_Success(t *testing.T) {
+	store := &mockGameStore{
+		deletePlayerAidFn: func(ctx context.Context, userID string, gameID, aidID int64) error {
+			return nil
+		},
+	}
+	h := NewHandler(store)
+	w := httptest.NewRecorder()
+	r := testutil.NewAuthRequestAs(t, "DELETE", "/api/v1/games/1/player-aids/2", "", "user-1", false)
+	r.SetPathValue("id", "1")
+	r.SetPathValue("aid_id", "2")
+
+	h.DeletePlayerAid(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
 }
 
 // --- ListGames ---
