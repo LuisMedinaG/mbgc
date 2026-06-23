@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/testutil"
 )
 
 // mockProfileStore implements profileStore for handler tests.
@@ -36,23 +36,12 @@ func (m *mockProfileStore) GetBGGUsername(ctx context.Context, userID string) (s
 	return "", nil
 }
 
-func newAuthenticatedRequest(method, path string, body string) *http.Request {
-	r := httptest.NewRequest(method, path, strings.NewReader(body))
-	r.Header.Set("Content-Type", "application/json")
-	ctx := httpx.SetGatewayUser(r.Context(), "user-1", "testuser", false)
-	return r.WithContext(ctx)
-}
-
-func newUnauthenticatedRequest(method, path string) *http.Request {
-	return httptest.NewRequest(method, path, nil)
-}
-
 // --- GetProfile ---
 
 func TestGetProfile_Unauthenticated(t *testing.T) {
 	h := NewHandler(NewService(&mockProfileStore{}))
 	w := httptest.NewRecorder()
-	r := newUnauthenticatedRequest("GET", "/api/v1/profile")
+	r := testutil.NewAnonRequest(t, "GET", "/api/v1/profile", "")
 	h.GetProfile(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", w.Code)
@@ -68,7 +57,7 @@ func TestGetProfile_Success(t *testing.T) {
 	}
 	h := NewHandler(NewService(store))
 	w := httptest.NewRecorder()
-	r := newAuthenticatedRequest("GET", "/api/v1/profile", "")
+	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/profile", "", "user-1", false)
 	h.GetProfile(w, r)
 
 	if w.Code != http.StatusOK {
@@ -98,7 +87,7 @@ func TestGetProfile_LazyUpsert(t *testing.T) {
 	}
 	h := NewHandler(NewService(store))
 	w := httptest.NewRecorder()
-	r := newAuthenticatedRequest("GET", "/api/v1/profile", "")
+	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/profile", "", "user-1", false)
 	h.GetProfile(w, r)
 
 	if w.Code != http.StatusOK {
@@ -120,7 +109,7 @@ func TestGetProfile_StoreError(t *testing.T) {
 	}
 	h := NewHandler(NewService(store))
 	w := httptest.NewRecorder()
-	r := newAuthenticatedRequest("GET", "/api/v1/profile", "")
+	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/profile", "", "user-1", false)
 	h.GetProfile(w, r)
 
 	if w.Code != http.StatusInternalServerError {
@@ -134,7 +123,7 @@ func TestGetProfile_StoreError(t *testing.T) {
 func TestSetBGGUsername_Unauthenticated(t *testing.T) {
 	h := NewHandler(NewService(&mockProfileStore{}))
 	w := httptest.NewRecorder()
-	r := newUnauthenticatedRequest("PUT", "/api/v1/profile/bgg-username")
+	r := testutil.NewAnonRequest(t, "PUT", "/api/v1/profile/bgg-username", "")
 	h.SetBGGUsername(w, r)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401, got %d", w.Code)
@@ -144,7 +133,7 @@ func TestSetBGGUsername_Unauthenticated(t *testing.T) {
 func TestSetBGGUsername_InvalidBody(t *testing.T) {
 	h := NewHandler(NewService(&mockProfileStore{}))
 	w := httptest.NewRecorder()
-	r := newAuthenticatedRequest("PUT", "/api/v1/profile/bgg-username", "bad json")
+	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/profile/bgg-username", "bad json", "user-1", false)
 	h.SetBGGUsername(w, r)
 
 	if w.Code != http.StatusBadRequest {
@@ -166,7 +155,7 @@ func TestSetBGGUsername_Success(t *testing.T) {
 	}
 	h := NewHandler(NewService(store))
 	w := httptest.NewRecorder()
-	r := newAuthenticatedRequest("PUT", "/api/v1/profile/bgg-username", `{"bgg_username":"myhandle"}`)
+	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/profile/bgg-username", `{"bgg_username":"myhandle"}`, "user-1", false)
 	h.SetBGGUsername(w, r)
 
 	if w.Code != http.StatusOK {
@@ -185,7 +174,7 @@ func TestSetBGGUsername_NotFound(t *testing.T) {
 	}
 	h := NewHandler(NewService(store))
 	w := httptest.NewRecorder()
-	r := newAuthenticatedRequest("PUT", "/api/v1/profile/bgg-username", `{"bgg_username":"myhandle"}`)
+	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/profile/bgg-username", `{"bgg_username":"myhandle"}`, "user-1", false)
 	h.SetBGGUsername(w, r)
 
 	if w.Code != http.StatusNotFound {

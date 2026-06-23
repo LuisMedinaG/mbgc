@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"strconv"
 
 	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
@@ -47,30 +46,12 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                          // ref: vibes.DISCOVER.1
 }
 
-// ref: auth.MULTI_TENANCY.2 — user identity extracted from context via httpx.UserIDFromContext
-func requireUserID(w http.ResponseWriter, r *http.Request) (string, bool) {
-	userID, ok := httpx.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, apierr.ErrUnauthorized)
-	}
-	return userID, ok
-}
-
 func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	// ref: collection.API.1 — clamp page/limit to safe bounds; attacker-controlled ?limit=1000000
-	// would otherwise cause expensive full scans and unbounded memory in the response envelope.
-	page := httpx.QueryInt(r, "page", 1)
-	if page < 1 {
-		page = 1
-	}
-	limit := httpx.QueryInt(r, "limit", 20)
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
+	page, limit := httpx.Pagination(r, 20, 100)
 	f := GameFilter{
 		Search:   httpx.Truncate(r.URL.Query().Get("search"), 255),
 		Category: httpx.Truncate(r.URL.Query().Get("category"), 255),
@@ -86,11 +67,11 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	id, err := httpx.PathInt64(r, "id")
 	if err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
@@ -104,11 +85,11 @@ func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	id, err := httpx.PathInt64(r, "id")
 	if err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
@@ -122,11 +103,11 @@ func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
 
 // ref: vibes.ASSIGN.2 — replaces entire collection assignment set for the game
 func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	gameID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	gameID, err := httpx.PathInt64(r, "id")
 	if err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
@@ -148,11 +129,11 @@ func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 // ref: game-detail.RULES_URL.1 — server-side allowlist runs in the store;
 // we only parse + truncate here.
 func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	gameID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	gameID, err := httpx.PathInt64(r, "id")
 	if err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
@@ -176,7 +157,7 @@ func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
@@ -189,7 +170,7 @@ func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
@@ -213,11 +194,11 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	id, err := httpx.PathInt64(r, "id")
 	if err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
@@ -241,11 +222,11 @@ func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	id, err := httpx.PathInt64(r, "id")
 	if err != nil {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
@@ -258,23 +239,16 @@ func (h *Handler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
-	userID, ok := requireUserID(w, r)
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
 		return
 	}
-	collectionID, err := strconv.ParseInt(r.URL.Query().Get("collection_id"), 10, 64)
+	collectionID, err := httpx.QueryInt64(r, "collection_id")
 	if err != nil || collectionID == 0 {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
-	page := httpx.QueryInt(r, "page", 1)
-	if page < 1 {
-		page = 1
-	}
-	limit := httpx.QueryInt(r, "limit", 20)
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
+	page, limit := httpx.Pagination(r, 20, 100)
 	f := DiscoverFilter{
 		CollectionID: collectionID,
 		Category:     httpx.Truncate(r.URL.Query().Get("category"), 255),
