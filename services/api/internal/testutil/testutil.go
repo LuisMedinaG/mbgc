@@ -1,7 +1,9 @@
 package testutil
 
 import (
+	"bytes"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,17 +12,22 @@ import (
 	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 )
 
-const TestUserID = "test-user-id"
+const testUserID = "test-user-id"
 
-// NewAuthRequest builds an authenticated httptest.Request with userID in context.
+// NewAuthRequest builds an authenticated request with the default test user ID.
 func NewAuthRequest(t *testing.T, method, path, body string) *http.Request {
+	return NewAuthRequestAs(t, method, path, body, testUserID, false)
+}
+
+// NewAuthRequestAs builds an authenticated request with a specific user ID and admin flag.
+func NewAuthRequestAs(t *testing.T, method, path, body, userID string, isAdmin bool) *http.Request {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
-	ctx := httpx.SetGatewayUser(r.Context(), TestUserID, "testuser", false)
+	ctx := httpx.SetGatewayUser(r.Context(), userID, "testuser", isAdmin)
 	return r.WithContext(ctx)
 }
 
-// NewAnonRequest builds an unauthenticated httptest.Request.
+// NewAnonRequest builds an unauthenticated request.
 func NewAnonRequest(t *testing.T, method, path, body string) *http.Request {
 	r := httptest.NewRequest(method, path, strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
@@ -41,4 +48,37 @@ func AssertStatus(t *testing.T, w *httptest.ResponseRecorder, want int) {
 	if w.Code != want {
 		t.Errorf("expected status %d, got %d", want, w.Code)
 	}
+}
+
+// TestUserID returns the default test user ID.
+func TestUserID() string {
+	return testUserID
+}
+
+// CaptureSlog swaps slog.Default to a JSON handler writing to a buffer for
+// the duration of the test, then restores the previous default.
+func CaptureSlog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	buf := &bytes.Buffer{}
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(buf, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return buf
+}
+
+// DecodeLogLines parses every JSON line in buf.
+func DecodeLogLines(t *testing.T, buf *bytes.Buffer) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, line := range strings.Split(strings.TrimRight(buf.String(), "\n"), "\n") {
+		if line == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("failed to parse log line %q: %v", line, err)
+		}
+		out = append(out, m)
+	}
+	return out
 }

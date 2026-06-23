@@ -24,9 +24,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 }
 
 func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpx.UserIDFromContext(r.Context())
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
-		httpx.WriteError(w, apierr.ErrUnauthorized)
 		return
 	}
 	profile, err := h.svc.GetProfile(r.Context(), userID)
@@ -40,9 +39,8 @@ func (h *Handler) GetProfile(w http.ResponseWriter, r *http.Request) {
 // ref: profile.BGG_USERNAME.1 — set/update/clear BGG username via PUT /api/v1/profile/bgg-username
 // ref: api-layer.CONFIG.7 — cap user-supplied strings at 255 chars before persistence
 func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
-	userID, ok := httpx.UserIDFromContext(r.Context())
+	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
-		httpx.WriteError(w, apierr.ErrUnauthorized)
 		return
 	}
 	var body struct {
