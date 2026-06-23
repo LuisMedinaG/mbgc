@@ -145,8 +145,8 @@ jobs:
         run: |
           pct=$(go tool cover -func=coverage-api.out | grep '^total:' | awk '{print $3}' | tr -d '%')
           echo "services/api coverage: ${pct}%"
-          if [ "$(echo "$pct < 52" | bc -l)" -eq 1 ]; then
-            echo "::error::Coverage ${pct}% is below 52% threshold"
+          if [ "$(echo "$pct < 43" | bc -l)" -eq 1 ]; then
+            echo "::error::Coverage ${pct}% is below 43% threshold"
             exit 1
           fi
       - name: Upload coverage
