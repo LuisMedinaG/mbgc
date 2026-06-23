@@ -23,7 +23,7 @@ bun install
 bun run dev          # Vite dev server
 bun run build        # tsc -b && vite build → dist/
 bun run lint         # eslint
-bun run test:e2e     # Playwright — requires full backend stack running
+bun run test:e2e     # Playwright — mocked, no backend needed (see web/e2e/README.md)
 ```
 
 ## Patterns

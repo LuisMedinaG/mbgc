@@ -23,6 +23,19 @@ e2e/
 └── README.md
 ```
 
+## Prerequisites
+
+```sh
+bun install
+npx playwright install chromium   # one-time: downloads the browser binary
+```
+
+**Don't run this while a stray Vite dev server is squatting on `:5173` from
+an unrelated tool** — `reuseExistingServer: false` in `playwright.config.ts`
+prevents Playwright from attaching to one accidentally, but if port `:5173`
+itself is occupied by something else, the webServer launch will fail. Free
+the port (`lsof -i :5173`) and rerun.
+
 ## Running
 
 ```sh
