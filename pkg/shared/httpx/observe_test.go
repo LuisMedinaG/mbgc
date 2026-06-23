@@ -35,6 +35,45 @@ func decodeLine(t *testing.T, buf *bytes.Buffer) map[string]any {
 	return m
 }
 
+// ref: monitoring.REDACTION.1-4 — disallowed keys never appear on a logged event
+func TestRecord_DropsDisallowedKeys(t *testing.T) {
+	buf := captureSlog(t)
+	r := httptest.NewRequest("GET", "/api/v1/games", nil)
+
+	Record(r, "test_event", slog.LevelInfo,
+		"api_key", "supersecret",
+		"cookie", "session=abc",
+		"x_forwarded_for", "1.2.3.4",
+		"set_cookie", "id=xyz",
+		"authorization", "Bearer x",
+		"user_id", "uid-from-attr",
+		"client_ip", "10.0.0.1",
+		"email", "a@b.com",
+		"bgg_token", "BGG-X",
+		"bgg_cookie", "BGG-C",
+		"service_role_key", "SRK",
+		"raw_query", "secret=true",
+		"body", "{...}",
+		"status", 200, // allowed — must survive
+	)
+
+	line := buf.String()
+	for _, banned := range []string{
+		"supersecret", "session=abc", "1.2.3.4", "id=xyz",
+		"Bearer x", "uid-from-attr", "10.0.0.1", "a@b.com",
+		"BGG-X", "BGG-C", "SRK", "secret=true", "{...}",
+	} {
+		if strings.Contains(line, banned) {
+			t.Errorf("disallowed value %q leaked into log output: %s", banned, line)
+		}
+	}
+
+	rec := decodeLine(t, buf)
+	if rec["status"] != float64(200) {
+		t.Errorf("expected status=200 to survive filter, got %v", rec["status"])
+	}
+}
+
 // ref: monitoring.SINK.6, monitoring.REDACTION.5 — helper always sets the
 // required fields, regardless of what the caller passes
 func TestRecord_IncludesRequestIDMethodPath(t *testing.T) {
@@ -262,9 +301,9 @@ func TestRecord_DefaultsStatusAndLatency(t *testing.T) {
 // Restores the prior Disabled state in Cleanup so it doesn't leak into
 // other tests in the package.
 func TestRecord_NoOpWhenDisabled(t *testing.T) {
-	prev := Disabled
-	t.Cleanup(func() { Disabled = prev })
-	Disabled = true
+	prev := Disabled.Load()
+	t.Cleanup(func() { Disabled.Store(prev) })
+	Disabled.Store(true)
 
 	buf := captureSlog(t)
 	r := httptest.NewRequest("GET", "/api/v1/games", nil)
