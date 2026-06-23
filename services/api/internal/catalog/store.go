@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -34,7 +35,11 @@ func NewStore(db *pgxpool.Pool) *Store {
 
 const gameColumns = "id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
 	" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
-	" language_dependence, recommended_players, rules_url, created_at, updated_at"
+	" language_dependence, recommended_players, rules_url," +
+	" (SELECT COALESCE(json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name), '[]'::json)" +
+	"  FROM games.collection_games cg JOIN games.collections c ON c.id = cg.collection_id" +
+	"  WHERE cg.game_id = games.games.id) AS vibes," +
+	" created_at, updated_at"
 
 // scanner is satisfied by both pgx.Rows (Query) and pgx.Row (QueryRow).
 type scanner interface {
@@ -43,11 +48,18 @@ type scanner interface {
 
 func scanGame(s scanner) (Game, error) {
 	var g Game
+	var vibesJSON []byte
 	err := s.Scan(&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
 		&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
 		&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
-		&g.RecommendedPlayers, &g.RulesURL, &g.CreatedAt, &g.UpdatedAt)
-	return g, err
+		&g.RecommendedPlayers, &g.RulesURL, &vibesJSON, &g.CreatedAt, &g.UpdatedAt)
+	if err != nil {
+		return g, err
+	}
+	if err := json.Unmarshal(vibesJSON, &g.Vibes); err != nil {
+		return g, err
+	}
+	return g, nil
 }
 
 func scanCollection(s scanner) (Collection, error) {
@@ -428,7 +440,11 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 	listSQL, listArgs, err := sq.Select(
 		"g.id, g.user_id, g.bgg_id, g.name, g.description, g.year_published, g.image, g.thumbnail," +
 			" g.min_players, g.max_players, g.playtime, g.categories, g.mechanics, g.types, g.weight, g.rating," +
-			" g.language_dependence, g.recommended_players, g.rules_url, g.created_at, g.updated_at").
+			" g.language_dependence, g.recommended_players, g.rules_url," +
+			" (SELECT COALESCE(json_agg(json_build_object('id', c2.id, 'name', c2.name) ORDER BY c2.name), '[]'::json)" +
+			"  FROM games.collection_games cg2 JOIN games.collections c2 ON c2.id = cg2.collection_id" +
+			"  WHERE cg2.game_id = g.id) AS vibes," +
+			" g.created_at, g.updated_at").
 		From("games.games g").
 		Join("games.collection_games cg ON g.id = cg.game_id").
 		Where(pred).
