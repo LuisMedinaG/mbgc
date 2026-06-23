@@ -42,4 +42,3 @@ func AssertStatus(t *testing.T, w *httptest.ResponseRecorder, want int) {
 		t.Errorf("expected status %d, got %d", want, w.Code)
 	}
 }
-
