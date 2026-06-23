@@ -29,6 +29,9 @@ type Game struct {
 type GameFilter struct {
 	Search   string
 	Category string
+	Players  string
+	Playtime string
+	Weight   string
 	Page     int
 	Limit    int
 }

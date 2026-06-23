@@ -56,19 +56,49 @@ func scanCollection(s scanner) (Collection, error) {
 	return c, err
 }
 
-func gamePredicates(userID string, search, category string) sq.And {
+func gamePredicates(userID string, f GameFilter) sq.And {
 	pred := sq.And{sq.Eq{"user_id": userID}}
-	if search != "" {
-		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", search))
+	if f.Search != "" {
+		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", f.Search))
 	}
-	if category != "" {
-		pred = append(pred, sq.Expr("? = ANY(categories)", category))
+	if f.Category != "" {
+		pred = append(pred, sq.Expr("? = ANY(categories)", f.Category))
+	}
+	switch f.Players {
+	case "1":
+		pred = append(pred, sq.LtOrEq{"min_players": 1})
+	case "2":
+		pred = append(pred, sq.LtOrEq{"min_players": 2})
+	case "2only":
+		pred = append(pred, sq.LtOrEq{"min_players": 2}, sq.GtOrEq{"max_players": 2})
+	case "3":
+		pred = append(pred, sq.LtOrEq{"min_players": 3})
+	case "4":
+		pred = append(pred, sq.LtOrEq{"min_players": 4})
+	case "5plus":
+		pred = append(pred, sq.GtOrEq{"max_players": 5})
+	}
+	switch f.Playtime {
+	case "short":
+		pred = append(pred, sq.Lt{"playtime": 30})
+	case "medium":
+		pred = append(pred, sq.GtOrEq{"playtime": 30}, sq.LtOrEq{"playtime": 60})
+	case "long":
+		pred = append(pred, sq.Gt{"playtime": 60})
+	}
+	switch f.Weight {
+	case "light":
+		pred = append(pred, sq.Lt{"weight": 2})
+	case "medium":
+		pred = append(pred, sq.GtOrEq{"weight": 2}, sq.LtOrEq{"weight": 3.5})
+	case "heavy":
+		pred = append(pred, sq.Gt{"weight": 3.5})
 	}
 	return pred
 }
 
 func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
-	pred := gamePredicates(userID, f.Search, f.Category)
+	pred := gamePredicates(userID, f)
 
 	countSQL, countArgs, err := sq.Select("COUNT(*)").
 		From("games.games").
