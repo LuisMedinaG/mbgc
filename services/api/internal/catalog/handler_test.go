@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/testutil"
 )
 
@@ -676,27 +676,25 @@ func TestDiscover_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 	var resp struct {
-		Data struct {
-			Collection *Collection `json:"collection"`
-			Data       []Game      `json:"data"`
-			Meta       struct {
-				Page  int `json:"page"`
-				Limit int `json:"limit"`
-				Total int `json:"total"`
-			} `json:"meta"`
-		} `json:"data"`
+		Collection *Collection `json:"collection"`
+		Data       []Game      `json:"data"`
+		Meta       struct {
+			Page  int `json:"page"`
+			Limit int `json:"limit"`
+			Total int `json:"total"`
+		} `json:"meta"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if resp.Data.Collection.Name != "Weekend Games" {
-		t.Fatalf("unexpected collection: %+v", resp.Data.Collection)
+	if resp.Collection.Name != "Weekend Games" {
+		t.Fatalf("unexpected collection: %+v", resp.Collection)
 	}
-	if len(resp.Data.Data) != 1 || resp.Data.Data[0].Name != "Catan" {
-		t.Fatalf("unexpected games: %+v", resp.Data.Data)
+	if len(resp.Data) != 1 || resp.Data[0].Name != "Catan" {
+		t.Fatalf("unexpected games: %+v", resp.Data)
 	}
-	if resp.Data.Meta.Total != 1 {
-		t.Fatalf("expected total=1, got %d", resp.Data.Meta.Total)
+	if resp.Meta.Total != 1 {
+		t.Fatalf("expected total=1, got %d", resp.Meta.Total)
 	}
 }
 

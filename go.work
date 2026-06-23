@@ -1,17 +1,6 @@
 // Minimum Go version for workspace mode (introduced in Go 1.18)
 go 1.25.0
 
-// List of modules to include in this workspace
-// Allows pkg/shared and services/api to share dependencies and build together
 use (
-	.                  // Root module (if any)
-	./pkg/shared       // Shared Go library (auth helpers, HTTP utilities, error types)
-	./services/api     // Main API service — imports pkg/shared for apierr, httpx, etc.
+	./services/api
 )
-
-// Local module replacement — development-only convenience
-// When services/api imports "github.com/LuisMedinaG/mbgc/pkg/shared",
-// Go resolves it to the local ./pkg/shared directory instead of a published version.
-// This eliminates the need to tag and version pkg/shared during feature development.
-// Important: This replace directive only applies in the workspace; it is NOT published.
-replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared

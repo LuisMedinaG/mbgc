@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	"golang.org/x/time/rate"
 )
 

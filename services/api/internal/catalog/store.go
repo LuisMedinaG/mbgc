@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -32,14 +32,43 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
-func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
+const gameColumns = "id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
+	" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
+	" language_dependence, recommended_players, rules_url, created_at, updated_at"
+
+// scanner is satisfied by both pgx.Rows (Query) and pgx.Row (QueryRow).
+type scanner interface {
+	Scan(dest ...any) error
+}
+
+func scanGame(s scanner) (Game, error) {
+	var g Game
+	err := s.Scan(&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
+		&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
+		&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
+		&g.RecommendedPlayers, &g.RulesURL, &g.CreatedAt, &g.UpdatedAt)
+	return g, err
+}
+
+func scanCollection(s scanner) (Collection, error) {
+	var c Collection
+	err := s.Scan(&c.ID, &c.UserID, &c.Name, &c.Description, &c.GameCount, &c.CreatedAt, &c.UpdatedAt)
+	return c, err
+}
+
+func gamePredicates(userID string, search, category string) sq.And {
 	pred := sq.And{sq.Eq{"user_id": userID}}
-	if f.Search != "" {
-		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", f.Search))
+	if search != "" {
+		pred = append(pred, sq.Expr("search_vector @@ plainto_tsquery('english', ?)", search))
 	}
-	if f.Category != "" {
-		pred = append(pred, sq.Expr("? = ANY(categories)", f.Category))
+	if category != "" {
+		pred = append(pred, sq.Expr("? = ANY(categories)", category))
 	}
+	return pred
+}
+
+func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
+	pred := gamePredicates(userID, f.Search, f.Category)
 
 	countSQL, countArgs, err := sq.Select("COUNT(*)").
 		From("games.games").
@@ -55,10 +84,7 @@ func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]G
 	}
 
 	offset := (f.Page - 1) * f.Limit
-	listSQL, listArgs, err := sq.Select(
-		"id, user_id, bgg_id, name, description, year_published, image, thumbnail," +
-			" min_players, max_players, playtime, categories, mechanics, types, weight, rating," +
-			" language_dependence, recommended_players, rules_url, created_at, updated_at").
+	listSQL, listArgs, err := sq.Select(gameColumns).
 		From("games.games").
 		Where(pred).
 		OrderBy("name").
@@ -78,11 +104,8 @@ func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]G
 
 	var games []Game
 	for rows.Next() {
-		var g Game
-		if err := rows.Scan(&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
-			&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
-			&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
-			&g.RecommendedPlayers, &g.RulesURL, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		g, err := scanGame(rows)
+		if err != nil {
 			return nil, 0, err
 		}
 		games = append(games, g)
@@ -94,15 +117,8 @@ func (s *Store) ListGames(ctx context.Context, userID string, f GameFilter) ([]G
 }
 
 func (s *Store) GetGame(ctx context.Context, id int64, userID string) (*Game, error) {
-	var g Game
-	err := s.db.QueryRow(ctx, `SELECT id, user_id, bgg_id, name, description, year_published, image, thumbnail,
-		min_players, max_players, playtime, categories, mechanics, types, weight, rating,
-		language_dependence, recommended_players, rules_url, created_at, updated_at
-		FROM games.games WHERE id = $1 AND user_id = $2`, id, userID).Scan(
-		&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
-		&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
-		&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
-		&g.RecommendedPlayers, &g.RulesURL, &g.CreatedAt, &g.UpdatedAt)
+	g, err := scanGame(s.db.QueryRow(ctx,
+		`SELECT `+gameColumns+` FROM games.games WHERE id = $1 AND user_id = $2`, id, userID))
 	if err != nil {
 		return nil, apierr.ErrNotFound
 	}
@@ -238,8 +254,8 @@ func (s *Store) ListCollections(ctx context.Context, userID string) ([]Collectio
 
 	var cols []Collection
 	for rows.Next() {
-		var c Collection
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Name, &c.Description, &c.GameCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		c, err := scanCollection(rows)
+		if err != nil {
 			return nil, err
 		}
 		cols = append(cols, c)
@@ -343,20 +359,17 @@ type DiscoverFilter struct {
 }
 
 func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error) {
-	// Fetch collection
-	var col Collection
-	err := s.db.QueryRow(ctx, `SELECT c.id, c.user_id, c.name, c.description,
+	col, err := scanCollection(s.db.QueryRow(ctx, `SELECT c.id, c.user_id, c.name, c.description,
 		COUNT(cg.game_id) AS game_count, c.created_at, c.updated_at
 		FROM games.collections c
 		LEFT JOIN games.collection_games cg ON c.id = cg.collection_id
 		WHERE c.id = $1 AND c.user_id = $2
 		GROUP BY c.id, c.user_id, c.name, c.description, c.created_at, c.updated_at`,
-		f.CollectionID, userID).Scan(&col.ID, &col.UserID, &col.Name, &col.Description, &col.GameCount, &col.CreatedAt, &col.UpdatedAt)
+		f.CollectionID, userID))
 	if err != nil {
 		return nil, 0, nil, apierr.ErrNotFound
 	}
 
-	// Build query for games in this collection
 	pred := sq.And{
 		sq.Expr("g.user_id = ?", userID),
 		sq.Expr("cg.collection_id = ?", f.CollectionID),
@@ -406,11 +419,8 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 
 	var games []Game
 	for rows.Next() {
-		var g Game
-		if err := rows.Scan(&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
-			&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
-			&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
-			&g.RecommendedPlayers, &g.RulesURL, &g.CreatedAt, &g.UpdatedAt); err != nil {
+		g, err := scanGame(rows)
+		if err != nil {
 			return nil, 0, nil, err
 		}
 		games = append(games, g)

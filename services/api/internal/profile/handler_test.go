@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/testutil"
 )
 
@@ -147,7 +147,7 @@ func TestSetBGGUsername_Success(t *testing.T) {
 			return &Profile{ID: userID}, nil
 		},
 		getProfileFn: func(ctx context.Context, userID string) (*Profile, error) {
-			return &Profile{ID: userID, Username: "admin", BGGUsername: strPtr("myhandle")}, nil
+			return &Profile{ID: userID, BGGUsername: strPtr("myhandle")}, nil
 		},
 		setBGGUsernameFn: func(ctx context.Context, userID, bggUsername string) error {
 			return nil
