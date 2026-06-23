@@ -11,6 +11,8 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+var validate = validator.New()
+
 // DecodeValidate decodes a JSON body and validates the struct using go-playground/validator.
 // Returns a human-readable validation error mapped to ErrBadRequest.
 func DecodeValidate[T any](body io.Reader, dst *T) error {
@@ -18,7 +20,6 @@ func DecodeValidate[T any](body io.Reader, dst *T) error {
 		return fmt.Errorf("%w: invalid request body", apierr.ErrBadRequest)
 	}
 
-	validate := validator.New()
 	if err := validate.Struct(dst); err != nil {
 		var msgs string
 		for _, validationErr := range err.(validator.ValidationErrors) {
