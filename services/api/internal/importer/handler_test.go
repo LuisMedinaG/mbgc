@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/testutil"
 )
 

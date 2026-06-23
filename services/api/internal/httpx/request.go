@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	"github.com/go-playground/validator/v10"
 )
 

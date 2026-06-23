@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	"github.com/google/uuid"
 )
 

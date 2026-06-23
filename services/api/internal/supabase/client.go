@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 // Client wraps Supabase HTTP API calls (token grant, refresh, user updates).
@@ -20,7 +22,7 @@ type Client struct {
 // New creates a Supabase client for auth operations.
 func New(baseURL, apiKey string, hc *http.Client) *Client {
 	if hc == nil {
-		hc = http.DefaultClient
+		hc = httpx.DefaultClient
 	}
 	return &Client{
 		url:    strings.TrimSuffix(baseURL, "/"),

@@ -18,10 +18,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/auth"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
@@ -196,7 +196,6 @@ func main() {
 			httpx.Logger,
 			// ref: api-layer.CLIENT_INFO.1 — extracts X-Client-Version/X-Platform into context
 			httpx.ClientInfo,
-			httpx.Gzip,
 			// ref: auth.MIDDLEWARE.2 — RequestID attaches unique UUID
 			httpx.RequestID,
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500

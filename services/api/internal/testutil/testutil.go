@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 const TestUserID = "test-user-id"

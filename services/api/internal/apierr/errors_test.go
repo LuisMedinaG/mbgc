@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 )
 
 func TestSentinels(t *testing.T) {

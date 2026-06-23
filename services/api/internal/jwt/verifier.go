@@ -10,8 +10,8 @@ import (
 	"github.com/MicahParks/keyfunc/v3"
 	jwtlib "github.com/golang-jwt/jwt/v5"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 // ref: auth.JWT_VALIDATION.7 — validates aud claim = "authenticated"
