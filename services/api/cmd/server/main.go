@@ -24,11 +24,24 @@ import (
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/logging"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
 	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
 )
+
+func heartbeat(ctx context.Context, interval time.Duration) {
+	httpx.Record(nil, "heartbeat", slog.LevelInfo)
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			httpx.Record(nil, "heartbeat", slog.LevelInfo)
+		}
+	}
+}
 
 func runMigrations(databaseURL string) error {
 	db, err := sql.Open("pgx", databaseURL)
@@ -70,16 +83,10 @@ func runMigrations(databaseURL string) error {
 }
 
 func main() {
-	// ref: monitoring.OBSERVABILITY.1, monitoring.FAIL_OPEN.1 — install the
-	// fail-open JSON handler before any slog call. Must be the first line of
-	// main so config-load failures are also captured as structured events.
-	slog.SetDefault(slog.New(logging.NewHandler()))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 
-	// ref: monitoring.OBSERVABILITY.3 — kill switch. When set, Record becomes
-	// a no-op and log ingestion from this service drops to zero. Flip on the
-	// next deploy with: gcloud run services update mbgc-api --update-env-vars MONITORING_DISABLED=true
 	if os.Getenv("MONITORING_DISABLED") == "true" {
-		httpx.Disabled.Store(true)
+		httpx.Disabled = true
 		slog.Info("monitoring disabled via MONITORING_DISABLED env var")
 	}
 
@@ -93,7 +100,7 @@ func main() {
 	// shutdown so it stops cleanly with the rest of the service.
 	hbCtx, hbCancel := context.WithCancel(context.Background())
 	defer hbCancel()
-	go logging.Heartbeat(hbCtx, 5*time.Minute)
+	go heartbeat(hbCtx, 5*time.Minute)
 
 	if os.Getenv("SKIP_MIGRATIONS") != "true" {
 		if err := runMigrations(cfg.DatabaseURL); err != nil {
