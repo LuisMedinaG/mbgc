@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 )
 
 // WriteJSON serializes v as JSON with the given HTTP status code.

@@ -2,11 +2,10 @@ package catalog
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 type gameStore interface {
@@ -101,6 +100,11 @@ func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type collectionRequest struct {
+	Name        string `json:"name" validate:"required"`
+	Description string `json:"description"`
+}
+
 // ref: vibes.ASSIGN.2 — replaces entire collection assignment set for the game
 func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
@@ -115,8 +119,8 @@ func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		CollectionIDs []int64 `json:"collection_ids"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpx.WriteError(w, apierr.ErrBadRequest)
+	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	if err := h.svc.SetGameCollections(r.Context(), userID, gameID, body.CollectionIDs); err != nil {
@@ -141,8 +145,8 @@ func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		RulesURL string `json:"rules_url"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpx.WriteError(w, apierr.ErrBadRequest)
+	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	body.RulesURL = httpx.Truncate(body.RulesURL, 2048)
@@ -174,13 +178,9 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// ref: api-layer.CONFIG.7 — cap user-supplied strings at 255 chars before persistence
-	var body struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpx.WriteError(w, apierr.ErrBadRequest)
+	var body collectionRequest
+	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	body.Name = httpx.Truncate(body.Name, 255)
@@ -203,13 +203,9 @@ func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
-	// ref: api-layer.CONFIG.7 — cap user-supplied strings at 255 chars before persistence
-	var body struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpx.WriteError(w, apierr.ErrBadRequest)
+	var body collectionRequest
+	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	body.Name = httpx.Truncate(body.Name, 255)
@@ -261,19 +257,11 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	type discoverMeta struct {
-		Page  int `json:"page"`
-		Limit int `json:"limit"`
-		Total int `json:"total"`
-	}
-	type discoverResponse struct {
-		Collection *Collection  `json:"collection"`
-		Data       []Game       `json:"data"`
-		Meta       discoverMeta `json:"meta"`
-	}
-	httpx.WriteJSON(w, http.StatusOK, httpx.New(discoverResponse{
-		Collection: col,
-		Data:       games,
-		Meta:       discoverMeta{Page: page, Limit: limit, Total: total},
-	}))
+	httpx.WriteJSON(w, http.StatusOK, struct {
+		Collection *Collection            `json:"collection"`
+		httpx.ListResponse[Game]
+	}{
+		Collection:   col,
+		ListResponse: httpx.NewList(games, page, limit, total),
+	})
 }

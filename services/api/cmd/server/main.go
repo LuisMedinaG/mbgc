@@ -18,7 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/auth"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/catalog"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
@@ -196,7 +196,6 @@ func main() {
 			httpx.Logger,
 			// ref: api-layer.CLIENT_INFO.1 — extracts X-Client-Version/X-Platform into context
 			httpx.ClientInfo,
-			httpx.Gzip,
 			// ref: auth.MIDDLEWARE.2 — RequestID attaches unique UUID
 			httpx.RequestID,
 			// ref: auth.MIDDLEWARE.3 — Recover catches panics, returns 500
@@ -204,8 +203,6 @@ func main() {
 			globalRateLimit,
 			// ref: api-layer.SEC.6 — caps JSON request bodies at 1MB
 			httpx.LimitBodySize(1<<20),
-			// ref: api-layer.SEC.7 — rejects wrong Content-Type on body-bearing requests (CSRF text/plain bypass)
-			httpx.RequireContentType("application/json", "multipart/form-data"),
 			// ref: auth.MIDDLEWARE.4 — SecurityHeaders sets nosniff, DENY, CSP
 			httpx.SecurityHeaders,
 			// ref: auth.MIDDLEWARE.5 — CORS validates origin; comma-separated ALLOWED_ORIGINS env var

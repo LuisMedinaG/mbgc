@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -21,14 +21,7 @@ func DecodeValidate[T any](body io.Reader, dst *T) error {
 	}
 
 	if err := validate.Struct(dst); err != nil {
-		var msgs string
-		for _, validationErr := range err.(validator.ValidationErrors) {
-			msgs = fmt.Sprintf("%s, %s", msgs, validationErr.Field()+" is "+validationErr.Tag())
-		}
-		if msgs != "" {
-			msgs = msgs[2:] // strip leading ", "
-		}
-		return fmt.Errorf("%w: %s", apierr.ErrBadRequest, msgs)
+		return fmt.Errorf("%w: %s", apierr.ErrBadRequest, err.Error())
 	}
 	return nil
 }

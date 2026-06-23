@@ -1,11 +1,9 @@
 package profile
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/LuisMedinaG/mbgc/pkg/shared/apierr"
-	"github.com/LuisMedinaG/mbgc/pkg/shared/httpx"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 )
 
 type Handler struct {
@@ -46,8 +44,8 @@ func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		BGGUsername string `json:"bgg_username"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		httpx.WriteError(w, apierr.ErrBadRequest)
+	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
+		httpx.WriteError(w, err)
 		return
 	}
 	body.BGGUsername = httpx.Truncate(body.BGGUsername, 255)
@@ -55,10 +53,5 @@ func (h *Handler) SetBGGUsername(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, err)
 		return
 	}
-	profile, err := h.svc.GetProfile(r.Context(), userID)
-	if err != nil {
-		httpx.WriteError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, httpx.New(profile))
+	w.WriteHeader(http.StatusNoContent)
 }
