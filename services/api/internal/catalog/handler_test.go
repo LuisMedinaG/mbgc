@@ -28,6 +28,8 @@ type mockGameStore struct {
 	setGameCollectionsFn func(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
 	updateRulesURLFn     func(ctx context.Context, gameID int64, userID, rulesURL string) error
 	discoverFn           func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
+	createPlayerAidFn    func(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error)
+	deletePlayerAidFn    func(ctx context.Context, userID string, gameID, aidID int64) error
 }
 
 func (m *mockGameStore) ListGames(ctx context.Context, userID string, f GameFilter) ([]Game, int, error) {
@@ -77,6 +79,18 @@ func (m *mockGameStore) Discover(ctx context.Context, userID string, f DiscoverF
 		return m.discoverFn(ctx, userID, f)
 	}
 	return nil, 0, nil, apierr.ErrNotFound
+}
+func (m *mockGameStore) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+	if m.createPlayerAidFn != nil {
+		return m.createPlayerAidFn(ctx, userID, gameID, filename, label)
+	}
+	return nil, nil
+}
+func (m *mockGameStore) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
+	if m.deletePlayerAidFn != nil {
+		return m.deletePlayerAidFn(ctx, userID, gameID, aidID)
+	}
+	return nil
 }
 
 // --- ListGames ---

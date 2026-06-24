@@ -22,7 +22,8 @@ type Game struct {
 	LanguageDependence *int      `json:"language_dependence,omitempty"`
 	RecommendedPlayers []int     `json:"recommended_players"`
 	RulesURL           *string   `json:"rules_url,omitempty"`
-	Vibes              []VibeRef `json:"vibes"`
+	Vibes              []VibeRef  `json:"vibes"`
+	PlayerAids         []PlayerAid `json:"player_aids"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 }
@@ -52,4 +53,12 @@ type Collection struct {
 	GameCount   int       `json:"game_count"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type PlayerAid struct {
+	ID        int64     `json:"id"`
+	GameID    int64     `json:"game_id"`
+	Filename  string    `json:"filename"`
+	Label     *string   `json:"label,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
