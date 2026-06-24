@@ -1,0 +1,96 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx @acai.sh/cli features --json 2>/dev/null || true",
+            "statusMessage": "Loading acai feature status..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx @acai.sh/cli push --all 2>/dev/null || true",
+            "statusMessage": "Syncing specs to acai dashboard..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook observe"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|mcp__lean-ctx__ctx_edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/lumedina/Documents/Projects/mbgc/.codex/hooks/prevent-pbxproj'"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook rewrite"
+          }
+        ]
+      },
+      {
+        "matcher": "Read|read|ReadFile|read_file|View|view|Grep|grep|Search|search|ListFiles|list_files|ListDirectory|list_directory",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook redirect"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook observe"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook observe"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "lean-ctx hook observe"
+          }
+        ]
+      }
+    ]
+  }
+}

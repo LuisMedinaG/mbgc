@@ -12,6 +12,8 @@ mbgc/
 ├── services/
 │   └── api/             Single consolidated Go API (auth, games, collections, importer, profile)
 ├── web/                 React + Vite + TypeScript + Tailwind
+├── ios/                 SwiftUI iOS app (Swift 6.2, SwiftData, URLSession)
+│   └── AGENTS.md        iOS-specific build/test/conventions
 ├── infra/               Terraform — GCP Cloud Run, Cloudflare, Supabase
 │   └── scripts/
 │       ├── bootstrap.sh       one-time infra provisioning + GitHub secrets sync
@@ -23,16 +25,17 @@ mbgc/
 ## Request Flow
 
 ```
-Browser / web
-      │
-      ▼
-services/api  (JWT validation via JWKS + all route handlers)
-  /api/v1/auth/*         auth ping
-  /api/v1/profile/*      user profile, BGG username
-  /api/v1/games/*        games, collections, player aids
-  /api/v1/collections/*  vibes/collections CRUD
-  /api/v1/import/*       BGG sync, CSV import
-  /readyz               health check
+Browser / web     iOS app
+      │              │
+      └──────┬───────┘
+             ▼
+      services/api  (JWT validation via JWKS + all route handlers)
+        /api/v1/auth/*         auth ping
+        /api/v1/profile/*      user profile, BGG username
+        /api/v1/games/*        games, collections, player aids
+        /api/v1/collections/*  vibes/collections CRUD
+        /api/v1/import/*       BGG sync, CSV import
+        /readyz                health check
 ```
 
 JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
