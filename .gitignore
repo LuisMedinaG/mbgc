@@ -115,6 +115,25 @@ infra/.env
 set-deploy-secrets.sh
 
 ##############################################################################
+# iOS / Xcode
+##############################################################################
+ios/build/
+ios/DerivedData/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcscmblueprint
+ios/*.xccheckout
+ios/*.pbxuser
+ios/*.mode1v3
+ios/*.mode2v3
+ios/*.perspectivev3
+ios/*.moved-aside
+ios/*.hmap
+ios/*.dSYM/
+ios/*.ipa
+ios/.build/
+ios/Carthage/Build/
+ios/Components/iOSInjectionProject/
 # macOS
 ##############################################################################
 .DS_Store

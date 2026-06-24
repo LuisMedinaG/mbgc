@@ -22,6 +22,7 @@ struct PageMeta: Decodable { let page: Int; let limit: Int; let total: Int }
 private struct ErrorEnvelope: Decodable { let error: APIErrorBody }
 private struct APIErrorBody: Decodable { let code: String; let message: String }
 
+@MainActor
 final class APIClient {
     static let shared = APIClient()
 
