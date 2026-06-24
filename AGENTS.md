@@ -28,7 +28,7 @@ make tidy          # go mod tidy
 make dev           # Vite dev server
 make build         # tsc -b && vite build
 make lint
-make test-e2e      # Playwright — requires full stack running
+make test-e2e      # Playwright — mocked, no backend needed; spins up its own isolated Vite server
 ```
 
 ### Admin user

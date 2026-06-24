@@ -22,13 +22,24 @@ type Game struct {
 	LanguageDependence *int      `json:"language_dependence,omitempty"`
 	RecommendedPlayers []int     `json:"recommended_players"`
 	RulesURL           *string   `json:"rules_url,omitempty"`
+	Vibes              []VibeRef `json:"vibes"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
+}
+
+// VibeRef is the collection (id, name) pair attached to a game's "vibes" —
+// the user-facing name for collection membership.
+type VibeRef struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 type GameFilter struct {
 	Search   string
 	Category string
+	Players  string
+	Playtime string
+	Weight   string
 	Page     int
 	Limit    int
 }
