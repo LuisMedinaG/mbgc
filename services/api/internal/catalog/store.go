@@ -493,7 +493,7 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 			"  FROM games.collection_games cg2 JOIN games.collections c2 ON c2.id = cg2.collection_id" +
 			"  WHERE cg2.game_id = g.id) AS vibes," +
 			" (SELECT COALESCE(json_agg(json_build_object('id', pa.id, 'game_id', pa.game_id, 'filename', pa.filename, 'label', pa.label, 'created_at', pa.created_at) ORDER BY pa.created_at), '[]'::json)" +
-			"  FROM games.player_aids pa WHERE pa.game_id = games.games.id) AS player_aids," +
+			"  FROM games.player_aids pa WHERE pa.game_id = g.id) AS player_aids," +
 			" g.created_at, g.updated_at").
 		From("games.games g").
 		Join("games.collection_games cg ON g.id = cg.game_id").
