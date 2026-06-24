@@ -27,6 +27,26 @@
                 "LOG_LEVEL": "debug"
             },
             "envFile": "${workspaceFolder}/services/api/.env"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mbgc}/.claude/skills/xcode-project-setup/scripts/xcode_spm_setup",
+            "name": "Debug xcode_spm_setup (.claude/skills/xcode-project-setup/scripts/xcode_spm_setup)",
+            "target": "xcode_spm_setup",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug xcode_spm_setup (.claude/skills/xcode-project-setup/scripts/xcode_spm_setup)"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:mbgc}/.claude/skills/xcode-project-setup/scripts/xcode_spm_setup",
+            "name": "Release xcode_spm_setup (.claude/skills/xcode-project-setup/scripts/xcode_spm_setup)",
+            "target": "xcode_spm_setup",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release xcode_spm_setup (.claude/skills/xcode-project-setup/scripts/xcode_spm_setup)"
         }
     ]
 }

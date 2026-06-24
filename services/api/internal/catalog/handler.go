@@ -23,6 +23,8 @@ type gameStore interface {
 	SetGameCollections(ctx context.Context, userID string, gameID int64, collectionIDs []int64) error
 	UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error
 	Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
+	CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error)
+	DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error
 }
 
 type Handler struct {
@@ -34,16 +36,18 @@ func NewHandler(svc gameStore) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
-	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))                            // ref: collection.API.1
-	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                         // ref: game-detail.DETAIL_VIEW.1
-	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))                   // ref: game-detail.DELETE.1
-	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections))) // ref: vibes.ASSIGN.1
-	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))        // ref: game-detail.RULES_URL.1
-	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))                // ref: vibes.LIST.1
-	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))              // ref: vibes.CRUD.1
-	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))          // ref: vibes.CRUD.3
-	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection)))       // ref: vibes.CRUD.4
-	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                          // ref: vibes.DISCOVER.1
+	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))                                   // ref: collection.API.1
+	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                                // ref: game-detail.DETAIL_VIEW.1
+	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))                          // ref: game-detail.DELETE.1
+	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections)))        // ref: vibes.ASSIGN.1
+	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))               // ref: game-detail.RULES_URL.1
+	mux.Handle("POST /api/v1/games/{id}/player-aids", auth(http.HandlerFunc(h.CreatePlayerAid)))           // ref: player-aid.CREATE.1
+	mux.Handle("DELETE /api/v1/games/{id}/player-aids/{aidID}", auth(http.HandlerFunc(h.DeletePlayerAid))) // ref: player-aid.DELETE.1
+	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))                       // ref: vibes.LIST.1
+	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))                     // ref: vibes.CRUD.1
+	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))                 // ref: vibes.CRUD.3
+	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection)))              // ref: vibes.CRUD.4
+	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                                 // ref: vibes.DISCOVER.1
 }
 
 func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
@@ -276,4 +280,62 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 		Meta:       httpx.PageMeta{Page: page, Limit: limit, Total: total},
 		Total:      total,
 	})
+}
+
+type playerAidRequest struct {
+	Filename string  `json:"filename"`
+	Label    *string `json:"label,omitempty"`
+}
+
+func (h *Handler) CreatePlayerAid(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.RequireUserID(w, r)
+	if !ok {
+		return
+	}
+	gameID, err := httpx.PathInt64(r, "id")
+	if err != nil {
+		httpx.WriteError(w, apierr.ErrBadRequest)
+		return
+	}
+	var body playerAidRequest
+	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	if body.Filename == "" {
+		httpx.WriteError(w, fmt.Errorf("%w: filename is required", apierr.ErrBadRequest))
+		return
+	}
+	body.Filename = httpx.Truncate(body.Filename, 255)
+	if body.Label != nil {
+		*body.Label = httpx.Truncate(*body.Label, 255)
+	}
+	aid, err := h.svc.CreatePlayerAid(r.Context(), userID, gameID, body.Filename, body.Label)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusCreated, httpx.New(aid))
+}
+
+func (h *Handler) DeletePlayerAid(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.RequireUserID(w, r)
+	if !ok {
+		return
+	}
+	gameID, err := httpx.PathInt64(r, "id")
+	if err != nil {
+		httpx.WriteError(w, apierr.ErrBadRequest)
+		return
+	}
+	aidID, err := httpx.PathInt64(r, "aidID")
+	if err != nil {
+		httpx.WriteError(w, apierr.ErrBadRequest)
+		return
+	}
+	if err := h.svc.DeletePlayerAid(r.Context(), userID, gameID, aidID); err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
