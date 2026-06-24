@@ -8,6 +8,7 @@ When given a task, agents MUST:
 ## Setup & Build
 
 > Full first-time setup guide: **[SETUP.md](./SETUP.md)**
+> iOS-specific build/test: **[ios/AGENTS.md](./ios/AGENTS.md)**
 
 ```sh
 # Root Makefile — primary entry points:
@@ -29,6 +30,10 @@ make dev           # Vite dev server
 make build         # tsc -b && vite build
 make lint
 make test-e2e      # Playwright — mocked, no backend needed; spins up its own isolated Vite server
+
+# iOS (from ios/ — see ios/AGENTS.md for full details):
+# Primary: xcode-gen MCP tasks `build_sim` / `test_sim`
+# Fallback: xcodebuild -scheme MBGC -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 ```
 
 ### Admin user
@@ -110,6 +115,9 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 - Server state via TanStack Query (`@tanstack/react-query` v5) — use `useQuery`/`useMutation`; never hand-roll `useState`+`useEffect` for API calls. Query keys in `web/src/lib/queryKeys.ts`, client config in `web/src/lib/queryClient.ts`
 - Hook conventions: `useGames(filters)`, `useGame(id)`, `useCollections()`, `useProfile()` — one hook per domain, exported from `web/src/hooks/`
 
+**Swift (iOS):**
+- See [ios/AGENTS.md](./ios/AGENTS.md) for full iOS conventions — @Observable, SwiftData, Keychain, URLSession async/await, xcodegen
+
 ## Git Workflow
 
 ```
@@ -148,6 +156,7 @@ refactor/*
 - Expose raw `err.Error()` from DB or internal code to HTTP responses
 - Commit secrets, `.env` files, or service account credentials
 - Use `--no-verify` on commits
+- Manually edit `.pbxproj` or `.xcodeproj/` in iOS app — hook prevents this by design. Use `xcodegen generate` in `ios/` directory instead
 
 <!-- lean-ctx-compression -->
 OUTPUT STYLE: dense

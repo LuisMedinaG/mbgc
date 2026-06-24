@@ -79,8 +79,7 @@ build:
 
 ## test: Run all tests
 test:
-	$(MAKE) -C pkg/shared test
-	$(MAKE) -C services/api test-v
+	$(MAKE) -C services/api test
 
 ## lint: Lint all code (Go + web + infra)
 lint:
