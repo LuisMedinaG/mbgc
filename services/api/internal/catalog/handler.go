@@ -36,16 +36,16 @@ func NewHandler(svc gameStore) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
-	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))                            // ref: collection.API.1
-	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                         // ref: game-detail.DETAIL_VIEW.1
-	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))                   // ref: game-detail.DELETE.1
-	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections))) // ref: vibes.ASSIGN.1
-	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))        // ref: game-detail.RULES_URL.1
-	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))                         // ref: vibes.LIST.1
-	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))                       // ref: vibes.CRUD.1
-	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))                   // ref: vibes.CRUD.3
-	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection)))                // ref: vibes.CRUD.4
-	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                                   // ref: vibes.DISCOVER.1
+	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))                                    // ref: collection.API.1
+	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                                 // ref: game-detail.DETAIL_VIEW.1
+	mux.Handle("DELETE /api/v1/games/{id}", auth(http.HandlerFunc(h.DeleteGame)))                           // ref: game-detail.DELETE.1
+	mux.Handle("POST /api/v1/games/{id}/collections", auth(http.HandlerFunc(h.SetGameCollections)))         // ref: vibes.ASSIGN.1
+	mux.Handle("PUT /api/v1/games/{id}/rules-url", auth(http.HandlerFunc(h.UpdateRulesURL)))                // ref: game-detail.RULES_URL.1
+	mux.Handle("GET /api/v1/collections", auth(http.HandlerFunc(h.ListCollections)))                        // ref: vibes.LIST.1
+	mux.Handle("POST /api/v1/collections", auth(http.HandlerFunc(h.CreateCollection)))                      // ref: vibes.CRUD.1
+	mux.Handle("PUT /api/v1/collections/{id}", auth(http.HandlerFunc(h.UpdateCollection)))                  // ref: vibes.CRUD.3
+	mux.Handle("DELETE /api/v1/collections/{id}", auth(http.HandlerFunc(h.DeleteCollection)))               // ref: vibes.CRUD.4
+	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                                  // ref: vibes.DISCOVER.1
 	mux.Handle("POST /api/v1/games/{id}/player-aids", auth(http.HandlerFunc(h.UploadPlayerAid)))            // ref: game-detail.PLAYER_AIDS.1
 	mux.Handle("DELETE /api/v1/games/{id}/player-aids/{aid_id}", auth(http.HandlerFunc(h.DeletePlayerAid))) // ref: game-detail.PLAYER_AIDS.2
 }
