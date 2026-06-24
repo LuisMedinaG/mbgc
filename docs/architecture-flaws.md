@@ -22,9 +22,9 @@ The third largest weakness is uneven adherence to frontend state-management conv
 
 | ID | Flaw | Criticality | Size | Primary path(s) | Why it matters | Recommended fix |
 |---|---|---:|---:|---|---|---|
-| F-01 | Refresh token is stored in `localStorage`. | P0 | L | `web/src/lib/api.ts`, `web/src/contexts/AuthContext.tsx`, `services/api/internal/auth/handler.go` | XSS can steal both access and refresh tokens, turning a UI bug into durable account takeover. | Move refresh token to `HttpOnly`, `Secure`, `SameSite` cookie or backend session storage; keep access token memory-only; add logout/refresh cookie tests. |
-| F-02 | Auth docs contradict auth implementation. | P1 | S | `web/AGENTS.md`, `web/src/lib/api.ts` | Contributors may make security decisions from stale docs. | Update docs after F-01; until then, explicitly document current localStorage risk and migration target. |
-| F-03 | Some frontend API writes bypass TanStack Query domain hooks. | P1 | M | `web/src/pages/ImportPage.tsx`, `web/src/pages/ImportCsvPage.tsx`, `web/src/pages/VibesPage.tsx`, `web/src/components/RulesUrlEditor.tsx`, `web/src/components/PlayerAidManager.tsx` | Local loading/error state fragments cache invalidation and makes mobile/offline behavior harder. | Add `useImport`, `useCsvImport`, `useDiscover`, `useRulesUrl`, and `usePlayerAids` hooks; centralize invalidation. |
+| F-01 | Refresh token was stored in `localStorage`; first remediation is now implemented on this branch. | P0 | L | `web/src/lib/api.ts`, `web/src/contexts/AuthContext.tsx`, `services/api/internal/auth/handler.go`, `services/api/internal/httpx/middleware.go` | XSS could steal both access and refresh tokens, turning a UI bug into durable account takeover. | Keep refresh token in an `HttpOnly`, `SameSite` cookie; keep access token memory-only; continue with end-to-end auth regression tests. |
+| F-02 | Auth docs contradicted auth implementation; first remediation is now implemented on this branch. | P1 | S | `web/AGENTS.md`, `web/src/lib/api.ts` | Contributors could make security decisions from stale docs. | Keep auth docs and implementation together in future auth changes; add e2e coverage for login, refresh, and logout. |
+| F-03 | Frontend API writes bypassed TanStack Query domain hooks; first remediation is now implemented on this branch. | P1 | M | `web/src/hooks/useImport.ts`, `web/src/hooks/useCsvImport.ts`, `web/src/hooks/useDiscover.ts`, `web/src/hooks/useRulesUrl.ts`, `web/src/hooks/usePlayerAids.ts` | Component-owned loading/error state fragments cache invalidation and makes mobile/offline behavior harder. | Keep API calls inside hooks; add component tests or e2e coverage for import, discover, rules URL, and player aids. |
 | F-04 | `pkg/shared` docs appear stale or under-wired. | P2 | S | `README.md`, `go.work`, `services/api/internal/httpx`, `services/api/internal/apierr` | Docs say shared error/envelope/middleware live in `pkg/shared`, but the active API uses `internal` packages and `go.work` only includes `services/api`. | Either remove stale references or add `./pkg/shared` to workspace and migrate common packages deliberately. |
 | F-05 | BGG sync runs synchronously inside HTTP request lifecycle. | P1 | L | `services/api/internal/importer/service.go`, `services/api/internal/importer/handler.go` | Large BGG collections can exceed user patience, Cloud Run timeouts, or mobile network stability. | Convert sync to background job: enqueue request, return job ID, expose job status/result endpoint. |
 | F-06 | CSV parsing silently skips malformed rows. | P2 | M | `services/api/internal/importer/service.go`, `web/src/pages/ImportCsvPage.tsx` | Users cannot tell whether missing imported games were invalid rows, duplicate rows, BGG failures, or skipped parser errors. | Return row-level warnings with line number, original ID/name, and reason; render warnings in preview. |
@@ -35,9 +35,9 @@ The third largest weakness is uneven adherence to frontend state-management conv
 
 ## Highest-impact sequence
 
-1. Fix token storage.
-2. Reconcile auth docs with implementation.
-3. Move component-level API mutations into hooks.
+1. Finish validating token-storage remediation in browser/e2e coverage.
+2. Add browser/e2e coverage for login, refresh, and logout.
+3. Add coverage for the new import/discover/rules/player-aid hooks.
 4. Decide whether `pkg/shared` is active or legacy.
 5. Move BGG sync to async jobs.
 
@@ -45,11 +45,11 @@ The third largest weakness is uneven adherence to frontend state-management conv
 
 ### F-01 token storage
 
-Current token helper reads and writes both tokens using `localStorage`.
+Previous token helper read and wrote both tokens using `localStorage`.
 
-That is the single most important flaw because refresh tokens extend the blast radius of XSS.
+That was the single most important flaw because refresh tokens extend the blast radius of XSS.
 
-A safer target design:
+The target design now being implemented:
 - Access token lives in memory only.
 - Refresh token is set by API as `HttpOnly; Secure; SameSite=Lax` or `Strict` cookie.
 - Refresh endpoint reads the cookie, not JSON body.

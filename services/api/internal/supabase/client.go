@@ -62,3 +62,64 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body map[st
 
 	return resp.StatusCode, respBody, nil
 }
+
+// Upload uploads a file to Supabase Storage.
+// path should be "bucket/filename".
+func (c *Client) Upload(ctx context.Context, bucket, filename string, content io.Reader, contentType string) error {
+	path := fmt.Sprintf("/storage/v1/object/%s/%s", bucket, filename)
+	req, err := http.NewRequestWithContext(ctx, "POST", c.url+path, content)
+	if err != nil {
+		return fmt.Errorf("create upload request: %w", err)
+	}
+
+	req.Header.Set("apikey", c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.apiKey) // Use service role key
+	req.Header.Set("Content-Type", contentType)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload failed (%d): %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// Remove deletes a file from Supabase Storage.
+func (c *Client) Remove(ctx context.Context, bucket, filename string) error {
+	path := fmt.Sprintf("/storage/v1/object/%s", bucket)
+	body := map[string][]string{
+		"prefixes": {filename},
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal remove request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "DELETE", c.url+path, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create remove request: %w", err)
+	}
+
+	req.Header.Set("apikey", c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("remove failed (%d): %s", resp.StatusCode, string(respBody))
+	}
+
+	return nil
+}

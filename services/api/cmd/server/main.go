@@ -23,6 +23,7 @@ import (
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/supabase"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
@@ -148,8 +149,9 @@ func main() {
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
 
+	sbClient := supabase.New(cfg.SupabaseURL, cfg.ServiceRoleKey, httpx.DefaultClient)
 	catalogStore := catalog.NewStore(pool)
-	catalogHandler := catalog.NewHandler(catalogStore)
+	catalogHandler := catalog.NewHandler(catalogStore, sbClient)
 
 	bggClient := importer.NewClient(cfg.BGGToken, cfg.BGGCookie)
 	importStore := importer.NewStore(pool)

@@ -1,0 +1,10 @@
+#!/bin/bash
+# Ponytail: prevents agents from editing .pbxproj files — the most destructive iOS mistake.
+# Run 'xcodegen generate' in ios/ instead of hand-editing the Xcode project.
+file=$(echo "$CLAUDE_TOOL_INPUT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('file_path',''))" 2>/dev/null)
+case "$file" in
+*.xcodeproj/* | *.pbxproj)
+  echo '{"decision":"deny","reason":"BLOCKED: .pbxproj/.xcodeproj edits are never allowed. Run xcodegen generate in ios/ instead."}'
+  exit 2
+  ;;
+esac

@@ -39,6 +39,8 @@ const gameColumns = "id, user_id, bgg_id, name, description, year_published, ima
 	" (SELECT COALESCE(json_agg(json_build_object('id', c.id, 'name', c.name) ORDER BY c.name), '[]'::json)" +
 	"  FROM games.collection_games cg JOIN games.collections c ON c.id = cg.collection_id" +
 	"  WHERE cg.game_id = games.games.id) AS vibes," +
+	" (SELECT COALESCE(json_agg(json_build_object('id', pa.id, 'game_id', pa.game_id, 'filename', pa.filename, 'label', pa.label, 'created_at', pa.created_at) ORDER BY pa.created_at), '[]'::json)" +
+	"  FROM games.player_aids pa WHERE pa.game_id = games.games.id) AS player_aids," +
 	" created_at, updated_at"
 
 // scanner is satisfied by both pgx.Rows (Query) and pgx.Row (QueryRow).
@@ -49,14 +51,18 @@ type scanner interface {
 func scanGame(s scanner) (Game, error) {
 	var g Game
 	var vibesJSON []byte
+	var aidsJSON []byte
 	err := s.Scan(&g.ID, &g.UserID, &g.BGGID, &g.Name, &g.Description, &g.YearPublished,
 		&g.Image, &g.Thumbnail, &g.MinPlayers, &g.MaxPlayers, &g.Playtime, &g.Categories,
 		&g.Mechanics, &g.Types, &g.Weight, &g.Rating, &g.LanguageDependence,
-		&g.RecommendedPlayers, &g.RulesURL, &vibesJSON, &g.CreatedAt, &g.UpdatedAt)
+		&g.RecommendedPlayers, &g.RulesURL, &vibesJSON, &aidsJSON, &g.CreatedAt, &g.UpdatedAt)
 	if err != nil {
 		return g, err
 	}
 	if err := json.Unmarshal(vibesJSON, &g.Vibes); err != nil {
+		return g, err
+	}
+	if err := json.Unmarshal(aidsJSON, &g.PlayerAids); err != nil {
 		return g, err
 	}
 	return g, nil
@@ -78,15 +84,15 @@ func gamePredicates(userID string, f GameFilter) sq.And {
 	}
 	switch f.Players {
 	case "1":
-		pred = append(pred, sq.LtOrEq{"min_players": 1})
+		pred = append(pred, sq.LtOrEq{"min_players": 1}, sq.GtOrEq{"max_players": 1})
 	case "2":
-		pred = append(pred, sq.LtOrEq{"min_players": 2})
-	case "2only":
 		pred = append(pred, sq.LtOrEq{"min_players": 2}, sq.GtOrEq{"max_players": 2})
+	case "2only":
+		pred = append(pred, sq.Eq{"min_players": 2}, sq.Eq{"max_players": 2})
 	case "3":
-		pred = append(pred, sq.LtOrEq{"min_players": 3})
+		pred = append(pred, sq.LtOrEq{"min_players": 3}, sq.GtOrEq{"max_players": 3})
 	case "4":
-		pred = append(pred, sq.LtOrEq{"min_players": 4})
+		pred = append(pred, sq.LtOrEq{"min_players": 4}, sq.GtOrEq{"max_players": 4})
 	case "5plus":
 		pred = append(pred, sq.GtOrEq{"max_players": 5})
 	}
@@ -444,6 +450,8 @@ func (s *Store) Discover(ctx context.Context, userID string, f DiscoverFilter) (
 			" (SELECT COALESCE(json_agg(json_build_object('id', c2.id, 'name', c2.name) ORDER BY c2.name), '[]'::json)" +
 			"  FROM games.collection_games cg2 JOIN games.collections c2 ON c2.id = cg2.collection_id" +
 			"  WHERE cg2.game_id = g.id) AS vibes," +
+			" (SELECT COALESCE(json_agg(json_build_object('id', pa.id, 'game_id', pa.game_id, 'filename', pa.filename, 'label', pa.label, 'created_at', pa.created_at) ORDER BY pa.created_at), '[]'::json)" +
+			"  FROM games.player_aids pa WHERE pa.game_id = g.id) AS player_aids," +
 			" g.created_at, g.updated_at").
 		From("games.games g").
 		Join("games.collection_games cg ON g.id = cg.game_id").
@@ -486,6 +494,55 @@ func (s *Store) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesU
 	tag, err := s.db.Exec(ctx,
 		`UPDATE games.games SET rules_url = $1, updated_at = now()
 		 WHERE id = $2 AND user_id = $3`, rulesURL, gameID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return apierr.ErrNotFound
+	}
+	return nil
+}
+
+func (s *Store) GetPlayerAid(ctx context.Context, userID string, gameID, aidID int64) (*PlayerAid, error) {
+	var a PlayerAid
+	err := s.db.QueryRow(ctx, `
+		SELECT id, game_id, filename, label, created_at
+		FROM games.player_aids
+		WHERE id = $1 AND game_id = $2 AND game_id IN (SELECT id FROM games.games WHERE user_id = $3)`,
+		aidID, gameID, userID).Scan(&a.ID, &a.GameID, &a.Filename, &a.Label, &a.CreatedAt)
+	if err != nil {
+		return nil, apierr.ErrNotFound
+	}
+	return &a, nil
+}
+
+func (s *Store) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+	var exists bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM games.games WHERE id = $1 AND user_id = $2)`,
+		gameID, userID).Scan(&exists); err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, apierr.ErrNotFound
+	}
+
+	var pa PlayerAid
+	err := s.db.QueryRow(ctx, `
+		INSERT INTO games.player_aids (game_id, filename, label)
+		VALUES ($1, $2, $3)
+		RETURNING id, game_id, filename, label, created_at`,
+		gameID, filename, label).Scan(&pa.ID, &pa.GameID, &pa.Filename, &pa.Label, &pa.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &pa, nil
+}
+
+func (s *Store) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
+	tag, err := s.db.Exec(ctx, `
+		DELETE FROM games.player_aids
+		WHERE id = $1 AND game_id = $2 AND game_id IN (SELECT id FROM games.games WHERE user_id = $3)`,
+		aidID, gameID, userID)
 	if err != nil {
 		return err
 	}
