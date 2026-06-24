@@ -48,10 +48,11 @@ actor APIClient {
 
     private init() {
         #if DEBUG
-        // Simulator shares the host network, so localhost reaches `make dev` and
-        // is reliably exempt from App Transport Security. For a physical device,
-        // set MBGC_API_BASE_URL to the Mac's LAN IP in the run scheme.
-        baseURL = ProcessInfo.processInfo.environment["MBGC_API_BASE_URL"] ?? "http://localhost:8080"
+        // `localhost` only resolves to the Mac from the simulator (shared host
+        // network) — on a physical device it means the phone itself. The Mac's
+        // mDNS hostname (`<name>.local`) works from both and survives DHCP
+        // reassigning the LAN IP. Override with MBGC_API_BASE_URL if needed.
+        baseURL = ProcessInfo.processInfo.environment["MBGC_API_BASE_URL"] ?? "http://Luis-macbook-pro.local:8080"
         #else
         baseURL = "https://api.lumedina.dev"
         #endif
