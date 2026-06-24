@@ -40,7 +40,7 @@ final class APIClient {
     }()
 
     private init() {
-        baseURL = ProcessInfo.processInfo.environment["MBGC_API_BASE_URL"] ?? "http://localhost:8080"
+        baseURL = ProcessInfo.processInfo.environment["MBGC_API_BASE_URL"] ?? "http://192.168.100.48:8080"
     }
 
     func login(username: String, password: String) async throws -> LoginResult {
