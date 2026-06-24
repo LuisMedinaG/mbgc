@@ -9,10 +9,10 @@ final class AuthViewModel {
 
     init() {
         isAuthenticated = Keychain.get(Tokens.access) != nil
-        NotificationCenter.default.addObserver(
-            forName: .authSessionExpired, object: nil, queue: .main
-        ) { [weak self] _ in
-            self?.isAuthenticated = false
+        Task { @MainActor [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: .authSessionExpired) {
+                self?.isAuthenticated = false
+            }
         }
     }
 
