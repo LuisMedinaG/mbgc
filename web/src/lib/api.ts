@@ -2,24 +2,14 @@ import type { Game } from '../types/game'
 
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? '') + '/api/v1'
 
-// ── Token storage ──────────────────────────────────────────────────────────────
-// ref: auth.LOGIN.4 — tokens stored client-side on successful login
-// ref: auth.TOKEN_REFRESH.4 — tokens cleared on auth failure
-const ACCESS_KEY  = 'mbgc_access'
-const REFRESH_KEY = 'mbgc_refresh'
+// ── Access-token memory ──────────────────────────────────────────────────────
+// Refresh tokens are stored by the API in an HttpOnly cookie, not in web storage.
+let accessToken: string | null = null
 
 export const tokens = {
-  getAccess:  () => localStorage.getItem(ACCESS_KEY),
-  getRefresh: () => localStorage.getItem(REFRESH_KEY),
-  setAccess:  (t: string) => localStorage.setItem(ACCESS_KEY, t),
-  set(access: string, refresh: string) {
-    localStorage.setItem(ACCESS_KEY, access)
-    localStorage.setItem(REFRESH_KEY, refresh)
-  },
-  clear() {
-    localStorage.removeItem(ACCESS_KEY)
-    localStorage.removeItem(REFRESH_KEY)
-  },
+  getAccess:  () => accessToken,
+  setAccess:  (t: string) => { accessToken = t },
+  clear() { accessToken = null },
 }
 
 // ── Error ──────────────────────────────────────────────────────────────────────
@@ -42,10 +32,10 @@ export function setOnAuthFailure(cb: () => void) { onAuthFailureCb = cb }
 // ref: auth.TOKEN_REFRESH.3 — coalesces concurrent refresh attempts
 let refreshPromise: Promise<void> | null = null
 
-function ensureRefreshPromise(refreshToken: string): Promise<void> {
+function ensureRefreshPromise(): Promise<void> {
   if (!refreshPromise) {
     refreshPromise = request<{ data: { access_token: string } }>(
-      'POST', '/auth/refresh', { refresh_token: refreshToken }, false,
+      'POST', '/auth/refresh', undefined, false,
     ).then(r => {
       tokens.setAccess(r.data.access_token)
     }).catch(err => {
@@ -72,15 +62,13 @@ async function request<T>(
   const res = await fetch(BASE + path, {
     method,
     headers,
+    credentials: 'include',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
 
   // Auto-refresh on 401 — coalesce concurrent requests into one refresh attempt
   if (res.status === 401 && retry) {
-    const refresh = tokens.getRefresh()
-    if (!refresh) throw new ApiError(401, 'unauthorized')
-
-    await ensureRefreshPromise(refresh)
+    await ensureRefreshPromise()
     return request<T>(method, path, body, false)
   }
 
@@ -100,14 +88,16 @@ async function upload<T>(path: string, formData: FormData, retry = true): Promis
   const token = tokens.getAccess()
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const res = await fetch(BASE + path, { method: 'POST', headers, body: formData })
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: formData,
+  })
 
   // Auto-refresh on 401 — coalesce concurrent requests into one refresh attempt
   if (res.status === 401 && retry) {
-    const refresh = tokens.getRefresh()
-    if (!refresh) throw new ApiError(401, 'unauthorized')
-
-    await ensureRefreshPromise(refresh)
+    await ensureRefreshPromise()
     return upload<T>(path, formData, false)
   }
 
@@ -272,18 +262,15 @@ export interface DiscoverParams {
 export const api = {
   // Auth
   async login(username: string, password: string) {
-    const r = await request<{ data: { access_token: string; refresh_token: string; expires_in: number } }>(
+    const r = await request<{ data: { access_token: string; expires_in: number } }>(
       'POST', '/auth/login', { username, password },
     )
-    tokens.set(r.data.access_token, r.data.refresh_token)
+    tokens.setAccess(r.data.access_token)
     return r.data
   },
 
   async logout() {
-    const refresh = tokens.getRefresh()
-    if (refresh) {
-      await request('POST', '/auth/logout', { refresh_token: refresh }).catch(() => {})
-    }
+    await request('POST', '/auth/logout', undefined, false).catch(() => {})
     tokens.clear()
   },
 

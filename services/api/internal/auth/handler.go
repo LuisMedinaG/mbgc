@@ -51,8 +51,40 @@ type loginRequest struct {
 
 type tokenData struct {
 	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token,omitempty"`
 	ExpiresIn    int    `json:"expires_in"`
+}
+
+const refreshCookieName = "mbgc_refresh"
+
+func secureCookie(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+func setRefreshCookie(w http.ResponseWriter, r *http.Request, token string, maxAge int) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     refreshCookieName,
+		Value:    token,
+		Path:     "/api/v1/auth",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   secureCookie(r),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+func clearRefreshCookie(w http.ResponseWriter, r *http.Request) {
+	setRefreshCookie(w, r, "", -1)
+}
+
+func refreshTokenFromRequest(r *http.Request) string {
+	if c, err := r.Cookie(refreshCookieName); err == nil {
+		return c.Value
+	}
+	return ""
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
@@ -96,23 +128,21 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setRefreshCookie(w, r, result.RefreshToken, result.ExpiresIn)
+	result.RefreshToken = ""
 	httpx.WriteJSON(w, http.StatusOK, httpx.Response[tokenData]{Data: result})
 }
 
-type refreshRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
-}
-
 func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
-	var req refreshRequest
-	if err := httpx.DecodeValidate(r.Body, &req); err != nil {
-		httpx.WriteError(w, err)
+	refreshToken := refreshTokenFromRequest(r)
+	if refreshToken == "" {
+		httpx.WriteError(w, apierr.ErrUnauthorized)
 		return
 	}
 
 	status, respBody, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/token?grant_type=refresh_token",
-		map[string]string{"refresh_token": req.RefreshToken}, "")
+		map[string]string{"refresh_token": refreshToken}, "")
 
 	if err != nil {
 		httpx.WriteError(w, err)
@@ -130,20 +160,22 @@ func (h *Handler) refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	setRefreshCookie(w, r, result.RefreshToken, result.ExpiresIn)
+	result.RefreshToken = ""
 	httpx.WriteJSON(w, http.StatusOK, httpx.Response[tokenData]{Data: result})
 }
 
-type logoutRequest struct {
-	RefreshToken string `json:"refresh_token"`
-}
-
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
-	var req logoutRequest
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	refreshToken := refreshTokenFromRequest(r)
+	clearRefreshCookie(w, r)
+	if refreshToken == "" {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
 
 	_, _, err := h.supabase.DoRequest(r.Context(), http.MethodPost,
 		"/auth/v1/logout?scope=global",
-		map[string]string{"refresh_token": req.RefreshToken}, "")
+		map[string]string{"refresh_token": refreshToken}, "")
 
 	// logout is best-effort; errors are not actionable to client
 	if err != nil {

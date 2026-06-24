@@ -1,29 +1,24 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError, type SyncResult } from '../lib/api'
+import { ApiError } from '../lib/api'
 import { useProfile } from '../hooks/useProfile'
-import { api } from '../lib/api'
+import { useImport } from '../hooks/useImport'
 
 export default function ImportPage() {
   const { profile } = useProfile()
+  const { syncBGG } = useImport()
   const bggUsername = profile?.bgg_username ?? ''
 
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<SyncResult | null>(null)
   const [syncError, setSyncError] = useState<string | null>(null)
   const [fullRefresh, setFullRefresh] = useState(false)
 
   async function handleSync() {
-    setSyncing(true)
-    setSyncResult(null)
+    syncBGG.reset()
     setSyncError(null)
     try {
-      const r = await api.syncBGG(fullRefresh)
-      setSyncResult(r)
+      await syncBGG.mutateAsync(fullRefresh)
     } catch (e) {
       setSyncError(e instanceof ApiError ? e.message : 'Sync failed')
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -63,12 +58,12 @@ export default function ImportPage() {
 
         {syncError && <div className="alert-error">{syncError}</div>}
 
-        {syncResult && (
+        {syncBGG.data && (
           <div className="bg-[#d1fae5] rounded-lg px-4 py-3 flex gap-6">
             {([
-              { label: 'Imported', value: syncResult.imported },
-              { label: 'Skipped',  value: syncResult.skipped },
-              { label: 'Failed',   value: syncResult.failed },
+              { label: 'Imported', value: syncBGG.data.imported },
+              { label: 'Skipped',  value: syncBGG.data.skipped },
+              { label: 'Failed',   value: syncBGG.data.failed },
             ] as const).map(s => (
               <div key={s.label}>
                 <div className="font-heading text-[1.25rem] font-bold text-[#065f46]">{s.value}</div>
@@ -80,10 +75,10 @@ export default function ImportPage() {
 
         <button
           onClick={handleSync}
-          disabled={syncing || !bggUsername}
+          disabled={syncBGG.isPending || !bggUsername}
           className="pressable btn btn-primary self-start disabled:opacity-50"
         >
-          {syncing ? 'Syncing…' : 'Sync from BGG'}
+          {syncBGG.isPending ? 'Syncing…' : 'Sync from BGG'}
         </button>
       </section>
 
