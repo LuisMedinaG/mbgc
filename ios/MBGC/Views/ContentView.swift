@@ -7,6 +7,8 @@ struct ContentView: View {
                 .tabItem { Label("Library", systemImage: "books.vertical") }
             SearchView()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
+            VibesView()
+                .tabItem { Label("Vibes", systemImage: "tag") }
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gear") }
         }

@@ -25,6 +25,7 @@ struct ListEnvelope<T: Decodable>: Decodable {
 struct PageMeta: Decodable { let page: Int; let limit: Int; let total: Int }
 private struct ErrorEnvelope: Decodable { let error: APIErrorBody }
 private struct APIErrorBody: Decodable { let code: String; let message: String }
+private struct DiscoverEnvelope: Decodable { let data: [GameDTO] }
 
 struct ProfileDTO: Decodable { let username: String; let bggUsername: String }
 // Mirrors services/api/internal/importer.SyncResult — also the response shape
@@ -130,6 +131,34 @@ actor APIClient {
     func listCollections() async throws -> [Collection] {
         let envelope: Envelope<[Collection]> = try await send(
             path: "/api/v1/collections", method: "GET", jsonBody: nil, authorized: true)
+        return envelope.data
+    }
+
+    func createCollection(name: String, description: String) async throws -> Collection {
+        struct Body: Encodable { let name: String; let description: String }
+        let body = try encoder.encode(Body(name: name, description: description))
+        let envelope: Envelope<Collection> = try await send(
+            path: "/api/v1/collections", method: "POST", jsonBody: body, authorized: true)
+        return envelope.data
+    }
+
+    func updateCollection(id: Int, name: String, description: String) async throws {
+        struct Body: Encodable { let name: String; let description: String }
+        let body = try encoder.encode(Body(name: name, description: description))
+        struct Empty: Decodable {}
+        let _: Envelope<Empty> = try await send(
+            path: "/api/v1/collections/\(id)", method: "PUT", jsonBody: body, authorized: true)
+    }
+
+    func deleteCollection(id: Int) async throws {
+        struct Empty: Decodable {}
+        let _: Envelope<Empty> = try await send(
+            path: "/api/v1/collections/\(id)", method: "DELETE", jsonBody: nil, authorized: true)
+    }
+
+    func discover(collectionId: Int) async throws -> [GameDTO] {
+        let envelope: DiscoverEnvelope = try await send(
+            path: "/api/v1/discover?collection_id=\(collectionId)&limit=200", method: "GET", jsonBody: nil, authorized: true)
         return envelope.data
     }
 
