@@ -112,7 +112,8 @@ rotate_supabase() {
   update_tfvars supabase_access_token              "$SB_TOKEN"
 
   printf '\n  ℹ After rotating S3 keys, also update environments/prod/backend.hcl with\n'
-  printf '    the new access key, then run: terraform init -reconfigure\n'
+  printf '    the new access key, then run (from environments/prod):\n'
+  printf '    terraform init -backend-config=backend.hcl -reconfigure\n'
 }
 
 rotate_api() {
