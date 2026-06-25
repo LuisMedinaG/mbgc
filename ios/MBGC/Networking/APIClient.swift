@@ -27,23 +27,14 @@ private struct ErrorEnvelope: Decodable { let error: APIErrorBody }
 private struct APIErrorBody: Decodable { let code: String; let message: String }
 
 struct ProfileDTO: Decodable { let username: String; let bggUsername: String }
-struct SyncResult: Decodable { let imported: Int; let skipped: Int; let failed: Int }
-struct CSVPreviewResult: Decodable { let rows: [CSVPreviewRow]; let totalRows: Int; let previewLimit: Int }
+// Mirrors services/api/internal/importer.SyncResult — also the response shape
+// for CSVImport (ImportBGGIDs returns the same type).
+struct SyncResult: Decodable { let imported: Int; let skipped: Int; let failed: [String] }
 struct CSVPreviewRow: Decodable, Identifiable {
     let bggId: Int
     let name: String
-    let alreadyOwned: Bool
     var id: Int { bggId }
-    
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        bggId = try container.decode(Int.self, forKey: .bggId)
-        name = try container.decode(String.self, forKey: .name)
-        alreadyOwned = try container.decode(Bool.self, forKey: .alreadyOwned)
-    }
-    enum CodingKeys: String, CodingKey { case bggId, name, alreadyOwned }
 }
-struct CSVImportResult: Decodable { let imported: Int; let failed: Int }
 struct Collection: Decodable, Identifiable { let id: Int; let name: String; let description: String; let gameCount: Int }
 
 actor APIClient {
@@ -84,14 +75,27 @@ actor APIClient {
     }
 
     func listGames(query: String? = nil) async throws -> [GameDTO] {
-        var path = "/api/v1/games"
-        if let query, !query.isEmpty {
-            let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            path += "?q=\(encoded)"
+        var games: [GameDTO] = []
+        var page = 1
+        let limit = 100
+        while true {
+            var components = URLComponents()
+            var items = [URLQueryItem(name: "page", value: String(page)), URLQueryItem(name: "limit", value: String(limit))]
+            if let query, !query.isEmpty {
+                items.append(URLQueryItem(name: "q", value: query))
+            }
+            components.queryItems = items
+            let path = "/api/v1/games?" + (components.percentEncodedQuery ?? "")
+            let envelope: ListEnvelope<GameDTO> = try await send(
+                path: path, method: "GET", jsonBody: nil, authorized: true)
+            games += envelope.data
+            // ponytail: walks all pages so library refresh never drops rows past page 1
+            if envelope.data.isEmpty || games.count >= envelope.meta.total {
+                break
+            }
+            page += 1
         }
-        let envelope: ListEnvelope<GameDTO> = try await send(
-            path: path, method: "GET", jsonBody: nil, authorized: true)
-        return envelope.data
+        return games
     }
 
     func getGame(id: Int) async throws -> GameDetailDTO {
@@ -149,7 +153,7 @@ actor APIClient {
         return envelope.data
     }
 
-    func csvPreview(fileData: Data, filename: String) async throws -> CSVPreviewResult {
+    func csvPreview(fileData: Data, filename: String) async throws -> [CSVPreviewRow] {
         let boundary = "Boundary-\(UUID().uuidString)"
         var formData = Data()
         formData.append("--\(boundary)\r\n".data(using: .utf8)!)
@@ -173,13 +177,14 @@ actor APIClient {
         guard (200...299).contains(status) else {
             throw APIError.server(code: "unknown", message: "Upload failed (\(status))")
         }
-        return try decoder.decode(CSVPreviewResult.self, from: data)
+        let envelope = try decoder.decode(ListEnvelope<CSVPreviewRow>.self, from: data)
+        return envelope.data
     }
 
-    func csvImport(bggIds: [Int]) async throws -> CSVImportResult {
+    func csvImport(bggIds: [Int]) async throws -> SyncResult {
         struct Body: Encodable { let bggIds: [Int] }
         let body = try encoder.encode(Body(bggIds: bggIds))
-        let envelope: Envelope<CSVImportResult> = try await send(
+        let envelope: Envelope<SyncResult> = try await send(
             path: "/api/v1/import/csv", method: "POST", jsonBody: body, authorized: true)
         return envelope.data
     }

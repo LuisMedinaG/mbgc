@@ -9,9 +9,8 @@ struct CsvImportView: View {
     @State private var step: CSVStep = .upload
     @State private var selectedFile: URL?
     @State private var previewRows: [CSVPreviewRow] = []
-    @State private var previewTotalRows: Int = 0
     @State private var previewError: String?
-    @State private var importResult: CSVImportResult?
+    @State private var importResult: SyncResult?
     @State private var importError: String?
     @State private var isLoading = false
     @State private var showingPicker = false
@@ -65,10 +64,7 @@ struct CsvImportView: View {
     private var previewContent: some View {
         Group {
             Section {
-                Text("\(previewTotalRows) games in CSV")
-                    .foregroundStyle(.secondary)
-                let newCount = previewRows.filter { !$0.alreadyOwned }.count
-                Text("\(newCount) new")
+                Text("\(previewRows.count) games in CSV")
                     .foregroundStyle(.secondary)
             }
             Section {
@@ -77,11 +73,10 @@ struct CsvImportView: View {
                 }
             }
             Section {
-                let newCount = previewRows.filter { !$0.alreadyOwned }.count
-                Button("Import \(newCount) games") {
+                Button("Import \(previewRows.count) games") {
                     Task { await importCSV() }
                 }
-                .disabled(isLoading || newCount == 0)
+                .disabled(isLoading || previewRows.isEmpty)
                 Button("Cancel") {
                     reset()
                 }
@@ -94,17 +89,11 @@ struct CsvImportView: View {
     }
 
     private func rowView(_ row: CSVPreviewRow) -> some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(row.name)
-                Text("\(row.bggId)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(row.alreadyOwned ? "owned" : "new")
+        VStack(alignment: .leading) {
+            Text(row.name)
+            Text("\(row.bggId)")
                 .font(.caption)
-                .foregroundStyle(row.alreadyOwned ? Color.secondary : Color.green)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -118,7 +107,11 @@ struct CsvImportView: View {
                             Text("Imported").font(.caption).foregroundStyle(.secondary)
                         }
                         VStack {
-                            Text("\(result.failed)").font(.title).fontWeight(.bold)
+                            Text("\(result.skipped)").font(.title).fontWeight(.bold)
+                            Text("Skipped").font(.caption).foregroundStyle(.secondary)
+                        }
+                        VStack {
+                            Text("\(result.failed.count)").font(.title).fontWeight(.bold)
                             Text("Failed").font(.caption).foregroundStyle(.secondary)
                         }
                     }
@@ -146,9 +139,7 @@ struct CsvImportView: View {
             }
             defer { url.stopAccessingSecurityScopedResource() }
             let data = try Data(contentsOf: url)
-            let result = try await APIClient.shared.csvPreview(fileData: data, filename: url.lastPathComponent)
-            previewRows = result.rows
-            previewTotalRows = result.totalRows
+            previewRows = try await APIClient.shared.csvPreview(fileData: data, filename: url.lastPathComponent)
             step = .preview
         } catch {
             previewError = "Preview failed"
@@ -161,11 +152,8 @@ struct CsvImportView: View {
         importError = nil
         defer { isLoading = false }
 
-        let newBggIds = previewRows.filter { !$0.alreadyOwned }.map(\.bggId)
-        guard !newBggIds.isEmpty else { return }
-
         do {
-            importResult = try await APIClient.shared.csvImport(bggIds: newBggIds)
+            importResult = try await APIClient.shared.csvImport(bggIds: previewRows.map(\.bggId))
             step = .done
         } catch {
             importError = "Import failed"
@@ -176,7 +164,6 @@ struct CsvImportView: View {
         step = .upload
         selectedFile = nil
         previewRows = []
-        previewTotalRows = 0
         previewError = nil
         importResult = nil
         importError = nil

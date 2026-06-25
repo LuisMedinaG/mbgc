@@ -34,7 +34,7 @@ struct GameDetailView: View {
         }
         .navigationTitle(viewModel.game?.name ?? "Game")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await viewModel.load(gameId: gameId) }
+        .task { await viewModel.load(gameId: gameId, modelContext: modelContext) }
     }
 
     private func heroImage(_ game: GameDetailDTO) -> some View {
@@ -65,19 +65,19 @@ struct GameDetailView: View {
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.85))
                     }
-                    if game.rating > 0 {
-                        Text("★ \(String(format: "%.1f", game.rating))")
+                    if let rating = game.rating, rating > 0 {
+                        Text("★ \(String(format: "%.1f", rating))")
                             .font(.caption)
                             .fontWeight(.bold)
                             .foregroundStyle(.white)
                     }
-                    if game.weight > 0 {
-                        Text(String(format: "%.1f", game.weight))
+                    if let weight = game.weight, weight > 0 {
+                        Text(String(format: "%.1f", weight))
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.85))
                     }
-                    if game.languageDependence > 0 {
-                        Text(langDep[game.languageDependence])
+                    if let dep = game.languageDependence, langDep.indices.contains(dep) {
+                        Text(langDep[dep])
                             .font(.caption)
                             .foregroundStyle(.white.opacity(0.85))
                     }
@@ -114,7 +114,7 @@ struct GameDetailView: View {
             Divider()
 
             VStack {
-                Text(game.weight > 0 ? String(format: "%.1f", game.weight) : "—")
+                Text(game.weight.map { String(format: "%.1f", $0) } ?? "—")
                     .font(.title3)
                     .fontWeight(.bold)
                 Text("Complexity")
@@ -130,11 +130,11 @@ struct GameDetailView: View {
 
     private func descriptionSection(_ game: GameDetailDTO) -> some View {
         Group {
-            if !game.description.isEmpty {
+            if let description = game.description, !description.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("About")
                         .font(.headline)
-                    Text(game.description)
+                    Text(description)
                         .font(.subheadline)
                 }
             }

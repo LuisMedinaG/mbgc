@@ -22,7 +22,7 @@ struct ImportView: View {
                     HStack {
                         VStack { Text("\(result.imported)").font(.title2).fontWeight(.bold); Text("Imported").font(.caption).foregroundStyle(.secondary) }
                         VStack { Text("\(result.skipped)").font(.title2).fontWeight(.bold); Text("Skipped").font(.caption).foregroundStyle(.secondary) }
-                        VStack { Text("\(result.failed)").font(.title2).fontWeight(.bold); Text("Failed").font(.caption).foregroundStyle(.secondary) }
+                        VStack { Text("\(result.failed.count)").font(.title2).fontWeight(.bold); Text("Failed").font(.caption).foregroundStyle(.secondary) }
                     }
                     .frame(maxWidth: .infinity)
                 }

@@ -13,7 +13,7 @@ iOS SwiftUI app for MBGC backend. Swift 6.2 / iOS 17+ / SwiftData / URLSession.
 - `ios/MBGC/` — all Swift source
 - `ios/project.yml` — XcodeGen config
 - `ios/AGENTS.md` — this file
-- `docs/ios-plan.md` — full plan reference
+- `docs/ios-status.md` — current state, bug ledger, pending work
 
 ## Build Commands
 - MCP `build_sim` / `test_sim` — primary

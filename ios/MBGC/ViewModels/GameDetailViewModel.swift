@@ -14,9 +14,15 @@ final class GameDetailViewModel {
     var showDeleteConfirm = false
     var editingVibes = false
 
-    func load(gameId: Int) async {
-        isLoading = true
+    func load(gameId: Int, modelContext: ModelContext) async {
         errorMessage = nil
+        // ponytail: render the cached copy instantly, then refresh from the
+        // network — mirrors LibraryView's cache-first read.
+        if let cached = fetchLocalGame(gameId: gameId, modelContext: modelContext) {
+            game = GameDTO(game: cached)
+        } else {
+            isLoading = true
+        }
         defer { isLoading = false }
         do {
             async let gameTask = APIClient.shared.getGame(id: gameId)

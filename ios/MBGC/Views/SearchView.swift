@@ -4,6 +4,7 @@ struct SearchView: View {
     @State private var query = ""
     @State private var results: [GameDTO] = []
     @State private var isLoading = false
+    @State private var errorMessage: String?
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -43,6 +44,8 @@ struct SearchView: View {
             .overlay {
                 if isLoading {
                     ProgressView()
+                } else if let errorMessage {
+                    Text(errorMessage).foregroundStyle(.red)
                 } else if results.isEmpty && !query.isEmpty {
                     Text("No games found").foregroundStyle(.secondary)
                 }
@@ -52,7 +55,13 @@ struct SearchView: View {
 
     private func search() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
-        results = (try? await APIClient.shared.listGames(query: query)) ?? []
+        do {
+            results = try await APIClient.shared.listGames(query: query)
+        } catch {
+            results = []
+            errorMessage = "Search failed. Check your connection and try again."
+        }
     }
 }

@@ -26,6 +26,9 @@ targets:
     platform: iOS
     sources:
       - path: MBGCTests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
     dependencies:
       - target: MBGC
 schemes:
