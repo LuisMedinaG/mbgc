@@ -3,6 +3,7 @@ import Security
 
 enum Tokens {
     static let access = "mbgc.accessToken"
+    static let refresh = "mbgc.refreshToken"
 }
 
 enum Keychain {

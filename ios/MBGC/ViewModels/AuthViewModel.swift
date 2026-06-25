@@ -9,11 +9,6 @@ final class AuthViewModel {
 
     init() {
         isAuthenticated = Keychain.get(Tokens.access) != nil
-        Task { @MainActor [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: .authSessionExpired) {
-                self?.isAuthenticated = false
-            }
-        }
     }
 
     func login(username: String, password: String) async {
@@ -23,6 +18,7 @@ final class AuthViewModel {
         do {
             let result = try await APIClient.shared.login(username: username, password: password)
             Keychain.set(result.accessToken, key: Tokens.access)
+            Keychain.set(result.refreshToken, key: Tokens.refresh)
             isAuthenticated = true
         } catch APIError.server(_, let message) {
             errorMessage = message
@@ -33,8 +29,7 @@ final class AuthViewModel {
 
     func logout() {
         Keychain.delete(Tokens.access)
+        Keychain.delete(Tokens.refresh)
         isAuthenticated = false
-        // Revoke the refresh cookie server-side; non-blocking so the UI flips instantly.
-        Task { await APIClient.shared.logout() }
     }
 }

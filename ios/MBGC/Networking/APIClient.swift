@@ -7,16 +7,10 @@ enum APIError: Error {
     case decoding(Error)
 }
 
-extension Notification.Name {
-    /// Posted when a 401 retry's token refresh fails — the session is over.
-    static let authSessionExpired = Notification.Name("authSessionExpired")
-}
-
 struct LoginResult: Decodable {
     let accessToken: String
+    let refreshToken: String
     let expiresIn: Int
-    // No refreshToken: the API returns it as an HttpOnly `mbgc_refresh` cookie,
-    // not in the JSON body. URLSession's cookie storage carries it automatically.
 }
 
 struct Envelope<T: Decodable>: Decodable { let data: T }
@@ -28,7 +22,8 @@ struct PageMeta: Decodable { let page: Int; let limit: Int; let total: Int }
 private struct ErrorEnvelope: Decodable { let error: APIErrorBody }
 private struct APIErrorBody: Decodable { let code: String; let message: String }
 
-actor APIClient {
+@MainActor
+final class APIClient {
     static let shared = APIClient()
 
     private let baseURL: String
@@ -43,19 +38,9 @@ actor APIClient {
         e.keyEncodingStrategy = .convertToSnakeCase
         return e
     }()
-    // Dedupes concurrent 401s onto one in-flight refresh instead of firing one per request.
-    private var refreshTask: Task<LoginResult, Error>?
 
     private init() {
-        #if DEBUG
-        // `localhost` only resolves to the Mac from the simulator (shared host
-        // network) — on a physical device it means the phone itself. The Mac's
-        // mDNS hostname (`<name>.local`) works from both and survives DHCP
-        // reassigning the LAN IP. Override with MBGC_API_BASE_URL if needed.
-        baseURL = ProcessInfo.processInfo.environment["MBGC_API_BASE_URL"] ?? "http://Luis-macbook-pro.local:8080"
-        #else
-        baseURL = "https://api.lumedina.dev"
-        #endif
+        baseURL = ProcessInfo.processInfo.environment["MBGC_API_BASE_URL"] ?? "http://localhost:8080"
     }
 
     func login(username: String, password: String) async throws -> LoginResult {
@@ -78,30 +63,12 @@ actor APIClient {
     }
 
     private func refreshTokens() async throws -> LoginResult {
-        if let refreshTask {
-            return try await refreshTask.value
-        }
-        let task = Task<LoginResult, Error> {
-            // The refresh token lives in the HttpOnly `mbgc_refresh` cookie, which
-            // URLSession resends automatically — no request body required.
-            let envelope: Envelope<LoginResult> = try await send(
-                path: "/api/v1/auth/refresh", method: "POST", jsonBody: nil, authorized: false)
-            return envelope.data
-        }
-        refreshTask = task
-        defer { refreshTask = nil }
-        return try await task.value
-    }
-
-    /// Best-effort server logout: revokes the session and clears the refresh cookie.
-    func logout() async {
-        guard let url = URL(string: baseURL + "/api/v1/auth/logout") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        if let token = Keychain.get(Tokens.access) {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        _ = try? await session.data(for: request)
+        guard let token = Keychain.get(Tokens.refresh) else { throw APIError.unauthorized }
+        struct Body: Encodable { let refreshToken: String }
+        let body = try encoder.encode(Body(refreshToken: token))
+        let envelope: Envelope<LoginResult> = try await send(
+            path: "/api/v1/auth/refresh", method: "POST", jsonBody: body, authorized: false)
+        return envelope.data
     }
 
     private func send<T: Decodable>(
@@ -129,16 +96,9 @@ actor APIClient {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
 
         if status == 401, authorized, !retrying {
-            do {
-                let tokens = try await refreshTokens()
-                Keychain.set(tokens.accessToken, key: Tokens.access)
-            } catch {
-                // Refresh cookie is gone or expired — session is over. Clear the
-                // access token and notify AuthViewModel so the app drops to login.
-                Keychain.delete(Tokens.access)
-                NotificationCenter.default.post(name: .authSessionExpired, object: nil)
-                throw APIError.unauthorized
-            }
+            let tokens = try await refreshTokens()
+            Keychain.set(tokens.accessToken, key: Tokens.access)
+            Keychain.set(tokens.refreshToken, key: Tokens.refresh)
             return try await send(
                 path: path, method: method, jsonBody: jsonBody, authorized: authorized, retrying: true)
         }

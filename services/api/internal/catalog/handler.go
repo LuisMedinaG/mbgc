@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"path/filepath"
 
@@ -380,7 +379,8 @@ func (h *Handler) DeletePlayerAid(w http.ResponseWriter, r *http.Request) {
 
 	// Delete from storage. Failure here is logged but doesn't block the response.
 	if err := h.storage.Remove(r.Context(), "player-aids", aid.Filename); err != nil {
-		slog.WarnContext(r.Context(), "failed to remove player aid from storage", "filename", aid.Filename, "error", err)
+		// Log error but don't return 500 if DB delete succeeded.
+		fmt.Printf("warning: failed to remove %s from storage: %v\n", aid.Filename, err)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
