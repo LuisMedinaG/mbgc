@@ -32,7 +32,7 @@ git add <specific files>   # never git add -A blindly
 git commit -m "type: short description"
 ```
 
-Types: `feat` | `fix` | `refactor` | `docs` | `chore` | `test`  
+Types: `feat` | `fix` | `refactor` | `docs` | `chore` | `test`
 Subject: imperative, ≤50 chars.
 
 ### 3. Push

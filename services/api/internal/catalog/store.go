@@ -84,15 +84,15 @@ func gamePredicates(userID string, f GameFilter) sq.And {
 	}
 	switch f.Players {
 	case "1":
-		pred = append(pred, sq.LtOrEq{"min_players": 1})
+		pred = append(pred, sq.LtOrEq{"min_players": 1}, sq.GtOrEq{"max_players": 1})
 	case "2":
-		pred = append(pred, sq.LtOrEq{"min_players": 2})
-	case "2only":
 		pred = append(pred, sq.LtOrEq{"min_players": 2}, sq.GtOrEq{"max_players": 2})
+	case "2only":
+		pred = append(pred, sq.Eq{"min_players": 2}, sq.Eq{"max_players": 2})
 	case "3":
-		pred = append(pred, sq.LtOrEq{"min_players": 3})
+		pred = append(pred, sq.LtOrEq{"min_players": 3}, sq.GtOrEq{"max_players": 3})
 	case "4":
-		pred = append(pred, sq.LtOrEq{"min_players": 4})
+		pred = append(pred, sq.LtOrEq{"min_players": 4}, sq.GtOrEq{"max_players": 4})
 	case "5plus":
 		pred = append(pred, sq.GtOrEq{"max_players": 5})
 	}
@@ -501,6 +501,19 @@ func (s *Store) UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesU
 		return apierr.ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) GetPlayerAid(ctx context.Context, userID string, gameID, aidID int64) (*PlayerAid, error) {
+	var a PlayerAid
+	err := s.db.QueryRow(ctx, `
+		SELECT id, game_id, filename, label, created_at
+		FROM games.player_aids
+		WHERE id = $1 AND game_id = $2 AND game_id IN (SELECT id FROM games.games WHERE user_id = $3)`,
+		aidID, gameID, userID).Scan(&a.ID, &a.GameID, &a.Filename, &a.Label, &a.CreatedAt)
+	if err != nil {
+		return nil, apierr.ErrNotFound
+	}
+	return &a, nil
 }
 
 func (s *Store) CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {

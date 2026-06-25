@@ -3,10 +3,14 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
+	"path/filepath"
 
 	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
+	"github.com/google/uuid"
 )
 
 type gameStore interface {
@@ -24,15 +28,22 @@ type gameStore interface {
 	UpdateRulesURL(ctx context.Context, gameID int64, userID, rulesURL string) error
 	Discover(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 	CreatePlayerAid(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error)
+	GetPlayerAid(ctx context.Context, userID string, gameID, aidID int64) (*PlayerAid, error)
 	DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error
 }
 
-type Handler struct {
-	svc gameStore
+type storage interface {
+	Upload(ctx context.Context, bucket, filename string, content io.Reader, contentType string) error
+	Remove(ctx context.Context, bucket, filename string) error
 }
 
-func NewHandler(svc gameStore) *Handler {
-	return &Handler{svc: svc}
+type Handler struct {
+	svc     gameStore
+	storage storage
+}
+
+func NewHandler(svc gameStore, storage storage) *Handler {
+	return &Handler{svc: svc, storage: storage}
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
@@ -297,24 +308,45 @@ func (h *Handler) CreatePlayerAid(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
-	var body playerAidRequest
-	if err := httpx.DecodeValidate(r.Body, &body); err != nil {
-		httpx.WriteError(w, err)
+
+	// ref: api-layer.SEC.6 — Player aids allow up to 5MB, overriding the global 1MB JSON limit.
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	if err := r.ParseMultipartForm(5 << 20); err != nil {
+		httpx.WriteError(w, fmt.Errorf("%w: failed to parse form", apierr.ErrBadRequest))
 		return
 	}
-	if body.Filename == "" {
-		httpx.WriteError(w, fmt.Errorf("%w: filename is required", apierr.ErrBadRequest))
-		return
-	}
-	body.Filename = httpx.Truncate(body.Filename, 255)
-	if body.Label != nil {
-		*body.Label = httpx.Truncate(*body.Label, 255)
-	}
-	aid, err := h.svc.CreatePlayerAid(r.Context(), userID, gameID, body.Filename, body.Label)
+
+	file, header, err := r.FormFile("file")
 	if err != nil {
+		httpx.WriteError(w, fmt.Errorf("%w: file is required", apierr.ErrBadRequest))
+		return
+	}
+	defer file.Close()
+
+	label := r.FormValue("label")
+	var labelPtr *string
+	if label != "" {
+		l := httpx.Truncate(label, 255)
+		labelPtr = &l
+	}
+
+	// Generate a unique filename to prevent collisions and overwrites in storage.
+	ext := filepath.Ext(header.Filename)
+	storageName := fmt.Sprintf("%s%s", uuid.NewString(), ext)
+
+	if err := h.storage.Upload(r.Context(), "player-aids", storageName, file, header.Header.Get("Content-Type")); err != nil {
+		httpx.WriteError(w, fmt.Errorf("failed to upload to storage: %w", err))
+		return
+	}
+
+	aid, err := h.svc.CreatePlayerAid(r.Context(), userID, gameID, storageName, labelPtr)
+	if err != nil {
+		// Cleanup storage if database record creation fails.
+		_ = h.storage.Remove(r.Context(), "player-aids", storageName)
 		httpx.WriteError(w, err)
 		return
 	}
+
 	httpx.WriteJSON(w, http.StatusCreated, httpx.New(aid))
 }
 
@@ -333,9 +365,23 @@ func (h *Handler) DeletePlayerAid(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteError(w, apierr.ErrBadRequest)
 		return
 	}
+
+	// Fetch metadata first to get the filename for storage cleanup.
+	aid, err := h.svc.GetPlayerAid(r.Context(), userID, gameID, aidID)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+
 	if err := h.svc.DeletePlayerAid(r.Context(), userID, gameID, aidID); err != nil {
 		httpx.WriteError(w, err)
 		return
 	}
+
+	// Delete from storage. Failure here is logged but doesn't block the response.
+	if err := h.storage.Remove(r.Context(), "player-aids", aid.Filename); err != nil {
+		slog.WarnContext(r.Context(), "failed to remove player aid from storage", "filename", aid.Filename, "error", err)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }

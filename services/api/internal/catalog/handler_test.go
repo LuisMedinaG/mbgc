@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,6 +30,7 @@ type mockGameStore struct {
 	updateRulesURLFn     func(ctx context.Context, gameID int64, userID, rulesURL string) error
 	discoverFn           func(ctx context.Context, userID string, f DiscoverFilter) ([]Game, int, *Collection, error)
 	createPlayerAidFn    func(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error)
+	getPlayerAidFn       func(ctx context.Context, userID string, gameID, aidID int64) (*PlayerAid, error)
 	deletePlayerAidFn    func(ctx context.Context, userID string, gameID, aidID int64) error
 }
 
@@ -86,6 +88,12 @@ func (m *mockGameStore) CreatePlayerAid(ctx context.Context, userID string, game
 	}
 	return nil, nil
 }
+func (m *mockGameStore) GetPlayerAid(ctx context.Context, userID string, gameID, aidID int64) (*PlayerAid, error) {
+	if m.getPlayerAidFn != nil {
+		return m.getPlayerAidFn(ctx, userID, gameID, aidID)
+	}
+	return nil, nil
+}
 func (m *mockGameStore) DeletePlayerAid(ctx context.Context, userID string, gameID, aidID int64) error {
 	if m.deletePlayerAidFn != nil {
 		return m.deletePlayerAidFn(ctx, userID, gameID, aidID)
@@ -96,7 +104,7 @@ func (m *mockGameStore) DeletePlayerAid(ctx context.Context, userID string, game
 // --- ListGames ---
 
 func TestListGames_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "GET", "/api/v1/games", "")
 	h.ListGames(w, r)
@@ -111,7 +119,7 @@ func TestListGames_Success(t *testing.T) {
 			return []Game{{ID: 1, Name: "Catan"}}, 1, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/games?page=1&limit=20", "", "user-1", false)
 	h.ListGames(w, r)
@@ -138,7 +146,7 @@ func TestListGames_StoreError(t *testing.T) {
 			return nil, 0, apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/games", "", "user-1", false)
 	h.ListGames(w, r)
@@ -157,7 +165,7 @@ func TestListGames_ClampsPageAndLimit(t *testing.T) {
 			return nil, 0, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/games?page=-5&limit=99999", "", "user-1", false)
 	h.ListGames(w, r)
@@ -176,7 +184,7 @@ func TestListGames_ClampsPageAndLimit(t *testing.T) {
 // --- GetGame ---
 
 func TestGetGame_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "GET", "/api/v1/games/1", "")
 	h.GetGame(w, r)
@@ -186,7 +194,7 @@ func TestGetGame_Unauthenticated(t *testing.T) {
 }
 
 func TestGetGame_InvalidID(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/games/abc", "", "user-1", false)
 	r.SetPathValue("id", "abc")
@@ -203,7 +211,7 @@ func TestGetGame_Success(t *testing.T) {
 			return &Game{ID: 1, Name: "Catan"}, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/games/1", "", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -228,7 +236,7 @@ func TestGetGame_NotFound(t *testing.T) {
 			return nil, apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/games/1", "", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -242,7 +250,7 @@ func TestGetGame_NotFound(t *testing.T) {
 // --- DeleteGame ---
 
 func TestDeleteGame_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "DELETE", "/api/v1/games/1", "")
 	h.DeleteGame(w, r)
@@ -257,7 +265,7 @@ func TestDeleteGame_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "DELETE", "/api/v1/games/1", "", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -274,7 +282,7 @@ func TestDeleteGame_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "DELETE", "/api/v1/games/1", "", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -288,7 +296,7 @@ func TestDeleteGame_NotFound(t *testing.T) {
 // --- SetGameCollections ---
 
 func TestSetGameCollections_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "POST", "/api/v1/games/1/collections", "")
 	h.SetGameCollections(w, r)
@@ -298,7 +306,7 @@ func TestSetGameCollections_Unauthenticated(t *testing.T) {
 }
 
 func TestSetGameCollections_InvalidBody(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/games/1/collections", "not json", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -315,7 +323,7 @@ func TestSetGameCollections_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/games/1/collections", `{"collection_ids":[1,2]}`, "user-1", false)
 	r.SetPathValue("id", "1")
@@ -332,7 +340,7 @@ func TestSetGameCollections_StoreError(t *testing.T) {
 			return errors.New("db error")
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/games/1/collections", `{"collection_ids":[1]}`, "user-1", false)
 	r.SetPathValue("id", "1")
@@ -346,7 +354,7 @@ func TestSetGameCollections_StoreError(t *testing.T) {
 // --- ListCollections ---
 
 func TestListCollections_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "GET", "/api/v1/collections", "")
 	h.ListCollections(w, r)
@@ -361,7 +369,7 @@ func TestListCollections_Success(t *testing.T) {
 			return []Collection{{ID: 1, Name: "Favorites"}}, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/collections", "", "user-1", false)
 	h.ListCollections(w, r)
@@ -382,7 +390,7 @@ func TestListCollections_Success(t *testing.T) {
 // --- CreateCollection ---
 
 func TestCreateCollection_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "POST", "/api/v1/collections", "")
 	h.CreateCollection(w, r)
@@ -397,7 +405,7 @@ func TestCreateCollection_Success(t *testing.T) {
 			return &Collection{ID: 1, Name: name}, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/collections", `{"name":"Favorites","description":"top games"}`, "user-1", false)
 	h.CreateCollection(w, r)
@@ -416,7 +424,7 @@ func TestCreateCollection_Success(t *testing.T) {
 }
 
 func TestCreateCollection_InvalidBody(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/collections", "bad json", "user-1", false)
 	h.CreateCollection(w, r)
@@ -429,7 +437,7 @@ func TestCreateCollection_InvalidBody(t *testing.T) {
 // --- UpdateCollection ---
 
 func TestUpdateCollection_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "PUT", "/api/v1/collections/1", "")
 	h.UpdateCollection(w, r)
@@ -444,7 +452,7 @@ func TestUpdateCollection_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/collections/1", `{"name":"Updated"}`, "user-1", false)
 	r.SetPathValue("id", "1")
@@ -461,7 +469,7 @@ func TestUpdateCollection_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/collections/1", `{"name":"Updated"}`, "user-1", false)
 	r.SetPathValue("id", "1")
@@ -475,7 +483,7 @@ func TestUpdateCollection_NotFound(t *testing.T) {
 // --- DeleteCollection ---
 
 func TestDeleteCollection_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "DELETE", "/api/v1/collections/1", "")
 	h.DeleteCollection(w, r)
@@ -490,7 +498,7 @@ func TestDeleteCollection_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "DELETE", "/api/v1/collections/1", "", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -507,7 +515,7 @@ func TestDeleteCollection_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "DELETE", "/api/v1/collections/1", "", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -544,7 +552,7 @@ func TestQueryInt_Invalid(t *testing.T) {
 // --- UpdateRulesURL ---
 
 func TestUpdateRulesURL_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "PUT", "/api/v1/games/1/rules-url", "")
 	h.UpdateRulesURL(w, r)
@@ -554,7 +562,7 @@ func TestUpdateRulesURL_Unauthenticated(t *testing.T) {
 }
 
 func TestUpdateRulesURL_InvalidID(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/games/abc/rules-url", `{"rules_url":""}`, "user-1", false)
 	r.SetPathValue("id", "abc")
@@ -565,7 +573,7 @@ func TestUpdateRulesURL_InvalidID(t *testing.T) {
 }
 
 func TestUpdateRulesURL_InvalidBody(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/games/1/rules-url", "not json", "user-1", false)
 	r.SetPathValue("id", "1")
@@ -581,7 +589,7 @@ func TestUpdateRulesURL_Success(t *testing.T) {
 			return nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/games/1/rules-url",
 		`{"rules_url":"https://drive.google.com/file/d/abc"}`, "user-1", false)
@@ -598,7 +606,7 @@ func TestUpdateRulesURL_NotFound(t *testing.T) {
 			return apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/games/1/rules-url",
 		`{"rules_url":"https://drive.google.com/file/d/abc"}`, "user-1", false)
@@ -616,7 +624,7 @@ func TestUpdateRulesURL_InvalidURL(t *testing.T) {
 			return apierr.ErrValidation
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "PUT", "/api/v1/games/1/rules-url",
 		`{"rules_url":"https://evil.com/malware"}`, "user-1", false)
@@ -627,10 +635,65 @@ func TestUpdateRulesURL_InvalidURL(t *testing.T) {
 	}
 }
 
+// --- PlayerAids ---
+
+func TestCreatePlayerAid_Success(t *testing.T) {
+	store := &mockGameStore{
+		createPlayerAidFn: func(ctx context.Context, userID string, gameID int64, filename string, label *string) (*PlayerAid, error) {
+			return &PlayerAid{ID: 1, GameID: gameID, Filename: filename, Label: label}, nil
+		},
+	}
+	storage := &mockStorage{
+		uploadFn: func(ctx context.Context, bucket, filename string, content io.Reader, contentType string) error {
+			return nil
+		},
+	}
+	h := NewHandler(store, storage)
+	w := httptest.NewRecorder()
+
+	body := "---boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.png\"\r\nContent-Type: image/png\r\n\r\nfake-data\r\n---boundary\r\nContent-Disposition: form-data; name=\"label\"\r\n\r\nMy Aid\r\n---boundary--\r\n"
+	r := testutil.NewAuthRequestAs(t, "POST", "/api/v1/games/1/player-aids", body, "user-1", false)
+	r.Header.Set("Content-Type", "multipart/form-data; boundary=-boundary")
+	r.SetPathValue("id", "1")
+
+	h.CreatePlayerAid(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeletePlayerAid_Success(t *testing.T) {
+	store := &mockGameStore{
+		getPlayerAidFn: func(ctx context.Context, userID string, gameID, aidID int64) (*PlayerAid, error) {
+			return &PlayerAid{ID: aidID, GameID: gameID, Filename: "file.png"}, nil
+		},
+		deletePlayerAidFn: func(ctx context.Context, userID string, gameID, aidID int64) error {
+			return nil
+		},
+	}
+	storage := &mockStorage{
+		removeFn: func(ctx context.Context, bucket, filename string) error {
+			return nil
+		},
+	}
+	h := NewHandler(store, storage)
+	w := httptest.NewRecorder()
+	r := testutil.NewAuthRequestAs(t, "DELETE", "/api/v1/games/1/player-aids/1", "", "user-1", false)
+	r.SetPathValue("id", "1")
+	r.SetPathValue("aidID", "1")
+
+	h.DeletePlayerAid(w, r)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", w.Code)
+	}
+}
+
 // --- Discover ---
 
 func TestDiscover_Unauthenticated(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAnonRequest(t, "GET", "/api/v1/discover?collection_id=1", "")
 	h.Discover(w, r)
@@ -640,7 +703,7 @@ func TestDiscover_Unauthenticated(t *testing.T) {
 }
 
 func TestDiscover_MissingCollectionID(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/discover", "", "user-1", false)
 	h.Discover(w, r)
@@ -650,7 +713,7 @@ func TestDiscover_MissingCollectionID(t *testing.T) {
 }
 
 func TestDiscover_InvalidCollectionID(t *testing.T) {
-	h := NewHandler(&mockGameStore{})
+	h := NewHandler(&mockGameStore{}, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/discover?collection_id=abc", "", "user-1", false)
 	h.Discover(w, r)
@@ -665,7 +728,7 @@ func TestDiscover_CollectionNotFound(t *testing.T) {
 			return nil, 0, nil, apierr.ErrNotFound
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/discover?collection_id=99", "", "user-1", false)
 	h.Discover(w, r)
@@ -681,7 +744,7 @@ func TestDiscover_Success(t *testing.T) {
 			return []Game{{ID: 1, Name: "Catan"}}, 1, col, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/discover?collection_id=1&page=1&limit=20", "", "user-1", false)
 	h.Discover(w, r)
@@ -721,7 +784,7 @@ func TestDiscover_ClampsPageAndLimit(t *testing.T) {
 			return nil, 0, &Collection{}, nil
 		},
 	}
-	h := NewHandler(store)
+	h := NewHandler(store, nil)
 	w := httptest.NewRecorder()
 	r := testutil.NewAuthRequestAs(t, "GET", "/api/v1/discover?collection_id=1&page=-1&limit=999", "", "user-1", false)
 	h.Discover(w, r)

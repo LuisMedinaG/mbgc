@@ -235,7 +235,7 @@ func (h *testHarness) mux() http.Handler {
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
 	catalogStore := catalog.NewStore(h.pool)
-	catalogHandler := catalog.NewHandler(catalogStore)
+	catalogHandler := catalog.NewHandler(catalogStore, nil)
 	profileHandler.RegisterRoutes(mux, h.verifier.requireAuth)
 	catalogHandler.RegisterRoutes(mux, h.verifier.requireAuth)
 	return mux

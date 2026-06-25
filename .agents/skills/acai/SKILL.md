@@ -22,7 +22,7 @@ components:
     EXAMPLE:
       requirements:
         1: The ACID for this requirement is `my-feature.EXAMPLE.1`
-    
+
     # Simply reference them in code comments or other specs by full ACID only:
     # my-feature.EXAMPLE.1
     AUTH:
