@@ -17,7 +17,7 @@ make dev           # start API + web in tmux
 make db-migrate    # apply pending migrations
 make db-reset      # wipe + replay local DB
 make build         # build API + web
-make test          # run Go tests (pkg/shared + services/api with -race)
+make test          # run Go tests (services/api with -race)
 make lint          # lint Go + web + infra
 
 # services/api Makefile:
@@ -90,19 +90,13 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
 - **Body limits:** All request bodies capped at 1MB via `httpx.LimitBodySize` middleware.
 - **HTTP client:** Use `httpx.DefaultClient` (10s timeout) for outbound HTTP — never `http.DefaultClient`.
 
-## go.work Workspace
-
-`go.work` + `replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared` means `services/api` resolves `pkg/shared` locally — no version bump needed during development.
-
-When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` before opening a PR.
-
 ## Code Style (non-obvious rules)
 
 **Go:**
 - `slog` for structured logging — never `log.Printf` or `fmt.Println`
 - Wrap errors with `fmt.Errorf("%w", err)`; check with `errors.Is` / `errors.As`
-- Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
-- Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
+- Use `services/api/internal/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
+- Use `services/api/internal/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
 - Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
 - Use `httpx.DefaultClient` for outbound HTTP — never `http.DefaultClient`
 - Apply `httpx.LimitBodySize(1<<20)` to all JSON endpoints — 1MB cap
@@ -137,13 +131,12 @@ refactor/*
 
 **Always:**
 - Include `user_id` in every query on user-owned data — multi-tenancy enforced at SQL layer
-- Use `pkg/shared/apierr` sentinels for all error paths
+- Use `services/api/internal/apierr` sentinels for all error paths
 - Validate JWT in `services/api/internal/jwt/` middleware — never skip or trust forwarded headers from untrusted callers
 - Run `make test-v` before opening a PR
 - Define store interfaces per package — `Handler` depends on the interface, not concrete `*Store` (enables `httptest` handler tests without DB)
 
 **Ask first:**
-- Any change to `pkg/shared` exported types (`services/api` depends on it)
 - Auth flow modifications (JWT expiry, Supabase config, refresh logic, JWKS)
 - Running `supabase db push` — this writes to the hosted production database
 - New external service integrations or third-party dependencies

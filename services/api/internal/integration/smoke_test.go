@@ -318,7 +318,7 @@ func TestSmoke_MultiTenancy_IsolatesGameRows(t *testing.T) {
 // ref: game-detail.RULES_URL.1 — server-side allowlist runs at the SQL/store
 // layer, not just the client. The unit test in game/store_test.go covers the
 // validation function; this is the end-to-end check that the handler wires it
-// up before issuing UPDATE. ErrValidation maps to 422 per pkg/shared/CLAUDE.md.
+// up before issuing UPDATE. ErrValidation maps to 422 per internal/apierr.
 func TestSmoke_RulesURL_RejectsNonDriveHost(t *testing.T) {
 	h := newHarness(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

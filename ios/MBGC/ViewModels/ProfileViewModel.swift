@@ -12,19 +12,8 @@ final class ProfileViewModel {
     var successMessage: String?
 
     func load() async {
-        isLoading = true
-        errorMessage = nil
-        defer { isLoading = false }
-        do {
-            let profile = try await APIClient.shared.getProfile()
-            username = profile.username
-            bggUsername = profile.bggUsername
-            bggInput = profile.bggUsername
-        } catch APIError.server(_, let message) {
-            errorMessage = message
-        } catch {
-            errorMessage = "Couldn't load profile."
-        }
+        // ponytail: profile is server-side + authed; inert until the local
+        // BGG-import port. No network on appear.
     }
 
     func saveBGG() async {

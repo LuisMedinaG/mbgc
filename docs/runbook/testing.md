@@ -2,7 +2,7 @@
 
 ## Coverage & CI
 
-- **Threshold:** 50% minimum on `services/api/...` + `pkg/shared/...`
+- **Threshold:** 50% minimum on `services/api/...`
 - **Enforcement:** CI fails if coverage drops below 50%
 - **Command:** `make test` runs `go test -race -coverprofile` and checks threshold
 
@@ -137,7 +137,7 @@ make test-v
 make test
 
 # Check coverage (detailed per function)
-go test -coverprofile=/tmp/cov.out ./services/api/... ./pkg/shared/...
+go test -coverprofile=/tmp/cov.out ./services/api/...
 go tool cover -func=/tmp/cov.out
 
 # Run frontend E2E tests (mocked, no backend needed)

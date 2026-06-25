@@ -1,163 +1,255 @@
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
 
-enum CSVStep {
-    case upload, preview, done
+private enum CSVStep {
+    case upload, preview, importing, done
+}
+
+private struct ImportResult {
+    let imported: Int
+    let skipped: Int
+    let failed: [Int]
+}
+
+private struct CSVRow: Identifiable {
+    let bggId: Int
+    let name: String
+    var id: Int { bggId }
 }
 
 struct CsvImportView: View {
+    @Environment(\.modelContext) private var modelContext
+
     @State private var step: CSVStep = .upload
     @State private var selectedFile: URL?
-    @State private var previewRows: [CSVPreviewRow] = []
+    @State private var previewRows: [CSVRow] = []
     @State private var previewError: String?
-    @State private var importResult: SyncResult?
+    @State private var importProgress: (done: Int, total: Int)?
+    @State private var importResult: ImportResult?
     @State private var importError: String?
-    @State private var isLoading = false
     @State private var showingPicker = false
 
     var body: some View {
         Form {
             switch step {
-            case .upload:
-                uploadContent
-            case .preview:
-                previewContent
-            case .done:
-                doneContent
+            case .upload:   uploadContent
+            case .preview:  previewContent
+            case .importing: importingContent
+            case .done:     doneContent
             }
         }
         .navigationTitle("CSV Import")
-        .fileImporter(isPresented: $showingPicker, allowedContentTypes: [UTType.commaSeparatedText, UTType.plainText]) { result in
+        .fileImporter(
+            isPresented: $showingPicker,
+            allowedContentTypes: [UTType.commaSeparatedText, UTType.plainText]
+        ) { result in
             switch result {
-            case .success(let url):
-                selectedFile = url
-            case .failure:
-                previewError = "Couldn't read file"
+            case .success(let url): selectedFile = url
+            case .failure:         previewError = "Couldn't read file"
             }
         }
     }
+
+    // MARK: — Upload step
 
     private var uploadContent: some View {
         Group {
             Section {
-                Text("Export your collection from BGG as CSV and upload it here.")
+                Text("Export your collection from BoardGameGeek (My Collection → Export) and upload the CSV here.")
                     .foregroundStyle(.secondary)
                 if let url = selectedFile {
-                    Text(url.lastPathComponent)
+                    Label(url.lastPathComponent, systemImage: "doc.text")
+                        .font(.subheadline)
                 }
-                Button("Choose CSV File") {
-                    showingPicker = true
-                }
+                Button("Choose CSV File") { showingPicker = true }
             }
             Section {
-                Button("Preview") {
-                    Task { await previewCSV() }
-                }
-                .disabled(selectedFile == nil || isLoading)
+                Button("Preview") { Task { await previewCSV() } }
+                    .disabled(selectedFile == nil)
                 if let error = previewError {
-                    Text(error).foregroundStyle(.red)
+                    Text(error).foregroundStyle(.red).font(.caption)
                 }
             }
         }
     }
+
+    // MARK: — Preview step
 
     private var previewContent: some View {
         Group {
             Section {
-                Text("\(previewRows.count) games in CSV")
+                Text("\(previewRows.count) game\(previewRows.count == 1 ? "" : "s") found")
                     .foregroundStyle(.secondary)
             }
             Section {
                 ForEach(previewRows) { row in
-                    rowView(row)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(row.name).lineLimit(1)
+                        Text("BGG #\(row.bggId)").font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
             Section {
-                Button("Import \(previewRows.count) games") {
-                    Task { await importCSV() }
-                }
-                .disabled(isLoading || previewRows.isEmpty)
-                Button("Cancel") {
-                    reset()
-                }
-                .foregroundStyle(.secondary)
-                if let error = importError {
-                    Text(error).foregroundStyle(.red)
-                }
+                Button("Import \(previewRows.count) games") { Task { await importCSV() } }
+                    .disabled(previewRows.isEmpty)
+                Button("Cancel") { reset() }
+                    .foregroundStyle(.secondary)
             }
         }
     }
 
-    private func rowView(_ row: CSVPreviewRow) -> some View {
-        VStack(alignment: .leading) {
-            Text(row.name)
-            Text("\(row.bggId)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+    // MARK: — Importing step
+
+    private var importingContent: some View {
+        Section {
+            HStack(spacing: 12) {
+                ProgressView()
+                if let progress = importProgress {
+                    Text("Fetching from BGG (\(progress.done) of \(progress.total))…")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Fetching from BGG…")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.vertical, 4)
         }
     }
+
+    // MARK: — Done step
 
     private var doneContent: some View {
         Group {
             if let result = importResult {
                 Section {
                     HStack {
-                        VStack {
-                            Text("\(result.imported)").font(.title).fontWeight(.bold)
-                            Text("Imported").font(.caption).foregroundStyle(.secondary)
-                        }
-                        VStack {
-                            Text("\(result.skipped)").font(.title).fontWeight(.bold)
-                            Text("Skipped").font(.caption).foregroundStyle(.secondary)
-                        }
-                        VStack {
-                            Text("\(result.failed.count)").font(.title).fontWeight(.bold)
-                            Text("Failed").font(.caption).foregroundStyle(.secondary)
-                        }
+                        Spacer()
+                        statCell(value: result.imported, label: "Imported")
+                        Spacer()
+                        statCell(value: result.skipped, label: "Skipped")
+                        Spacer()
+                        statCell(value: result.failed.count, label: "Failed")
+                        Spacer()
                     }
-                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                }
+                if !result.failed.isEmpty {
+                    Section("Failed IDs") {
+                        Text(result.failed.map(String.init).joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Section {
-                    Button("Import another") {
-                        reset()
-                    }
+                    Button("Import another file") { reset() }
                 }
             }
         }
     }
 
+    private func statCell(value: Int, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)").font(.title2).fontWeight(.bold)
+            Text(label).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: — Logic
+
     private func previewCSV() async {
         guard let url = selectedFile else { return }
-        isLoading = true
         previewError = nil
-        defer { isLoading = false }
 
         do {
             guard url.startAccessingSecurityScopedResource() else {
-                previewError = "Couldn't access file"
+                previewError = "Couldn't access file — try again"
                 return
             }
             defer { url.stopAccessingSecurityScopedResource() }
-            let data = try Data(contentsOf: url)
-            previewRows = try await APIClient.shared.csvPreview(fileData: data, filename: url.lastPathComponent)
+            let raw = try String(contentsOf: url, encoding: .utf8)
+            let rows = parseCSV(raw)
+            if rows.isEmpty {
+                previewError = "No BGG game IDs found. Make sure the CSV has an \"objectid\" column."
+                return
+            }
+            previewRows = rows
             step = .preview
         } catch {
-            previewError = "Preview failed"
+            previewError = "Couldn't read file: \(error.localizedDescription)"
         }
     }
 
     private func importCSV() async {
         guard !previewRows.isEmpty else { return }
-        isLoading = true
+        step = .importing
         importError = nil
-        defer { isLoading = false }
+        importProgress = nil
 
         do {
-            importResult = try await APIClient.shared.csvImport(bggIds: previewRows.map(\.bggId))
+            // Find which IDs are already in SwiftData (skip re-importing)
+            let allIds = previewRows.map(\.bggId)
+            let existing = existingBggIds(from: allIds)
+            let toFetch = allIds.filter { !existing.contains($0) }
+            let skipped = allIds.count - toFetch.count
+
+            if toFetch.isEmpty {
+                importResult = ImportResult(imported: 0, skipped: skipped, failed: [])
+                step = .done
+                return
+            }
+
+            importProgress = (done: 0, total: toFetch.count)
+
+            // Fetch from BGG — public API, no auth needed
+            let games = try await BGGClient.shared.fetchThings(ids: toFetch) { done, total in
+                Task { @MainActor in
+                    importProgress = (done: done, total: total)
+                }
+            }
+
+            // Write to SwiftData
+            var imported = 0
+            var failedIds: [Int] = []
+            let fetchedById = Dictionary(grouping: games, by: \.bggId).compactMapValues(\.first)
+            var newGames: [Game] = []
+
+            for id in toFetch {
+                if let bggGame = fetchedById[id] {
+                    let game = Game(bggGame: bggGame)
+                    modelContext.insert(game)
+                    newGames.append(game)
+                    imported += 1
+                } else {
+                    failedIds.append(id)
+                }
+            }
+
+            // Add to Library collection
+            let libraryDesc = FetchDescriptor<Collection>(
+                predicate: #Predicate { $0.isDefault == true }
+            )
+            if let library = (try? modelContext.fetch(libraryDesc))?.first {
+                library.games.append(contentsOf: newGames)
+            }
+
+            try modelContext.save()
+
+            importResult = ImportResult(imported: imported, skipped: skipped, failed: failedIds)
             step = .done
         } catch {
-            importError = "Import failed"
+            importError = "Import failed: \(error.localizedDescription)"
+            step = .preview
         }
+    }
+
+    private func existingBggIds(from ids: [Int]) -> Set<Int> {
+        // Fetch all games and filter in memory — SwiftData predicates don't
+        // support Array.contains on arbitrary arrays.
+        let descriptor = FetchDescriptor<Game>()
+        let all = (try? modelContext.fetch(descriptor)) ?? []
+        let idSet = Set(ids)
+        return Set(all.map(\.bggId).filter { idSet.contains($0) })
     }
 
     private func reset() {
@@ -165,7 +257,59 @@ struct CsvImportView: View {
         selectedFile = nil
         previewRows = []
         previewError = nil
+        importProgress = nil
         importResult = nil
         importError = nil
     }
+}
+
+// MARK: — CSV Parser
+
+private func parseCSV(_ raw: String) -> [CSVRow] {
+    let lines = raw.components(separatedBy: .newlines).filter { !$0.isEmpty }
+    guard !lines.isEmpty else { return [] }
+
+    // Find the header line: first line that contains "objectid" (case-insensitive)
+    guard let headerIndex = lines.firstIndex(where: { $0.lowercased().contains("objectid") }) else {
+        return []
+    }
+    let headers = csvFields(lines[headerIndex]).map { $0.lowercased() }
+    guard let idCol = headers.firstIndex(of: "objectid") else { return [] }
+    let nameCol = headers.firstIndex(of: "objectname")
+
+    var rows: [CSVRow] = []
+    for line in lines[(headerIndex + 1)...] {
+        let fields = csvFields(line)
+        guard fields.count > idCol,
+              let id = Int(fields[idCol].trimmingCharacters(in: .whitespaces)),
+              id > 0 else { continue }
+        let name: String
+        if let nc = nameCol, fields.count > nc {
+            name = fields[nc].trimmingCharacters(in: .init(charactersIn: "\" \t"))
+        } else {
+            name = "BGG #\(id)"
+        }
+        rows.append(CSVRow(bggId: id, name: name.isEmpty ? "BGG #\(id)" : name))
+    }
+    return rows
+}
+
+/// Splits one CSV line respecting double-quoted fields.
+private func csvFields(_ line: String) -> [String] {
+    var fields: [String] = []
+    var current = ""
+    var inQuotes = false
+    for ch in line {
+        switch ch {
+        case "\"":
+            inQuotes.toggle()
+        case "," where !inQuotes:
+            fields.append(current)
+            current = ""
+        default:
+            current.append(ch)
+        }
+    }
+    fields.append(current)
+    return fields
 }

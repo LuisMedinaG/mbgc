@@ -34,6 +34,7 @@ explicitly requested.
   (preview → import).
 - Offline-first reads: Library and Game Detail render from SwiftData instantly, then
   refresh from the API in the background.
+- All bug ledger items (see below).
 
 ## Speed (done this pass)
 
@@ -56,26 +57,19 @@ Deferred (too big for this pass, see `docs/ios-api-needs.md` for the backend hal
 (`GameDetailViewModel.saveVibes`); collection *management* does not — no dedicated tab, no
 create/rename/delete UI, no `GET /discover?collection_id=` browse. Build when needed.
 
-## Bug ledger
+## Bug ledger (all fixed)
 
-Fixed in this pass:
-- Library refresh deleted local games beyond API page 1 (`listGames` now walks all pages).
-- Search query string could inject `&`/`=`/`#` into the URL (now built via `URLComponents`).
-- Logout left the prior account's games in SwiftData (now cleared via `onChange` in
-  `MBGCApp`).
-- `SearchView` collapsed network errors into a false "no results" empty state.
-- `MBGCTests` target couldn't build (missing `GENERATE_INFOPLIST_FILE`) — tests now run.
-- `GameDTO`/`GameDetailDTO` were duplicate 20-field structs with 4x copy-pasted field
-  mapping — collapsed to one DTO + `typealias`.
-- `description`/`weight`/`rating`/`languageDependence` were declared non-optional in the
-  DTO while the API omits them when null — decoding crashed on any sparse game. Now
-  optional with explicit `decodeIfPresent`.
-- `langDep[game.languageDependence]` could index out of bounds — now bounds-checked.
-- **CSV import was broken end-to-end**: `CSVPreviewResult`/`CSVPreviewRow.alreadyOwned`/
-  `CSVImportResult` didn't match the real API shapes (`{data, meta}` envelopes, no
-  `already_owned` field, `SyncResult{imported, skipped, failed[]}` not
-  `{imported, failed: Int}`). Every CSV preview/import call would have failed to decode.
-  Fixed by reusing the actual contract; server already skips owned games server-side.
+| Bug | Fix |
+|-----|-----|
+| Library refresh deleted local games beyond API page 1 | `listGames` now walks all pages before diffing |
+| Search query string could inject `&`/`=`/`#` into URL | Built via `URLComponents` |
+| Logout left prior account's games in SwiftData | Cleared via `onChange` in `MBGCApp` |
+| `SearchView` collapsed network errors into false "no results" | `do/catch` + `errorMessage` state |
+| `MBGCTests` target couldn't build | Added `GENERATE_INFOPLIST_FILE: YES` |
+| `GameDTO`/`GameDetailDTO` were 4x copy-pasted | Collapsed to one DTO + `typealias` |
+| Sparse game fields crashed decoding | Made optional with `decodeIfPresent` |
+| `langDep[game.languageDependence]` out-of-bounds | Now bounds-checked |
+| CSV import broken end-to-end | Fixed DTO shapes to match real API contract |
 
 ## YAGNI (not building)
 

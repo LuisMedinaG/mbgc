@@ -2,8 +2,7 @@
 
 Cloud Logging + Cloud Monitoring for the mbgc API. Creates the
 log-based metrics and alert policies that observe the slog events
-emitted by `pkg/shared/httpx/Record` and
-`services/api/internal/observe/`.
+emitted by `services/api/internal/httpx/Record`.
 
 ## Resources created
 

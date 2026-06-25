@@ -1,10 +1,12 @@
+import SwiftData
 import SwiftUI
 
 enum HomeTab { case discover, collection }
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var vibesViewModel = VibesViewModel()
-    @State private var tab: HomeTab = .collection
+    @State private var tab: HomeTab = .discover
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
@@ -23,16 +25,17 @@ struct ContentView: View {
                 HomePillView(tab: $tab)
                 Spacer()
                 VStack(spacing: 10) {
-                    Button {
-                        tab = .collection
-                        showCreate = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 52, height: 52)
-                            .background(Color.orange)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    if tab == .collection {
+                        Button {
+                            showCreate = true
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 52, height: 52)
+                                .background(Color.orange)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
                     }
                     Button { showSearch = true } label: {
                         Image(systemName: "magnifyingglass")
@@ -63,6 +66,7 @@ struct ContentView: View {
         .sheet(isPresented: $showSearch)   { SearchView() }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .sheet(isPresented: $showCreate)   { createSheet }
+        .task { seedLibraryIfNeeded() }
     }
 
     private var createSheet: some View {
@@ -88,13 +92,25 @@ struct ContentView: View {
                         showCreate = false
                         createName = ""
                         createDescription = ""
-                        Task { await vibesViewModel.create(name: name, description: desc) }
+                        vibesViewModel.create(name: name, description: desc, modelContext: modelContext)
                     }
                     .disabled(createName.isEmpty)
                 }
             }
         }
         .presentationDetents([.medium])
+    }
+
+    // MARK: — Library seed
+
+    private func seedLibraryIfNeeded() {
+        let descriptor = FetchDescriptor<Collection>(
+            predicate: #Predicate { $0.isDefault == true }
+        )
+        guard ((try? modelContext.fetch(descriptor)) ?? []).isEmpty else { return }
+        let library = Collection(name: "Library", isDefault: true)
+        modelContext.insert(library)
+        try? modelContext.save()
     }
 }
 

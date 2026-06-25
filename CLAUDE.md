@@ -8,7 +8,6 @@ Personal board game collection app. Consolidated Go API + React frontend.
 
 ```
 mbgc/
-├── pkg/shared/          Go shared library (envelope, apierr, httpx)
 ├── services/
 │   └── api/             Single consolidated Go API (auth, games, collections, importer, profile)
 ├── web/                 React + Vite + TypeScript + Tailwind

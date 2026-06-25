@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @Environment(AuthViewModel.self) private var auth
-
     var body: some View {
         NavigationStack {
             Form {
@@ -12,11 +10,6 @@ struct SettingsView: View {
                     }
                     NavigationLink("Import") {
                         ImportView()
-                    }
-                }
-                Section {
-                    Button("Log Out", role: .destructive) {
-                        auth.logout()
                     }
                 }
             }

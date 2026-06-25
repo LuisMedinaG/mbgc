@@ -18,7 +18,7 @@
 | `infra.yml` | PR to `main` | `terraform plan` (comment on PR) |
 | `infra.yml` | Merge to `main` | `terraform apply --auto-approve` |
 
-The `services/api` Docker build context is the repo root (to include `pkg/shared`). See `services/api/deploy/Dockerfile`.
+The `services/api` Docker build context is the repo root. See `services/api/deploy/Dockerfile`.
 
 ## GitHub Secrets
 

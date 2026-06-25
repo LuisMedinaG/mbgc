@@ -6,37 +6,21 @@ struct ImportView: View {
     var body: some View {
         Form {
             Section("BoardGameGeek Sync") {
-                if viewModel.hasBGGUsername {
-                    Text("Syncing as \(viewModel.bggUsername)")
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Set your BGG username in Profile first.")
-                        .foregroundStyle(.secondary)
+                Text("Enter your BGG username in Profile, then sync your collection directly. Coming soon.")
+                    .foregroundStyle(.secondary)
+                    .font(.subheadline)
+                if let err = viewModel.errorMessage {
+                    Text(err).foregroundStyle(.orange).font(.caption)
                 }
-
-                if let error = viewModel.errorMessage {
-                    Text(error).foregroundStyle(.red)
-                }
-
-                if let result = viewModel.result {
-                    HStack {
-                        VStack { Text("\(result.imported)").font(.title2).fontWeight(.bold); Text("Imported").font(.caption).foregroundStyle(.secondary) }
-                        VStack { Text("\(result.skipped)").font(.title2).fontWeight(.bold); Text("Skipped").font(.caption).foregroundStyle(.secondary) }
-                        VStack { Text("\(result.failed.count)").font(.title2).fontWeight(.bold); Text("Failed").font(.caption).foregroundStyle(.secondary) }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-
-                Button("Sync from BGG") {
-                    Task { await viewModel.sync() }
-                }
-                .disabled(viewModel.isSyncing || !viewModel.hasBGGUsername)
             }
 
             Section("CSV Import") {
                 NavigationLink("Import from CSV") {
                     CsvImportView()
                 }
+                Text("Export your collection from BGG (My Collection → Export) and import the CSV file.")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
             }
         }
         .navigationTitle("Import")

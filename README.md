@@ -62,7 +62,7 @@ make acai-push       # sync specs + refs to dashboard
 |---|---|---|
 | Go API | `services/api` | JWT validation, all business logic |
 | React SPA | `web` | Frontend, talks only to `services/api` |
-| Shared lib | `pkg/shared` | Error types, response envelope, HTTP middleware |
+| Shared lib | `services/api/internal` | Error types (`apierr`), response envelope, HTTP middleware (`httpx`) |
 | Infrastructure | `infra` | Terraform — GCP, Cloudflare, Supabase |
 
 **Auth:** Supabase issues JWTs → API validates via JWKS on every request → identity in context.

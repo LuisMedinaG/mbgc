@@ -18,7 +18,7 @@ final class LibraryViewModel {
                 self?.loadProgress = (loaded, total)
             })
             let existing = try modelContext.fetch(FetchDescriptor<Game>())
-            var byId = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+            var byId = Dictionary(uniqueKeysWithValues: existing.map { ($0.bggId, $0) })
 
             for dto in dtos {
                 if let game = byId.removeValue(forKey: dto.id) {

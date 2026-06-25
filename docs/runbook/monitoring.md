@@ -307,8 +307,7 @@ touching the code.
 ## Reference
 
 - **Spec:** `features/monitoring.feature.yaml` (24 ACIDs)
-- **Code sinks:** `pkg/shared/httpx/observe.go`,
-  `services/api/internal/observe/handler.go`
+- **Code sinks:** `services/api/internal/httpx/observe.go`
 - **Infra module:** `infra/modules/monitoring/`
 - **Handoff history:** `.handoff/monitoring-progress.md`
 - **Progress tracker:** see the acai dashboard at

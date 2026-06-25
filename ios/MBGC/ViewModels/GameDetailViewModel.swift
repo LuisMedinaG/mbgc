@@ -5,7 +5,7 @@ import SwiftData
 @Observable
 final class GameDetailViewModel {
     var game: GameDetailDTO?
-    var collections: [Collection] = []
+    var collections: [CollectionDTO] = []
     var selectedVibeIds: Set<Int> = []
     var isLoading = false
     var isSaving = false
@@ -114,7 +114,7 @@ final class GameDetailViewModel {
     }
 
     private func fetchLocalGame(gameId: Int, modelContext: ModelContext) -> Game? {
-        let descriptor = FetchDescriptor<Game>(predicate: #Predicate { $0.id == gameId })
+        let descriptor = FetchDescriptor<Game>(predicate: #Predicate { $0.bggId == gameId })
         return try? modelContext.fetch(descriptor).first
     }
 }

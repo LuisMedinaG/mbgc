@@ -36,7 +36,7 @@ struct CSVPreviewRow: Decodable, Identifiable {
     let name: String
     var id: Int { bggId }
 }
-struct Collection: Decodable, Identifiable { let id: Int; let name: String; let description: String; let gameCount: Int }
+struct CollectionDTO: Decodable, Identifiable { let id: Int; let name: String; let description: String; let gameCount: Int }
 
 actor APIClient {
     static let shared = APIClient()
@@ -128,16 +128,16 @@ actor APIClient {
             path: "/api/v1/games/\(gameId)/rules-url", method: "PUT", jsonBody: body, authorized: true)
     }
 
-    func listCollections() async throws -> [Collection] {
-        let envelope: Envelope<[Collection]> = try await send(
+    func listCollections() async throws -> [CollectionDTO] {
+        let envelope: Envelope<[CollectionDTO]> = try await send(
             path: "/api/v1/collections", method: "GET", jsonBody: nil, authorized: true)
         return envelope.data
     }
 
-    func createCollection(name: String, description: String) async throws -> Collection {
+    func createCollection(name: String, description: String) async throws -> CollectionDTO {
         struct Body: Encodable { let name: String; let description: String }
         let body = try encoder.encode(Body(name: name, description: description))
-        let envelope: Envelope<Collection> = try await send(
+        let envelope: Envelope<CollectionDTO> = try await send(
             path: "/api/v1/collections", method: "POST", jsonBody: body, authorized: true)
         return envelope.data
     }
