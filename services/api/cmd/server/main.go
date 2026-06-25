@@ -23,10 +23,10 @@ import (
 	"github.com/LuisMedinaG/mbgc/services/api/internal/config"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/httpx"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/importer"
-	"github.com/LuisMedinaG/mbgc/services/api/internal/supabase"
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/supabase"
 	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
 )
 
