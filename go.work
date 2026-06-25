@@ -1,7 +1,7 @@
 // Minimum Go version for workspace mode (introduced in Go 1.18)
 go 1.26.0
 
-toolchain go1.26.1
+toolchain go1.26.4
 
 use (
 	./services/api

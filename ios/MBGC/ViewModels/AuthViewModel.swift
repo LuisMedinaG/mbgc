@@ -9,9 +9,10 @@ final class AuthViewModel {
 
     init() {
         isAuthenticated = Keychain.get(Tokens.access) != nil
-        Task { @MainActor [weak self] in
+        // ponytail: nonisolated task avoids sending non-Sendable Notification across actor boundary (Xcode 16 SDK)
+        Task { [weak self] in
             for await _ in NotificationCenter.default.notifications(named: .authSessionExpired) {
-                self?.isAuthenticated = false
+                await MainActor.run { self?.isAuthenticated = false }
             }
         }
     }
