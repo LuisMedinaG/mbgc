@@ -13,9 +13,11 @@ BGG's public XML API and is stored on-device via SwiftData.
 ```
 iOS app
   │
-  ├── BGGClient  ──────────────────────▶  BGG XML API (public, no auth)
+  ├── BGGClient  ──────────────────────▶  BGG XML API (Bearer token)
   │     fetchThings(ids:)                 https://boardgamegeek.com/xmlapi2/thing
-  │     fetchCollection(username:)  ← Option A (not yet built)
+  │     fetchCollection(username:token:)
+  │
+  ├── Keychain (BGG API token only)
   │
   ├── SwiftData (on-device SQLite)
   │     Game     — @Attribute(.unique) bggId
@@ -49,11 +51,11 @@ ios/MBGC/
 │   ├── Game.swift             @Model — bggId is @Attribute(.unique) primary key
 │   └── Collection.swift       @Model — isDefault=true reserved for Library
 ├── Networking/
-│   ├── BGGClient.swift        actor — fetchThings(ids:), 2 RPS, 4-attempt retry
+│   ├── BGGClient.swift        actor — fetchThings(ids:token:), 5s pacing, 4-attempt retry
 │   ├── BGGXMLParser.swift     XMLParser delegate for /xmlapi2/thing XML
 │   ├── BGGGame.swift          Intermediate struct (mirrors Go importer.BGGGame)
 │   ├── APIClient.swift        DEAD CODE — all routes require JWT (none stored)
-│   └── Keychain.swift         DEAD CODE — no tokens stored
+│   └── Keychain.swift         BGG API token storage only
 ├── ViewModels/
 │   ├── VibesViewModel.swift   SwiftData CRUD for Collection (no API calls)
 │   ├── ProfileViewModel.swift BGG username → UserDefaults (no API calls)
@@ -65,7 +67,7 @@ ios/MBGC/
 │   ├── LibraryView.swift      Discover tab — empty state placeholder
 │   ├── VibesView.swift        Collection tab — @Query collections, CRUD sheets
 │   ├── CsvImportView.swift    CSV → BGG fetch → SwiftData → calls onComplete
-│   ├── ImportView.swift        Import from BGG page: username field, CSV + BGG import, CollectionPickerView
+│   ├── ImportView.swift        Import page: side-by-side BGG/CSV modes, CollectionPickerView
 │   ├── GameDetailView.swift   Detail — reads SwiftData cache; APIClient call fails silently
 │   ├── SearchView.swift       BROKEN — calls APIClient.listGames (returns 401)
 │   └── ProfileView.swift      BGG username field, saves to UserDefaults (still reachable)
@@ -92,6 +94,10 @@ ios/MBGC/
 - Stored in `UserDefaults.standard` under key `"profile.bggUsername"`
 - NOT stored in Keychain, NOT synced to backend
 
+### BGG API token
+- Stored in iOS Keychain under key `"bgg.apiToken"`
+- Never store in repo files, `.env`, screenshots, or handoff docs
+
 ---
 
 ## What works end-to-end
@@ -107,7 +113,7 @@ ios/MBGC/
 | BGG username save / load | ✅ Working (UserDefaults) |
 | Discover tab | ⏳ Placeholder (coming in Option A) |
 | Search | ❌ Calls APIClient.listGames → 401 |
-| BGG username sync (full) | ❌ Option A not yet built |
+| BGG username sync (full) | ⏳ Requires user BGG API token in Keychain |
 | Vibes editing on game detail | ❌ Calls APIClient → 401 |
 
 ---
@@ -118,7 +124,7 @@ ios/MBGC/
 |---|---|---|
 | `APIClient.swift` — `login`, `refreshTokens`, `logout`, 401-retry | No JWT, no login | Delete those methods |
 | `APIClient.swift` — all `authorized: true` methods | All return 401 | Delete entire file once Option A lands |
-| `Keychain.swift` | No tokens stored | Delete |
+| `Keychain.swift` | Stores BGG API token | Keep |
 | `LibraryViewModel.swift` | Calls `APIClient.listGames` | Rewrite or delete |
 | `Game.vibeNames`, `vibeCollectionIds` | Server-side vibes, unused locally | Delete after local vibes are built |
 
@@ -157,23 +163,23 @@ view properties used as sheet content).
 **Do NOT call `APIClient` methods.** They all require a JWT that doesn't exist.
 Any new data feature must go through `BGGClient` or SwiftData directly.
 
-**BGG rate limiting.** `BGGClient` enforces 2 RPS via `Task.sleep`. Do not add
-parallel fetches without updating the rate-limit budget — BGG will 429-ban the IP.
+**BGG rate limiting.** `BGGClient` paces requests at ~5s via `Task.sleep`. Do not add
+parallel fetches without updating the rate-limit budget — BGG will 429/5xx the IP.
 
 ---
 
-## Next: Option A — BGG username sync
+## BGG username sync
 
-Add `fetchCollection(username:)` to `BGGClient`:
+Add `fetchCollection(username:token:)` to `BGGClient`:
 - `GET https://boardgamegeek.com/xmlapi2/collection?username=X&own=1`
 - Returns `[Int]` (owned BGG IDs) — same 202-retry pattern as Go importer
 - Reference: `services/api/internal/importer/bgg.go` → `FetchCollection`
 
 Wire into `ImportView`:
 1. BGG username already in `ImportView.bggUsername` field
-2. `BGGClient.fetchCollection(username:)` → `[Int]`
+2. `BGGClient.fetchCollection(username:token:)` → `[Int]`
 3. Diff against existing SwiftData `bggId`s
-4. `BGGClient.fetchThings(ids: toFetch)` → `[BGGGame]`
+4. `BGGClient.fetchThings(ids: toFetch, token:)` → `[BGGGame]`
 5. Insert `Game` objects → call `onComplete?(newGames)` → show `CollectionPickerView`
 
 The destination picker is already wired for CSV import — BGG sync uses the same `onComplete` path.

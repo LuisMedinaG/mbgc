@@ -25,6 +25,7 @@ targets:
       path: MBGC/Info.plist
       properties:
         CFBundleDisplayName: MBGC
+        UIRequiresFullScreen: true
         UILaunchScreen: {}
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

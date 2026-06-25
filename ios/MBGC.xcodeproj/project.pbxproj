@@ -19,7 +19,6 @@
 		5763C2DC7634E0D71998A9E3 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FF2F7C0A1246DFA97A32129 /* LibraryView.swift */; };
 		5B702FC979C65059E69AE1B5 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62288FD9B5C3E5AC1E934102 /* Game.swift */; };
 		71094DE68B7D7F216992CBDE /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23998AB6E73A40AC90BD30CB /* APIClient.swift */; };
-		7B3A787FB8FB881C29643E13 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E144C2E5B666F8B34EF90144 /* LibraryViewModel.swift */; };
 		7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */; };
 		80D024F0D11FFF26F68E036F /* VibesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E87CF1FE5164753FD476E2F /* VibesView.swift */; };
 		93FC2BC690E736B32C8020F1 /* BGGXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC72A5148F980A8CE0BA6DD /* BGGXMLParser.swift */; };
@@ -56,7 +55,7 @@
 		5FF2F7C0A1246DFA97A32129 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		62288FD9B5C3E5AC1E934102 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		9165E7A7049E0C99F7DD168B /* ProfileViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
-		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99C1F0CBB227E63609C23F0A /* MBGCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBGCApp.swift; sourceTree = "<group>"; };
 		A0076C98DF51184321766D82 /* BGGClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGClient.swift; sourceTree = "<group>"; };
 		A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
@@ -66,7 +65,6 @@
 		C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CD671A7394CE1D23B5C50B9B /* BGGGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGGame.swift; sourceTree = "<group>"; };
 		DDE7C4D04B668130E6304142 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
-		E144C2E5B666F8B34EF90144 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
 		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8B1B3026AF2474E8CCBCEDA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -86,7 +84,6 @@
 			children = (
 				1D54977781EC32711BF85BF6 /* GameDetailViewModel.swift */,
 				59C803C3FC3764055C12DE85 /* ImportViewModel.swift */,
-				E144C2E5B666F8B34EF90144 /* LibraryViewModel.swift */,
 				9165E7A7049E0C99F7DD168B /* ProfileViewModel.swift */,
 				3FDE49F6EB6D9AC345ED03DD /* VibesViewModel.swift */,
 			);
@@ -205,7 +202,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					FF95678E676736D017659FA2 = {
 						ProvisioningStyle = Automatic;
@@ -251,7 +248,6 @@
 				1CC1519BB490E3E23A4F18F5 /* ImportViewModel.swift in Sources */,
 				22D5DE6E535A82A6E25FF21A /* Keychain.swift in Sources */,
 				5763C2DC7634E0D71998A9E3 /* LibraryView.swift in Sources */,
-				7B3A787FB8FB881C29643E13 /* LibraryViewModel.swift in Sources */,
 				F69123C72343D01B126F55D0 /* MBGCApp.swift in Sources */,
 				1604A87B15A7582BD38A6B95 /* ProfileView.swift in Sources */,
 				1EDC56E9F9BDD214EAD16CEB /* ProfileViewModel.swift in Sources */,
@@ -352,7 +348,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -436,7 +431,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";

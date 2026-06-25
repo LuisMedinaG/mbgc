@@ -1,6 +1,19 @@
 import Foundation
 
 enum BGGXMLParser {
+    static func parseCollectionResponse(_ data: Data) throws -> [Int] {
+        let delegate = CollectionDelegate()
+        let parser = XMLParser(data: data)
+        parser.delegate = delegate
+        guard parser.parse() else {
+            if let error = parser.parserError {
+                throw error
+            }
+            throw URLError(.cannotParseResponse)
+        }
+        return delegate.ids
+    }
+
     static func parseThingResponse(_ data: Data) throws -> [BGGGame] {
         let delegate = ThingDelegate()
         let parser = XMLParser(data: data)
@@ -12,6 +25,23 @@ enum BGGXMLParser {
             throw URLError(.cannotParseResponse)
         }
         return delegate.games
+    }
+
+    private final class CollectionDelegate: NSObject, XMLParserDelegate {
+        var ids: [Int] = []
+        private var seen = Set<Int>()
+
+        func parser(_ parser: XMLParser, didStartElement elementName: String,
+                    namespaceURI: String?, qualifiedName qName: String?,
+                    attributes attributeDict: [String: String] = [:]) {
+            guard elementName == "item",
+                  let id = Int(attributeDict["objectid"] ?? ""),
+                  id > 0,
+                  !seen.contains(id) else { return }
+            // ponytail: collection sync only needs BGG IDs; /thing already fetches metadata.
+            ids.append(id)
+            seen.insert(id)
+        }
     }
 
     private final class ThingDelegate: NSObject, XMLParserDelegate {
