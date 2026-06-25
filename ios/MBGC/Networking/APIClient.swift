@@ -74,7 +74,7 @@ actor APIClient {
         return envelope.data
     }
 
-    func listGames(query: String? = nil) async throws -> [GameDTO] {
+    func listGames(query: String? = nil, onPage: (@Sendable (Int, Int) -> Void)? = nil) async throws -> [GameDTO] {
         var games: [GameDTO] = []
         var page = 1
         let limit = 100
@@ -89,6 +89,7 @@ actor APIClient {
             let envelope: ListEnvelope<GameDTO> = try await send(
                 path: path, method: "GET", jsonBody: nil, authorized: true)
             games += envelope.data
+            onPage?(games.count, envelope.meta.total)
             // ponytail: walks all pages so library refresh never drops rows past page 1
             if envelope.data.isEmpty || games.count >= envelope.meta.total {
                 break

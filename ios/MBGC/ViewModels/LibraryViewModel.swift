@@ -6,13 +6,17 @@ import SwiftData
 final class LibraryViewModel {
     var isLoading = false
     var errorMessage: String?
+    var loadProgress: (loaded: Int, total: Int)?
 
     func refresh(modelContext: ModelContext) async {
         errorMessage = nil
         isLoading = true
-        defer { isLoading = false }
+        loadProgress = nil
+        defer { isLoading = false; loadProgress = nil }
         do {
-            let dtos = try await APIClient.shared.listGames()
+            let dtos = try await APIClient.shared.listGames(onPage: { [weak self] loaded, total in
+                Task { @MainActor in self?.loadProgress = (loaded, total) }
+            })
             let existing = try modelContext.fetch(FetchDescriptor<Game>())
             var byId = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
 

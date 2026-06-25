@@ -43,9 +43,12 @@ explicitly requested.
   `AsyncImage` rides `URLSession.shared`, so thumbnails/hero images now persist
   across launches instead of re-downloading every cold start.
 
+- `LibraryViewModel.refresh` now reports `loadProgress` (loaded/total) per page via
+  `APIClient.listGames(onPage:)`; `LibraryView` shows "Loading X of Y…" instead of a bare
+  spinner once the library spans more than one page.
+
 Deferred (too big for this pass, see `docs/ios-api-needs.md` for the backend half):
 - Lite list payload, async BGG sync job, incremental sync — all need a Go API change first.
-- Pagination progress UI (see Bug ledger below).
 
 ## What's pending
 
@@ -73,10 +76,6 @@ Fixed in this pass:
   `already_owned` field, `SyncResult{imported, skipped, failed[]}` not
   `{imported, failed: Int}`). Every CSV preview/import call would have failed to decode.
   Fixed by reusing the actual contract; server already skips owned games server-side.
-
-Still open (small, do alongside next iOS work, not urgent):
-- No pagination UI signal — library fetch now walks pages but does it serially with no
-  progress indicator; fine until collections get large.
 
 ## YAGNI (not building)
 

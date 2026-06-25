@@ -39,7 +39,11 @@ struct LibraryView: View {
             .task { await viewModel.refresh(modelContext: modelContext) }
             .overlay {
                 if games.isEmpty && viewModel.isLoading {
-                    ProgressView()
+                    if let progress = viewModel.loadProgress, progress.total > progress.loaded {
+                        ProgressView("Loading \(progress.loaded) of \(progress.total)…")
+                    } else {
+                        ProgressView()
+                    }
                 }
             }
         }
