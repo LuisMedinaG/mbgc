@@ -1,10 +1,7 @@
 import SwiftUI
 
 struct VibesView: View {
-    @State private var viewModel = VibesViewModel()
-    @State private var showCreate = false
-    @State private var createName = ""
-    @State private var createDescription = ""
+    let viewModel: VibesViewModel
     @State private var editingCollection: Collection?
     @State private var editName = ""
     @State private var editDescription = ""
@@ -15,17 +12,14 @@ struct VibesView: View {
                 if viewModel.isLoading && viewModel.collections.isEmpty {
                     ProgressView()
                 } else if viewModel.collections.isEmpty {
-                    ContentUnavailableView("No Vibes", systemImage: "tag.slash",
-                        description: Text("Tap + to create your first vibe."))
+                    ContentUnavailableView("No Collections", systemImage: "square.stack",
+                        description: Text("Tap + to create your first collection."))
                 } else {
                     collectionList
                 }
             }
-            .navigationTitle("Vibes")
-            .toolbar {
-                Button { showCreate = true } label: { Image(systemName: "plus") }
-            }
-            .sheet(isPresented: $showCreate) { createSheet }
+            .navigationTitle("Collection")
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $editingCollection) { col in renameSheet(col) }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
@@ -64,38 +58,6 @@ struct VibesView: View {
                 .tint(.blue)
             }
         }
-    }
-
-    private var createSheet: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $createName)
-                TextField("Description (optional)", text: $createDescription)
-            }
-            .navigationTitle("New Vibe")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showCreate = false
-                        createName = ""
-                        createDescription = ""
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        let name = createName
-                        let desc = createDescription
-                        showCreate = false
-                        createName = ""
-                        createDescription = ""
-                        Task { await viewModel.create(name: name, description: desc) }
-                    }
-                    .disabled(createName.isEmpty)
-                }
-            }
-        }
-        .presentationDetents([.medium])
     }
 
     private func renameSheet(_ col: Collection) -> some View {
@@ -165,6 +127,7 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .task {
             do {
                 games = try await APIClient.shared.discover(collectionId: collection.id)

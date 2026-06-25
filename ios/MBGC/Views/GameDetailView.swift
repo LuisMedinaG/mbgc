@@ -34,6 +34,7 @@ struct GameDetailView: View {
         }
         .navigationTitle(viewModel.game?.name ?? "Game")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .task { await viewModel.load(gameId: gameId, modelContext: modelContext) }
     }
 

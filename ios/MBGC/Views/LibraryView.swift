@@ -31,7 +31,8 @@ struct LibraryView: View {
                     }
                 }
             }
-            .navigationTitle("Library")
+            .navigationTitle("Discover")
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Int.self) { gameId in
                 GameDetailView(gameId: gameId)
             }
