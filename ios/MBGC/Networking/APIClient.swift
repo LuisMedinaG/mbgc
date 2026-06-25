@@ -77,6 +77,102 @@ actor APIClient {
         return envelope.data
     }
 
+    func getGame(id: Int) async throws -> GameDetailDTO {
+        let envelope: Envelope<GameDetailDTO> = try await send(
+            path: "/api/v1/games/\(id)", method: "GET", jsonBody: nil, authorized: true)
+        return envelope.data
+    }
+
+    func deleteGame(id: Int) async throws {
+        struct Empty: Decodable {}
+        let _: Envelope<Empty> = try await send(
+            path: "/api/v1/games/\(id)", method: "DELETE", jsonBody: nil, authorized: true)
+    }
+
+    func setGameCollections(gameId: Int, collectionIds: [Int]) async throws {
+        struct Body: Encodable { let collectionIds: [Int] }
+        let body = try encoder.encode(Body(collectionIds: collectionIds))
+        struct Empty: Decodable {}
+        let _: Envelope<Empty> = try await send(
+            path: "/api/v1/games/\(gameId)/collections", method: "POST", jsonBody: body, authorized: true)
+    }
+
+    func updateRulesUrl(gameId: Int, rulesUrl: String) async throws {
+        struct Body: Encodable { let rulesUrl: String }
+        let body = try encoder.encode(Body(rulesUrl: rulesUrl))
+        struct Empty: Decodable {}
+        let _: Envelope<Empty> = try await send(
+            path: "/api/v1/games/\(gameId)/rules-url", method: "PUT", jsonBody: body, authorized: true)
+    }
+
+    func listCollections() async throws -> [Collection] {
+        let envelope: Envelope<[Collection]> = try await send(
+            path: "/api/v1/collections", method: "GET", jsonBody: nil, authorized: true)
+        return envelope.data
+    }
+
+    func getProfile() async throws -> ProfileDTO {
+        let envelope: Envelope<ProfileDTO> = try await send(
+            path: "/api/v1/profile", method: "GET", jsonBody: nil, authorized: true)
+        return envelope.data
+    }
+
+    func setBGGUsername(_ username: String) async throws {
+        struct Body: Encodable { let bggUsername: String }
+        let body = try encoder.encode(Body(bggUsername: username))
+        struct Empty: Decodable {}
+        let _: Envelope<Empty> = try await send(
+            path: "/api/v1/profile/bgg-username", method: "PUT", jsonBody: body, authorized: true)
+    }
+
+    func syncBGG(fullRefresh: Bool = false) async throws -> SyncResult {
+        let path = fullRefresh ? "/api/v1/import/sync?full_refresh=true" : "/api/v1/import/sync"
+        let envelope: Envelope<SyncResult> = try await send(
+            path: path, method: "POST", jsonBody: nil, authorized: true)
+        return envelope.data
+    }
+
+    func csvPreview(fileData: Data, filename: String) async throws -> CSVPreviewResult {
+        var formData = Data()
+        formData.append("--Boundary\n".data(using: .utf8)!)
+        formData.append("Content-Disposition: form-data; name=\"csv_file\"; filename=\"\(filename)\"\n\n".data(using: .utf8)!)
+        formData.append(fileData)
+        formData.append("\n--Boundary--\n".data(using: .utf8)!)
+
+        guard let url = URL(string: baseURL + "/api/v1/import/csv/preview") else {
+            throw APIError.transport(URLError(.badURL))
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=Boundary", forHTTPHeaderField: "Content-Type")
+        if let token = Keychain.get(Tokens.access) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        request.httpBody = formData
+
+        let (data, response) = try await session.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200...299).contains(status) else {
+            throw APIError.server(code: "unknown", message: "Upload failed (\(status))")
+        }
+        return try decoder.decode(CSVPreviewResult.self, from: data)
+    }
+
+    func csvImport(bggIds: [Int]) async throws -> CSVImportResult {
+        struct Body: Encodable { let bggIds: [Int] }
+        let body = try encoder.encode(Body(bggIds: bggIds))
+        let envelope: Envelope<CSVImportResult> = try await send(
+            path: "/api/v1/import/csv", method: "POST", jsonBody: body, authorized: true)
+        return envelope.data
+    }
+
+    // ponytail: only needed types for now
+    struct ProfileDTO: Decodable { let username: String; let bggUsername: String }
+    struct SyncResult: Decodable { let imported: Int; let skipped: Int; let failed: Int }
+    struct CSVPreviewResult: Decodable { let rows: [CSVPreviewRow]; let totalRows: Int; let previewLimit: Int }
+    struct CSVPreviewRow: Decodable { let bggId: Int; let name: String; let alreadyOwned: Bool }
+    struct CSVImportResult: Decodable { let imported: Int; let failed: Int }
+
     private func refreshTokens() async throws -> LoginResult {
         if let refreshTask {
             return try await refreshTask.value
