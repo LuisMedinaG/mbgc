@@ -149,6 +149,7 @@ jobs:
           version: v2.12.2
           working-directory: services/api
           args: --timeout 5m
+          skip-govulncheck: true
       - name: Vulnerability scan
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./services/api/...
       - name: Build
