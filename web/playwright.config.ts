@@ -20,6 +20,13 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'iOS',
+      use: {
+        ...devices['iPhone 17 Pro'],
+        baseURL: 'http://localhost:5173',
+      },
+    },
   ],
 
   webServer: {

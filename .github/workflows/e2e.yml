@@ -1,9 +1,13 @@
 # e2e.yml — Playwright end-to-end tests against a live environment.
+#
+# Desktop (chromium) runs on ubuntu — tests the full web app.
+# iOS viewport emulation runs on macOS — tests the web app with iPhone viewport/UA.
+#
 # Triggers:
-#   pull_request → main: runs against dev env (vars.DEV_API_URL) to validate what's being promoted.
+#   pull_request → main: runs against dev env to validate what's being promoted.
 #   workflow_dispatch: manual run; caller selects branch, browser, and base URL.
-#   Push to main (merge) intentionally excluded — e2e would race the prod deploy; trigger manually
-#   after deploy or wire via workflow_run if desired.
+#   Push to main (merge) intentionally excluded — e2e would race the prod deploy.
+#
 # Uploads playwright-report on failure.
 # ref: ci-cd.E2E.1, ci-cd.E2E.2, ci-cd.E2E.3
 name: E2E
@@ -20,9 +24,9 @@ on:
       browser:
         description: Browser
         required: false
-        default: chromium
+        default: all
         type: choice
-        options: [chromium, firefox]
+        options: [all, chromium, webkit]
       base_url:
         description: Base URL for tests (defaults to dev environment)
         required: false
@@ -34,10 +38,13 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
-  e2e:
-    name: E2E (Playwright)
+  # Desktop browser — ubuntu
+  # ref: ci-cd.E2E.1
+  e2e-desktop:
+    name: E2E Desktop
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    if: inputs.browser == 'all' || inputs.browser == 'chromium' || github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,11 +77,11 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
-        run: bunx playwright install ${{ inputs.browser || 'chromium' }} --with-deps
+        run: bunx playwright install chromium --with-deps
         working-directory: web
 
-      - name: Run E2E tests
-        run: bunx playwright test --project=${{ inputs.browser || 'chromium' }}
+      - name: Run E2E tests (desktop)
+        run: bunx playwright test --project=chromium
         working-directory: web
         env:
           CI: true
@@ -84,6 +91,63 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
+          name: playwright-report-desktop
+          path: web/playwright-report/
+          retention-days: 7
+
+  # iOS viewport emulation — macOS (WebKit only runs on macOS)
+  # ref: ci-cd.E2E.2
+  e2e-ios:
+    name: E2E iOS Viewport
+    runs-on: macos-14
+    timeout-minutes: 30
+    if: inputs.browser == 'all' || inputs.browser == 'webkit' || github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.sha }}
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.15"
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun
+            web/node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('web/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: web
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('web/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers (WebKit for iOS emulation)
+        run: bunx playwright install webkit --with-deps
+        working-directory: web
+
+      - name: Run E2E tests (iOS viewport)
+        run: bunx playwright test --project=iOS
+        working-directory: web
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: ${{ inputs.base_url || vars.DEV_API_URL }}
+          TEST_TOKEN: ${{ secrets.TEST_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-ios
           path: web/playwright-report/
           retention-days: 7

@@ -27,8 +27,12 @@ e2e/
 
 ```sh
 bun install
-npx playwright install chromium   # one-time: downloads the browser binary
+bunx playwright install chromium   # desktop browser
+bunx playwright install webkit      # iOS viewport emulation (macOS only)
 ```
+
+> **Note for macOS users:** WebKit (required for iOS viewport tests) only runs on macOS.
+> On Linux you can only run the `chromium` project.
 
 **Don't run this while a stray Vite dev server is squatting on `:5173` from
 an unrelated tool** — `reuseExistingServer: false` in `playwright.config.ts`
@@ -39,14 +43,23 @@ the port (`lsof -i :5173`) and rerun.
 ## Running
 
 ```sh
-# Full suite — mocked mode, no backend needed (what CI runs)
+# Full suite (chromium only) — mocked mode, no backend needed
 bun run test:e2e
+
+# Full suite including iOS viewport — requires macOS (WebKit only runs on macOS)
+bun run test:e2e --project=chromium --project=iOS
+
+# iOS viewport only — requires macOS
+bunx playwright test --project=iOS
 
 # Interactive UI mode
 bunx playwright test --ui
 
 # Single file
 bunx playwright test e2e/tests/vibes.spec.ts
+
+# Single file on iOS viewport
+bunx playwright test e2e/tests/vibes.spec.ts --project=iOS
 
 # With a real backend (live mode)
 TEST_TOKEN=<jwt> bun run test:e2e
@@ -150,9 +163,18 @@ The earlier suite missed all of these. The new suite asserts on
 
 ## CI
 
-The `e2e` job in `.github/workflows/e2e.yml` runs the suite against a live
-environment (mocked mode is not used in CI). On failure the Playwright report
-is uploaded as `playwright-report` (7-day retention).
+`.github/workflows/e2e.yml` runs two parallel jobs:
+
+| Job | Runner | Browser | What it tests |
+|---|---|---|---|
+| `e2e-desktop` | ubuntu-24.04 | Chromium | Full desktop viewport (1280×720) |
+| `e2e-ios` | macos-14 | WebKit (iPhone 17 Pro) | iOS viewport (390×844) + touch + Mobile Safari UA |
+
+Both jobs run on every PR. On `workflow_dispatch` you can choose: `all`
+(both), `chromium` (desktop only), or `webkit` (iOS only).
+
+On failure the Playwright report is uploaded as `playwright-report-<desktop|ios>`
+(7-day retention).
 
 ### Adding `TEST_TOKEN` for live-mode CI runs
 
