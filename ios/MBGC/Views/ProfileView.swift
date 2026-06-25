@@ -5,15 +5,6 @@ struct ProfileView: View {
 
     var body: some View {
         Form {
-            Section("Account") {
-                HStack {
-                    Text("Username")
-                    Spacer()
-                    Text(viewModel.username.isEmpty ? "—" : viewModel.username)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             Section("BoardGameGeek") {
                 TextField("BGG Username", text: $viewModel.bggInput)
                     .textInputAutocapitalization(.never)
@@ -25,9 +16,13 @@ struct ProfileView: View {
                     Text(success).foregroundStyle(.green).font(.caption)
                 }
                 Button("Save") {
-                    Task { await viewModel.saveBGG() }
+                    viewModel.saveBGG()
                 }
-                .disabled(viewModel.isSaving || viewModel.bggInput.trimmingCharacters(in: .whitespaces) == viewModel.bggUsername)
+                .disabled(
+                    viewModel.isSaving ||
+                    viewModel.bggInput.trimmingCharacters(in: .whitespaces).isEmpty ||
+                    viewModel.bggInput.trimmingCharacters(in: .whitespaces) == viewModel.bggUsername
+                )
             }
         }
         .navigationTitle("Profile")

@@ -1,7 +1,7 @@
 # iOS Local-First Handoff
 
 **Date:** 2026-06-25
-**Status:** Option D complete — CSV import working. Option A (BGG username sync) is next.
+**Status:** Sessions 1–3 complete. CSV import, Collection model, and Profile working locally. Option A (BGG username sync) is next.
 
 ---
 
@@ -124,10 +124,97 @@ _(See original notes — right long-term answer for multi-user product.)_
 
 ---
 
+---
+
+## What was done (Session 3 — Collection model, profile fixes, UI)
+
+### Bug fixes
+
+| Bug | Root cause | Fix |
+|-----|-----------|-----|
+| Can't create collections | `ContentView.createSheet` was a computed property that captured `self.modelContext` — SwiftUI didn't reliably propagate that context into the presented sheet | Extracted `CreateCollectionSheet` as a standalone `View` struct with its own `@Environment(\.modelContext)` |
+| Can't save BGG username | `ProfileViewModel.saveBGG()` called `APIClient.shared.setBGGUsername()` which requires a JWT | Replaced with `UserDefaults.standard.set(forKey: "profile.bggUsername")` |
+| `seedLibraryIfNeeded` crash risk | `#Predicate { $0.isDefault == true }` can be unstable for Bool properties in SwiftData | Replaced with `fetch(FetchDescriptor<Collection>())` + in-memory `.filter { $0.isDefault }` |
+
+### New: `Collection` SwiftData model
+
+New file `ios/MBGC/Models/Collection.swift`:
+- `@Model class Collection` — `name`, `desc`, `isDefault`, `createdAt`
+- `isDefault = true` → Library (seeded once, undeletable, sorted first via `createdAt = .distantPast`)
+- `@Relationship(deleteRule: .nullify, inverse: \Game.collections) var games: [Game]`
+- `Game.collections: [Collection]` added (many-to-many inverse)
+- `MBGCApp.modelContainer(for: [Game.self, Collection.self])`
+
+**Rename:** `Collection` DTO in `APIClient.swift` → `CollectionDTO` to avoid naming conflict.
+
+### Collection tab — full local CRUD
+
+`VibesViewModel.swift` rewritten — synchronous SwiftData methods, no API calls:
+- `create(name:description:modelContext:)` → `modelContext.insert(Collection(...))`
+- `update(_:name:description:modelContext:)` → mutate + save
+- `delete(_:modelContext:)` → guard `!isDefault`, then `modelContext.delete` + save
+- Collections driven by `@Query(sort: \Collection.createdAt)` in `VibesView`
+
+**Rename / Rename sheets:** extracted as standalone `View` structs (`CreateCollectionSheet`, `RenameCollectionSheet`) — each has its own `@Environment(\.modelContext)`.
+
+### Collection page UI
+
+`VibesView.swift` redesigned:
+- Custom `.largeTitle.bold()` "Collection" header (not NavigationBar title)
+- Each row: colored icon (Library = blue grid, user = orange folder) | name | Spacer | count (number only, `.title3.semibold`)
+- Library row has lock icon; swipe actions hidden for `isDefault` collections
+- `CollectionDetailView` reads `collection.games` directly — no API call
+
+### Profile
+
+- `ProfileView` — Account section removed (no server-side username)
+- `ProfileViewModel.load()` — reads BGG username from `UserDefaults`
+- `ProfileViewModel.saveBGG()` — synchronous, writes to `UserDefaults`
+- Save button correctly disabled when input is empty or unchanged
+
+### CSV import — Library assignment
+
+`CsvImportView.importCSV()` now adds newly imported games to the Library collection:
+```swift
+let library = modelContext.fetch(FetchDescriptor<Collection>())
+    .first { $0.isDefault }
+library?.games.append(contentsOf: newGames)
+```
+
+### What works after Session 3
+
+| Flow | Status |
+|------|--------|
+| CSV import → BGG fetch → Library | ✅ |
+| Collection tab — create / rename / delete | ✅ |
+| Library collection — lists imported games | ✅ |
+| Game detail — reads SwiftData cache | ✅ |
+| BGG username save / load | ✅ (UserDefaults) |
+| Discover tab | ⏳ Placeholder |
+| Search | ❌ APIClient → 401 |
+| BGG username sync | ❌ Option A not yet built |
+
+---
+
+## What was done (Session 3b — documentation)
+
+Unified all project docs to reflect the local-first iOS architecture:
+
+| File | Change |
+|------|--------|
+| `ios/AGENTS.md` | Full rewrite — architecture diagram, data model rules, dead code map, Option A spec |
+| `README.md` | Updated architecture table, added iOS row pointing to BGG; added Xcode/XcodeGen to prerequisites; updated commands |
+| `CLAUDE.md` | Updated Request Flow section — split web and iOS flows; updated directory tree |
+| `.handoff/ios-status.md` | Marked SUPERSEDED with pointer to handoff doc |
+| `.handoff/ios-api-needs.md` | Marked SUPERSEDED — iOS no longer calls services/api |
+
+---
+
 ## References
 
 - BGG XML API docs: `https://boardgamegeek.com/wiki/page/BGG_XML_API2`
 - Go importer reference: `services/api/internal/importer/bgg.go` — same field mapping used in `BGGXMLParser.swift`
-- SwiftData model: `ios/MBGC/Models/Game.swift` — `init(bggGame:)` added
+- SwiftData models: `ios/MBGC/Models/Game.swift`, `ios/MBGC/Models/Collection.swift`
 - BGG client: `ios/MBGC/Networking/BGGClient.swift`
 - XML parser: `ios/MBGC/Networking/BGGXMLParser.swift`
+- iOS agent rules: `ios/AGENTS.md`

@@ -36,3 +36,31 @@ var (
 	ErrValidation           = errors.New("validation failed")
 	ErrWrongPassword        = errors.New("wrong password")
 )
+
+// Safe returns the sentinel error itself, stripping any wrapper text added via
+// fmt.Errorf("%w: detail", ...). This ensures client-facing error messages never
+// expose internal details. The original err is logged server-side for debugging.
+func Safe(err error) error {
+	switch {
+	case errors.Is(err, ErrBadRequest):
+		return ErrBadRequest
+	case errors.Is(err, ErrDuplicate):
+		return ErrDuplicate
+	case errors.Is(err, ErrForbidden):
+		return ErrForbidden
+	case errors.Is(err, ErrInternal):
+		return ErrInternal
+	case errors.Is(err, ErrNotFound):
+		return ErrNotFound
+	case errors.Is(err, ErrRateLimit):
+		return ErrRateLimit
+	case errors.Is(err, ErrUnauthorized), errors.Is(err, ErrWrongPassword):
+		return ErrUnauthorized
+	case errors.Is(err, ErrUnsupportedMediaType):
+		return ErrUnsupportedMediaType
+	case errors.Is(err, ErrValidation):
+		return ErrValidation
+	default:
+		return ErrInternal
+	}
+}

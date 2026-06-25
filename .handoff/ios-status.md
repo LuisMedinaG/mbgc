@@ -1,4 +1,13 @@
-# iOS App Status — MBGC
+# iOS App Status — MBGC [SUPERSEDED]
+
+> **This file is stale as of 2026-06-25.** The iOS app was migrated to a local-first
+> architecture — no login, no backend calls. See:
+> - `docs/handoff/2026-06-25-ios-local-first.md` — full change log (Sessions 1–3)
+> - `ios/AGENTS.md` — current architecture, data model, what works, what's dead code
+>
+> Everything below describes the pre-migration state and is kept for historical reference only.
+
+---
 
 Supersedes `ios-plan.md`, `ios-improvement-plan.md`, `ios-design.md` (deleted — they had
 drifted from each other and from the implementation; this is the single source of truth).

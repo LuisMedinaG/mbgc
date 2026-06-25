@@ -10,8 +10,6 @@ struct ContentView: View {
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
-    @State private var createName = ""
-    @State private var createDescription = ""
 
     var body: some View {
         Group {
@@ -65,49 +63,17 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSearch)   { SearchView() }
         .sheet(isPresented: $showSettings) { SettingsView() }
-        .sheet(isPresented: $showCreate)   { createSheet }
+        // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
+        .sheet(isPresented: $showCreate)   { CreateCollectionSheet() }
         .task { seedLibraryIfNeeded() }
-    }
-
-    private var createSheet: some View {
-        NavigationStack {
-            Form {
-                TextField("Name", text: $createName)
-                TextField("Description (optional)", text: $createDescription)
-            }
-            .navigationTitle("New Collection")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        showCreate = false
-                        createName = ""
-                        createDescription = ""
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        let name = createName
-                        let desc = createDescription
-                        showCreate = false
-                        createName = ""
-                        createDescription = ""
-                        vibesViewModel.create(name: name, description: desc, modelContext: modelContext)
-                    }
-                    .disabled(createName.isEmpty)
-                }
-            }
-        }
-        .presentationDetents([.medium])
     }
 
     // MARK: — Library seed
 
     private func seedLibraryIfNeeded() {
-        let descriptor = FetchDescriptor<Collection>(
-            predicate: #Predicate { $0.isDefault == true }
-        )
-        guard ((try? modelContext.fetch(descriptor)) ?? []).isEmpty else { return }
+        // Fetch all + filter in memory — avoids Bool predicate issues in SwiftData
+        let all = (try? modelContext.fetch(FetchDescriptor<Collection>())) ?? []
+        guard !all.contains(where: { $0.isDefault }) else { return }
         let library = Collection(name: "Library", isDefault: true)
         modelContext.insert(library)
         try? modelContext.save()

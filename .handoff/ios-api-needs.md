@@ -1,4 +1,16 @@
-# Go API changes worth making for iOS
+# Go API changes worth making for iOS [SUPERSEDED]
+
+> **This file is stale as of 2026-06-25.** The iOS app no longer calls `services/api`.
+> It reads directly from BGG's public XML API and stores data on-device via SwiftData.
+> None of the changes described below are needed for iOS in the current architecture.
+>
+> If iOS ever re-integrates with the backend (e.g. multi-user sync, Option C from the
+> handoff doc), revisit this file. Until then, these are backend improvements that
+> benefit the web app only.
+>
+> Current iOS architecture: `ios/AGENTS.md` and `docs/handoff/2026-06-25-ios-local-first.md`
+
+---
 
 Everything iOS needs today already exists (see `docs/ios-status.md`). These three are not
 blocking, but each removes a real cost on a mobile network. Per `AGENTS.md` boundaries,

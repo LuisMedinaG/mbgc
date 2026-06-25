@@ -1,5 +1,7 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
+
+// MARK: — Collections list
 
 struct VibesView: View {
     let viewModel: VibesViewModel
@@ -8,23 +10,60 @@ struct VibesView: View {
     @State private var editingCollection: Collection?
     @State private var editName = ""
     @State private var editDesc = ""
+    @State private var showCreate = false
 
     var body: some View {
         NavigationStack {
-            Group {
+            VStack(alignment: .leading, spacing: 0) {
+                // Custom title — matches the large header style in design
+                Text("Collection")
+                    .font(.largeTitle.bold())
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+
                 if collections.isEmpty {
+                    Spacer()
                     ContentUnavailableView(
                         "No Collections",
                         systemImage: "square.stack",
                         description: Text("Tap + to create your first collection.")
                     )
+                    Spacer()
                 } else {
-                    collectionList
+                    List(collections) { col in
+                        NavigationLink(destination: CollectionDetailView(collection: col)) {
+                            collectionRow(col)
+                        }
+                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            if !col.isDefault {
+                                Button(role: .destructive) {
+                                    viewModel.delete(col, modelContext: modelContext)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                Button {
+                                    editName = col.name
+                                    editDesc = col.desc
+                                    editingCollection = col
+                                } label: {
+                                    Label("Rename", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
+                        }
+                    }
+                    .listStyle(.plain)
                 }
             }
-            .navigationTitle("Collection")
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(item: $editingCollection) { col in renameSheet(col) }
+            .sheet(isPresented: $showCreate) {
+                CreateCollectionSheet()
+            }
+            .sheet(item: $editingCollection) { col in
+                RenameCollectionSheet(collection: col, initialName: editName, initialDesc: editDesc)
+            }
             .alert("Error", isPresented: Binding(
                 get: { viewModel.errorMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil } }
@@ -36,62 +75,113 @@ struct VibesView: View {
         }
     }
 
-    private var collectionList: some View {
-        List(collections) { col in
-            NavigationLink(destination: CollectionDetailView(collection: col)) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(col.name).font(.headline)
-                        Text("\(col.games.count) game\(col.games.count == 1 ? "" : "s")")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if col.isDefault {
-                        Image(systemName: "lock.fill")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
+    func showCreateSheet() {
+        showCreate = true
+    }
+
+    private func collectionRow(_ col: Collection) -> some View {
+        HStack(spacing: 14) {
+            // Icon
+            collectionIcon(col)
+
+            // Name
+            Text(col.name)
+                .font(.headline)
+
+            Spacer()
+
+            // Count — number only, no "games" label
+            Text("\(col.games.count)")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private func collectionIcon(_ col: Collection) -> some View {
+        Image(systemName: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+            .font(.system(size: 20, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 48, height: 48)
+            .background(col.isDefault ? Color.blue : Color.orange)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: — Create sheet (own @Environment so modelContext is guaranteed)
+
+struct CreateCollectionSheet: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var desc = ""
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                    TextField("Description (optional)", text: $desc)
                 }
             }
-            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                if !col.isDefault {
-                    Button(role: .destructive) {
-                        viewModel.delete(col, modelContext: modelContext)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+            .navigationTitle("New Collection")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Create") {
+                        let col = Collection(name: name, desc: desc)
+                        modelContext.insert(col)
+                        try? modelContext.save()
+                        dismiss()
                     }
-                    Button {
-                        editName = col.name
-                        editDesc = col.desc
-                        editingCollection = col
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
-                    .tint(.blue)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
-        .listStyle(.plain)
+        .presentationDetents([.medium])
+    }
+}
+
+// MARK: — Rename sheet
+
+struct RenameCollectionSheet: View {
+    let collection: Collection
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var desc: String
+
+    init(collection: Collection, initialName: String, initialDesc: String) {
+        self.collection = collection
+        _name = State(initialValue: initialName)
+        _desc = State(initialValue: initialDesc)
     }
 
-    private func renameSheet(_ col: Collection) -> some View {
+    var body: some View {
         NavigationStack {
             Form {
-                TextField("Name", text: $editName)
-                TextField("Description (optional)", text: $editDesc)
+                Section {
+                    TextField("Name", text: $name)
+                    TextField("Description (optional)", text: $desc)
+                }
             }
             .navigationTitle("Rename Collection")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { editingCollection = nil }
+                    Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        viewModel.update(col, name: editName, description: editDesc, modelContext: modelContext)
-                        editingCollection = nil
+                        collection.name = name
+                        collection.desc = desc
+                        try? modelContext.save()
+                        dismiss()
                     }
-                    .disabled(editName.isEmpty)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
