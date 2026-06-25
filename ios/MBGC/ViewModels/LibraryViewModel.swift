@@ -14,8 +14,8 @@ final class LibraryViewModel {
         loadProgress = nil
         defer { isLoading = false; loadProgress = nil }
         do {
-            let dtos = try await APIClient.shared.listGames(onPage: { [weak self] loaded, total in
-                Task { @MainActor in self?.loadProgress = (loaded, total) }
+            let dtos = try await APIClient.shared.listGames(onPage: { @MainActor [weak self] loaded, total in
+                self?.loadProgress = (loaded, total)
             })
             let existing = try modelContext.fetch(FetchDescriptor<Game>())
             var byId = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
