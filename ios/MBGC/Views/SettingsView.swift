@@ -6,8 +6,18 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Button("Log Out", role: .destructive) {
-                    auth.logout()
+                Section {
+                    NavigationLink("Profile") {
+                        ProfileView()
+                    }
+                    NavigationLink("Import") {
+                        ImportView()
+                    }
+                }
+                Section {
+                    Button("Log Out", role: .destructive) {
+                        auth.logout()
+                    }
                 }
             }
             .navigationTitle("Settings")

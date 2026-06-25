@@ -15,8 +15,6 @@ extension Notification.Name {
 struct LoginResult: Decodable {
     let accessToken: String
     let expiresIn: Int
-    // No refreshToken: the API returns it as an HttpOnly `mbgc_refresh` cookie,
-    // not in the JSON body. URLSession's cookie storage carries it automatically.
 }
 
 struct Envelope<T: Decodable>: Decodable { let data: T }
@@ -27,6 +25,26 @@ struct ListEnvelope<T: Decodable>: Decodable {
 struct PageMeta: Decodable { let page: Int; let limit: Int; let total: Int }
 private struct ErrorEnvelope: Decodable { let error: APIErrorBody }
 private struct APIErrorBody: Decodable { let code: String; let message: String }
+
+struct ProfileDTO: Decodable { let username: String; let bggUsername: String }
+struct SyncResult: Decodable { let imported: Int; let skipped: Int; let failed: Int }
+struct CSVPreviewResult: Decodable { let rows: [CSVPreviewRow]; let totalRows: Int; let previewLimit: Int }
+struct CSVPreviewRow: Decodable, Identifiable {
+    let bggId: Int
+    let name: String
+    let alreadyOwned: Bool
+    var id: Int { bggId }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        bggId = try container.decode(Int.self, forKey: .bggId)
+        name = try container.decode(String.self, forKey: .name)
+        alreadyOwned = try container.decode(Bool.self, forKey: .alreadyOwned)
+    }
+    enum CodingKeys: String, CodingKey { case bggId, name, alreadyOwned }
+}
+struct CSVImportResult: Decodable { let imported: Int; let failed: Int }
+struct Collection: Decodable, Identifiable { let id: Int; let name: String; let description: String; let gameCount: Int }
 
 actor APIClient {
     static let shared = APIClient()
@@ -43,7 +61,6 @@ actor APIClient {
         e.keyEncodingStrategy = .convertToSnakeCase
         return e
     }()
-    // Dedupes concurrent 401s onto one in-flight refresh instead of firing one per request.
     private var refreshTask: Task<LoginResult, Error>?
 
     private init() {
@@ -133,18 +150,19 @@ actor APIClient {
     }
 
     func csvPreview(fileData: Data, filename: String) async throws -> CSVPreviewResult {
+        let boundary = "Boundary-\(UUID().uuidString)"
         var formData = Data()
-        formData.append("--Boundary\n".data(using: .utf8)!)
-        formData.append("Content-Disposition: form-data; name=\"csv_file\"; filename=\"\(filename)\"\n\n".data(using: .utf8)!)
+        formData.append("--\(boundary)\r\n".data(using: .utf8)!)
+        formData.append("Content-Disposition: form-data; name=\"csv_file\"; filename=\"\(filename)\"\r\n\r\n".data(using: .utf8)!)
         formData.append(fileData)
-        formData.append("\n--Boundary--\n".data(using: .utf8)!)
+        formData.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
 
         guard let url = URL(string: baseURL + "/api/v1/import/csv/preview") else {
             throw APIError.transport(URLError(.badURL))
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        request.setValue("multipart/form-data; boundary=Boundary", forHTTPHeaderField: "Content-Type")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if let token = Keychain.get(Tokens.access) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
@@ -165,13 +183,6 @@ actor APIClient {
             path: "/api/v1/import/csv", method: "POST", jsonBody: body, authorized: true)
         return envelope.data
     }
-
-    // ponytail: only needed types for now
-    struct ProfileDTO: Decodable { let username: String; let bggUsername: String }
-    struct SyncResult: Decodable { let imported: Int; let skipped: Int; let failed: Int }
-    struct CSVPreviewResult: Decodable { let rows: [CSVPreviewRow]; let totalRows: Int; let previewLimit: Int }
-    struct CSVPreviewRow: Decodable { let bggId: Int; let name: String; let alreadyOwned: Bool }
-    struct CSVImportResult: Decodable { let imported: Int; let failed: Int }
 
     private func refreshTokens() async throws -> LoginResult {
         if let refreshTask {

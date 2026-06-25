@@ -13,16 +13,16 @@ final class Game {
     var maxPlayers: Int?
     var playtime: Int?
     var rulesUrl: String?
-    var gameDescription: String
-    var categories: [String]
-    var mechanics: [String]
-    var types: [String]
-    var weight: Double
-    var rating: Double
-    var languageDependence: Int
-    var recommendedPlayers: [Int]
+    var gameDescription: String?
+    var categories: [String]?
+    var mechanics: [String]?
+    var types: [String]?
+    var weight: Double?
+    var rating: Double?
+    var languageDependence: Int?
+    var recommendedPlayers: [Int]?
     var vibeNames: [String]
-    var vibeCollectionIds: [Int]
+    var vibeCollectionIds: [Int]?
 
     init(dto: GameDTO) {
         id = dto.id
