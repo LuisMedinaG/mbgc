@@ -85,22 +85,26 @@ struct HomePillView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            pillButton("Discover", for: .discover)
-            pillButton("Collection", for: .collection)
+            pillButton("Discover", icon: "binoculars.fill", for: .discover)
+            pillButton("Collection", icon: "square.stack.fill", for: .collection)
         }
         .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
     }
 
-    private func pillButton(_ label: String, for target: HomeTab) -> some View {
+    private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {
         Button { tab = target } label: {
-            Text(label)
-                .font(.subheadline.weight(tab == target ? .semibold : .regular))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .foregroundStyle(tab == target ? Color(.systemBackground) : .secondary)
-                .background(tab == target ? Color(.label) : Color.clear)
-                .clipShape(Capsule())
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 20))
+                Text(label)
+                    .font(.caption2.weight(tab == target ? .semibold : .regular))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .foregroundStyle(tab == target ? Color(.systemBackground) : .secondary)
+            .background(tab == target ? Color(.label) : Color.clear)
+            .clipShape(Capsule())
         }
     }
 }

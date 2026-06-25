@@ -1,7 +1,7 @@
 # iOS Local-First Handoff
 
 **Date:** 2026-06-25
-**Status:** Sessions 1–3 complete. CSV import, Collection model, and Profile working locally. Option A (BGG username sync) is next.
+**Status:** Sessions 1–5 complete. Full import flow, collection picker, UI polish. Option A (BGG username sync) is next.
 
 ---
 
@@ -193,6 +193,94 @@ library?.games.append(contentsOf: newGames)
 | Discover tab | ⏳ Placeholder |
 | Search | ❌ APIClient → 401 |
 | BGG username sync | ❌ Option A not yet built |
+
+---
+
+## What was done (Session 4 — UI polish)
+
+### Settings — single "Import from BGG" entry point
+
+`SettingsView.swift` simplified to two rows: "Import from BGG" and "Profile". No split menus.
+
+`ImportView.swift` restructured as a single `List`:
+- **Section 1:** BGG sync placeholder (coming soon) with icon + error display
+- **Section 2:** "Import from CSV" as a button that presents `CsvImportView` as a sheet (no push navigation)
+- Title: "Import from BGG", `.navigationBarTitleDisplayMode(.large)`
+
+### HomePillView — larger pills with icons
+
+`pillButton` now uses `Label(label, systemImage: icon)`:
+- Discover: `binoculars.fill`
+- Collection: `square.stack.fill`
+
+Size increases:
+| Before | After |
+|--------|-------|
+| `.subheadline` font | `.body` font |
+| `padding(.horizontal, 16)` | `padding(.horizontal, 20)` |
+| `padding(.vertical, 10)` | `padding(.vertical, 12)` |
+
+### VibesView — more top space
+
+Title top padding increased from `8pt` → `32pt` for a more spacious header.
+
+---
+
+## What was done (Session 4 — UI polish)
+
+### HomePillView — icon on top, small text
+
+Pills redesigned as `VStack(spacing: 4)` with icon above label:
+- Discover: `binoculars.fill` + "Discover"
+- Collection: `square.stack.fill` + "Collection"
+- Icon: `.system(size: 20)`, text: `.caption2`
+
+### Settings — Import from BGG + Import from CSV
+
+Two independent rows. No Profile link. "Import from CSV" opens `CsvImportView` as a sheet directly from Settings.
+
+### Import/Settings — consolidated navigation
+
+`SettingsView` → "Import from BGG" (pushes `ImportView`) or "Import from CSV" (sheet).
+
+---
+
+## What was done (Session 5 — Import flow redesign)
+
+### ImportView — new "Import from BGG" page
+
+Full redesign of `ImportView` as the entry point for all imports:
+- BGG username text field at the top (not stored, not linked to Profile)
+- **Import via BGG** — primary filled button (disabled / coming soon — `bggUsername.isEmpty` guard)
+- **Import via CSV** — secondary outlined button → opens `CsvImportView` as sheet
+- After CSV import completes → `onComplete` callback → `CollectionPickerView` presented as sheet
+
+### CsvImportView — no auto-Library assignment
+
+- Removed the `library.games.append(contentsOf: newGames)` + save step
+- Now calls `onComplete?(importedGames)` when done — parent drives the destination
+- "Add to a collection…" button shown in `doneContent` step (only when `importedGames` is non-empty)
+
+### CollectionPickerView — destination selector sheet
+
+New inline `View` in `ImportView.swift`:
+- Presented as a `.sheet` after CSV import completes
+- `List` of all collections with icon, name, and current game count
+- Tapping a collection: adds games to it, saves, dismisses both sheets
+- "Cancel" dismisses without saving
+
+### Flow summary
+
+```
+Settings → "Import from BGG" (ImportView)
+  ├── Enter BGG username
+  ├── "Import via BGG" (disabled — Option A)
+  └── "Import via CSV" → CsvImportView (sheet)
+        ├── Choose CSV → Preview → Import
+        └── "Add to a collection…" → CollectionPickerView (sheet)
+              ├── Tap Library / Collection name
+              └── Games added → both sheets dismiss
+```
 
 ---
 

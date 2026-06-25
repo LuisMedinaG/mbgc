@@ -3,7 +3,7 @@
 iOS app for MBGC. **Local-first.** No login, no backend calls. Data comes from
 BGG's public XML API and is stored on-device via SwiftData.
 
-> **Last updated:** 2026-06-25 — Sessions 1–3 removed auth, ported CSV import to BGG, added Collection model.
+> **Last updated:** 2026-06-25 — Sessions 1–5 complete. Full import flow with destination picker.
 > Full change log: `docs/handoff/2026-06-25-ios-local-first.md`
 
 ---
@@ -64,11 +64,11 @@ ios/MBGC/
 │   ├── ContentView.swift      Tab switcher — seeds Library on first launch
 │   ├── LibraryView.swift      Discover tab — empty state placeholder
 │   ├── VibesView.swift        Collection tab — @Query collections, CRUD sheets
-│   ├── CsvImportView.swift    CSV → BGG fetch → SwiftData → Library collection
-│   ├── ImportView.swift       BGG sync (coming soon) + CSV link
+│   ├── CsvImportView.swift    CSV → BGG fetch → SwiftData → calls onComplete
+│   ├── ImportView.swift        Import from BGG page: username field, CSV + BGG import, CollectionPickerView
 │   ├── GameDetailView.swift   Detail — reads SwiftData cache; APIClient call fails silently
 │   ├── SearchView.swift       BROKEN — calls APIClient.listGames (returns 401)
-│   └── ProfileView.swift      BGG username field, saves to UserDefaults
+│   └── ProfileView.swift      BGG username field, saves to UserDefaults (still reachable)
 └── project.yml                XcodeGen config (iOS 17, Swift 6, bundle: app.lumedina.mbgc)
 ```
 
@@ -86,7 +86,7 @@ ios/MBGC/
 - `isDefault: Bool` — `true` only for Library (seeded once in `ContentView.seedLibraryIfNeeded`)
 - Library is sorted first via `createdAt = Date.distantPast`
 - **Never delete or rename Library** — check `!collection.isDefault` before any destructive op
-- Games are added to Library on import via `library.games.append(contentsOf: newGames)`
+- Games are added to collections via `CollectionPickerView` after import — user picks the destination
 
 ### BGG username
 - Stored in `UserDefaults.standard` under key `"profile.bggUsername"`
@@ -98,14 +98,16 @@ ios/MBGC/
 
 | Flow | Status |
 |------|--------|
-| CSV import → BGG fetch → Library | ✅ Working |
+| CSV import → BGG fetch → destination picker → collection | ✅ Working |
+| Import from BGG page — BGG username field, CSV button | ✅ Working |
+| Collection picker — add games to any collection | ✅ Working |
 | Collection tab — create / rename / delete | ✅ Working |
 | Library collection — lists imported games | ✅ Working |
 | Game detail — reads from SwiftData cache | ✅ Working (no network needed) |
 | BGG username save / load | ✅ Working (UserDefaults) |
 | Discover tab | ⏳ Placeholder (coming in Option A) |
 | Search | ❌ Calls APIClient.listGames → 401 |
-| BGG username sync | ❌ Not yet built (Option A) |
+| BGG username sync (full) | ❌ Option A not yet built |
 | Vibes editing on game detail | ❌ Calls APIClient → 401 |
 
 ---
@@ -165,13 +167,15 @@ parallel fetches without updating the rate-limit budget — BGG will 429-ban the
 Add `fetchCollection(username:)` to `BGGClient`:
 - `GET https://boardgamegeek.com/xmlapi2/collection?username=X&own=1`
 - Returns `[Int]` (owned BGG IDs) — same 202-retry pattern as Go importer
-- Already has reference implementation: `services/api/internal/importer/bgg.go`
+- Reference: `services/api/internal/importer/bgg.go` → `FetchCollection`
 
-Then wire `ImportViewModel.sync()` to:
-1. Read BGG username from `UserDefaults`
+Wire into `ImportView`:
+1. BGG username already in `ImportView.bggUsername` field
 2. `BGGClient.fetchCollection(username:)` → `[Int]`
 3. Diff against existing SwiftData `bggId`s
 4. `BGGClient.fetchThings(ids: toFetch)` → `[BGGGame]`
-5. Insert `Game` objects, add to Library, save
+5. Insert `Game` objects → call `onComplete?(newGames)` → show `CollectionPickerView`
+
+The destination picker is already wired for CSV import — BGG sync uses the same `onComplete` path.
 
 Full spec: `docs/handoff/2026-06-25-ios-local-first.md` → Option A section.

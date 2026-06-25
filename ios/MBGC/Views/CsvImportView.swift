@@ -21,6 +21,9 @@ private struct CSVRow: Identifiable {
 struct CsvImportView: View {
     @Environment(\.modelContext) private var modelContext
 
+    /// Called with imported Game objects after the user picks a destination.
+    var onComplete: (([Game]) -> Void)?
+
     @State private var step: CSVStep = .upload
     @State private var selectedFile: URL?
     @State private var previewRows: [CSVRow] = []
@@ -29,6 +32,7 @@ struct CsvImportView: View {
     @State private var importResult: ImportResult?
     @State private var importError: String?
     @State private var showingPicker = false
+    @State private var importedGames: [Game] = []
 
     var body: some View {
         Form {
@@ -39,7 +43,7 @@ struct CsvImportView: View {
             case .done:     doneContent
             }
         }
-        .navigationTitle("CSV Import")
+        .navigationTitle("Import from CSV")
         .fileImporter(
             isPresented: $showingPicker,
             allowedContentTypes: [UTType.commaSeparatedText, UTType.plainText]
@@ -141,6 +145,13 @@ struct CsvImportView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                if !importedGames.isEmpty {
+                    Section {
+                        Button("Add to a collection…") {
+                            onComplete?(importedGames)
+                        }
+                    }
+                }
                 Section {
                     Button("Import another file") { reset() }
                 }
@@ -185,9 +196,9 @@ struct CsvImportView: View {
         step = .importing
         importError = nil
         importProgress = nil
+        importedGames = []
 
         do {
-            // Find which IDs are already in SwiftData (skip re-importing)
             let allIds = previewRows.map(\.bggId)
             let existing = existingBggIds(from: allIds)
             let toFetch = allIds.filter { !existing.contains($0) }
@@ -201,14 +212,12 @@ struct CsvImportView: View {
 
             importProgress = (done: 0, total: toFetch.count)
 
-            // Fetch from BGG — public API, no auth needed
             let games = try await BGGClient.shared.fetchThings(ids: toFetch) { done, total in
                 Task { @MainActor in
                     importProgress = (done: done, total: total)
                 }
             }
 
-            // Write to SwiftData
             var imported = 0
             var failedIds: [Int] = []
             let fetchedById = Dictionary(grouping: games, by: \.bggId).compactMapValues(\.first)
@@ -224,17 +233,9 @@ struct CsvImportView: View {
                     failedIds.append(id)
                 }
             }
-
-            // Add to Library collection
-            let libraryDesc = FetchDescriptor<Collection>(
-                predicate: #Predicate { $0.isDefault == true }
-            )
-            if let library = (try? modelContext.fetch(libraryDesc))?.first {
-                library.games.append(contentsOf: newGames)
-            }
-
             try modelContext.save()
 
+            importedGames = newGames
             importResult = ImportResult(imported: imported, skipped: skipped, failed: failedIds)
             step = .done
         } catch {
@@ -244,10 +245,7 @@ struct CsvImportView: View {
     }
 
     private func existingBggIds(from ids: [Int]) -> Set<Int> {
-        // Fetch all games and filter in memory — SwiftData predicates don't
-        // support Array.contains on arbitrary arrays.
-        let descriptor = FetchDescriptor<Game>()
-        let all = (try? modelContext.fetch(descriptor)) ?? []
+        let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
         let idSet = Set(ids)
         return Set(all.map(\.bggId).filter { idSet.contains($0) })
     }
@@ -260,6 +258,7 @@ struct CsvImportView: View {
         importProgress = nil
         importResult = nil
         importError = nil
+        importedGames = []
     }
 }
 
@@ -269,7 +268,6 @@ private func parseCSV(_ raw: String) -> [CSVRow] {
     let lines = raw.components(separatedBy: .newlines).filter { !$0.isEmpty }
     guard !lines.isEmpty else { return [] }
 
-    // Find the header line: first line that contains "objectid" (case-insensitive)
     guard let headerIndex = lines.firstIndex(where: { $0.lowercased().contains("objectid") }) else {
         return []
     }
@@ -294,20 +292,17 @@ private func parseCSV(_ raw: String) -> [CSVRow] {
     return rows
 }
 
-/// Splits one CSV line respecting double-quoted fields.
 private func csvFields(_ line: String) -> [String] {
     var fields: [String] = []
     var current = ""
     var inQuotes = false
     for ch in line {
         switch ch {
-        case "\"":
-            inQuotes.toggle()
+        case "\"": inQuotes.toggle()
         case "," where !inQuotes:
             fields.append(current)
             current = ""
-        default:
-            current.append(ch)
+        default: current.append(ch)
         }
     }
     fields.append(current)
