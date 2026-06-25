@@ -263,7 +263,7 @@ export const api = {
   // Auth
   async login(username: string, password: string) {
     const r = await request<{ data: { access_token: string; expires_in: number } }>(
-      'POST', '/auth/login', { username, password },
+      'POST', '/auth/login', { username, password }, false,
     )
     tokens.setAccess(r.data.access_token)
     return r.data

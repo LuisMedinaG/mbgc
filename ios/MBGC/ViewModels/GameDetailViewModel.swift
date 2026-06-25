@@ -33,7 +33,7 @@ final class GameDetailViewModel {
     }
 
     func saveVibes(gameId: Int, modelContext: ModelContext) async {
-        guard let currentGame = game else { return }
+        guard game != nil else { return }
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
