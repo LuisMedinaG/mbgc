@@ -9,11 +9,12 @@ final class AuthViewModel {
 
     init() {
         isAuthenticated = Keychain.get(Tokens.access) != nil
-        // ponytail: nonisolated task avoids sending non-Sendable Notification across actor boundary (Xcode 16 SDK)
-        Task { [weak self] in
-            for await _ in NotificationCenter.default.notifications(named: .authSessionExpired) {
-                await MainActor.run { self?.isAuthenticated = false }
-            }
+        // ponytail: addObserver avoids for-await over non-Sendable Notification (Swift 6.0/Xcode 16 compat).
+        // Token not stored — AuthViewModel lives for app lifetime; [weak self] prevents retain cycle.
+        NotificationCenter.default.addObserver(
+            forName: .authSessionExpired, object: nil, queue: nil
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.isAuthenticated = false }
         }
     }
 
