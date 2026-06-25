@@ -149,6 +149,8 @@ jobs:
           version: v2.12.2
           working-directory: services/api
           args: --timeout 5m
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./services/api/...
       - name: Build
         run: go build ./services/api/...
       - name: Test
@@ -202,6 +204,8 @@ jobs:
       - name: Lint
         run: bun run lint
         working-directory: web
+      - name: Audit dependencies
+        run: bun audit --audit-level=moderate
       - name: Build
         run: bun run build
         working-directory: web
