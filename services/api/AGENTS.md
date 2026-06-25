@@ -4,7 +4,7 @@ Single Go API service. Handles JWT validation, profiles, games, collections, and
 
 ## Stack
 
-- **Language:** Go 1.25
+- **Language:** Go 1.26
 - **Auth:** Supabase ES256/JWKS — `internal/jwt/verifier.go`
 - **DB:** pgx/v5 + pgxpool → Supabase Postgres
 - **Shared:** `github.com/LuisMedinaG/mbgc/pkg/shared`

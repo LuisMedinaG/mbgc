@@ -21,6 +21,8 @@ targets:
       properties:
         CFBundleDisplayName: MBGC
         UILaunchScreen: {}
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
   MBGCTests:
     type: bundle.unit-test
     platform: iOS
