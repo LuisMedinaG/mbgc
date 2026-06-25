@@ -35,6 +35,18 @@ explicitly requested.
 - Offline-first reads: Library and Game Detail render from SwiftData instantly, then
   refresh from the API in the background.
 
+## Speed (done this pass)
+
+- `GameDetailViewModel.load` renders the cached `Game` row first (instant), then
+  overwrites with the network fetch — no more spinner on revisit.
+- `URLCache.shared` tuned to 50MB memory / 200MB disk in `MBGCApp.init()` —
+  `AsyncImage` rides `URLSession.shared`, so thumbnails/hero images now persist
+  across launches instead of re-downloading every cold start.
+
+Deferred (too big for this pass, see `docs/ios-api-needs.md` for the backend half):
+- Lite list payload, async BGG sync job, incremental sync — all need a Go API change first.
+- Pagination progress UI (see Bug ledger below).
+
 ## What's pending
 
 **Vibes/Collections (Phase 5, partial):** game-detail vibe *assignment* exists
