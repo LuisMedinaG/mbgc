@@ -115,6 +115,57 @@ infra/.env
 set-deploy-secrets.sh
 
 ##############################################################################
+# iOS / Xcode
+##############################################################################
+# Based on github/gitignore Swift template — generic, not path-scoped
+
+## User settings / build
+xcuserdata/
+build/
+DerivedData/
+.build/
+.swiftpm/
+
+## Xcode legacy
+*.xcscmblueprint
+*.xccheckout
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+*.hmap
+
+## App packaging
+*.ipa
+*.dSYM
+*.dSYM.zip
+
+## Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+## Dependencies
+Carthage/Build/
+Dependencies/
+.accio/
+
+## Code injection
+iOSInjectionProject/
+
+## fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+## Project secrets (real file; .example is tracked)
+ios/Secrets.xcconfig
+
 # macOS
 ##############################################################################
 .DS_Store
@@ -210,4 +261,4 @@ tags
 # understand-anything generated artifacts
 .understand-anything/
 
-.handoff/
+"".handoff/

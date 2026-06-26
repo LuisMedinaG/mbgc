@@ -17,8 +17,9 @@ type Config struct {
 	AllowedOrigins []string
 	BGGToken       string
 	BGGCookie      string
-	SyncLimitUser  int
-	SyncLimitAdmin int
+	SyncLimitBasic int // basic tier: syncs per week
+	SyncLimitPro   int // pro tier: syncs per day (≈hourly)
+	SyncLimitAdmin int // admin hard cap: syncs per day
 	// Admin seed — only used on first boot if set. Idempotent.
 	SeedAdminEmail    string
 	SeedAdminPassword string
@@ -50,8 +51,9 @@ func Load() (Config, error) {
 		AllowedOrigins:    getenvList("ALLOWED_ORIGINS", "http://localhost:5173"), // ref: api-layer.CONFIG.4 — comma-separated; defaults to localhost:5173
 		BGGToken:          os.Getenv("BGG_TOKEN"),                                 // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
 		BGGCookie:         os.Getenv("BGG_COOKIE"),                                // ref: api-layer.CONFIG.5
-		SyncLimitUser:     getenvInt("SYNC_LIMIT_USER", 3),                        // ref: api-layer.CONFIG.6 — defaults to 3
-		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 20),                      // ref: api-layer.CONFIG.6 — defaults to 20
+		SyncLimitBasic: getenvInt("SYNC_LIMIT_BASIC", 1),   // 1 per week for basic users
+		SyncLimitPro:   getenvInt("SYNC_LIMIT_PRO", 24),   // ≈1/hour for pro users
+		SyncLimitAdmin: getenvInt("SYNC_LIMIT_ADMIN", 100), // hard safety cap for admins
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),

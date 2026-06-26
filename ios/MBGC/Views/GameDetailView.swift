@@ -1,0 +1,292 @@
+import SwiftData
+import SwiftUI
+
+struct GameDetailView: View {
+    let gameId: Int
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var viewModel = GameDetailViewModel()
+    @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
+
+    private let langDep = ["", "No language", "Some text", "Moderate", "Extensive", "Unplayable"]
+
+    var body: some View {
+        Group {
+            if let game = viewModel.game {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        heroImage(game)
+                        statsRow(game)
+                        descriptionSection(game)
+                        tagsSection(game)
+                        collectionsSection(game)
+                        linksSection(game)
+                        deleteSection(game)
+                    }
+                    .padding()
+                }
+            } else if let error = viewModel.errorMessage {
+                Text(error).foregroundStyle(.red)
+            } else {
+                ProgressView()
+            }
+        }
+        .navigationTitle(viewModel.game?.name ?? "Game")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .onAppear { viewModel.load(gameId: gameId, modelContext: modelContext) }
+    }
+
+    private func heroImage(_ game: Game) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Rectangle().fill(Color.gray.opacity(0.3))
+            }
+            .frame(height: 200)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
+                .frame(height: 100)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(game.name)
+                    .font(.title2).fontWeight(.bold).foregroundStyle(.white)
+                HStack(spacing: 8) {
+                    if let year = game.yearPublished, year > 0 {
+                        Text(String(year)).font(.caption).foregroundStyle(.white.opacity(0.85))
+                    }
+                    if let rating = game.rating, rating > 0 {
+                        Text("★ \(String(format: "%.1f", rating))").font(.caption).fontWeight(.bold).foregroundStyle(.white)
+                    }
+                    if let weight = game.weight, weight > 0 {
+                        Text(String(format: "%.1f", weight)).font(.caption).foregroundStyle(.white.opacity(0.85))
+                    }
+                    if let dep = game.languageDependence, langDep.indices.contains(dep) {
+                        Text(langDep[dep]).font(.caption).foregroundStyle(.white.opacity(0.85))
+                    }
+                }
+            }
+            .padding()
+        }
+    }
+
+    private func statsRow(_ game: Game) -> some View {
+        HStack {
+            VStack {
+                Text(playersStr(game)).font(.title3).fontWeight(.bold)
+                Text("Players").font(.caption2).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            Divider()
+            VStack {
+                Text("\(game.playtime ?? 0)").font(.title3).fontWeight(.bold)
+                Text("Minutes").font(.caption2).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            Divider()
+            VStack {
+                Text(game.weight.map { String(format: "%.1f", $0) } ?? "—").font(.title3).fontWeight(.bold)
+                Text("Complexity").font(.caption2).foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func descriptionSection(_ game: Game) -> some View {
+        Group {
+            if let desc = game.gameDescription, !desc.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("About").font(.headline)
+                    Text(desc).font(.subheadline)
+                }
+            }
+        }
+    }
+
+    private func tagsSection(_ game: Game) -> some View {
+        let categories = game.categories ?? []
+        let mechanics = game.mechanics ?? []
+        return Group {
+            if !categories.isEmpty || !mechanics.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    if !categories.isEmpty {
+                        Text("Categories").font(.headline)
+                        FlowLayout(spacing: 6) {
+                            ForEach(categories, id: \.self) { tag in
+                                tagChip(tag, color: .blue)
+                            }
+                        }
+                    }
+                    if !mechanics.isEmpty {
+                        Text("Mechanics").font(.headline)
+                        FlowLayout(spacing: 6) {
+                            ForEach(mechanics, id: \.self) { tag in
+                                tagChip(tag, color: .green)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tagChip(_ tag: String, color: Color) -> some View {
+        Text(tag)
+            .font(.caption)
+            .padding(.horizontal, 8).padding(.vertical, 4)
+            .background(color.opacity(0.15))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+    }
+
+    private func collectionsSection(_ game: Game) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Collections").font(.headline)
+                Spacer()
+                if !viewModel.editingCollections {
+                    Button("Edit") { viewModel.startEditingCollections() }
+                        .font(.subheadline)
+                }
+            }
+
+            if viewModel.editingCollections {
+                ForEach(allCollections) { col in
+                    let isSelected = col.isDefault || viewModel.selectedCollectionIds.contains(col.persistentModelID)
+                    Button { viewModel.toggleCollection(col) } label: {
+                        HStack {
+                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                            Text(col.name)
+                        }
+                    }
+                    .disabled(col.isDefault)
+                    .foregroundStyle(.primary)
+                }
+                if allCollections.isEmpty {
+                    Text("No collections yet").font(.subheadline).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Button("Save") {
+                        viewModel.saveCollections(allCollections: allCollections, modelContext: modelContext)
+                    }
+                    .disabled(viewModel.isSaving)
+                    Button("Cancel") { viewModel.editingCollections = false }
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                if game.collections.isEmpty {
+                    Text("Not in any collection")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else {
+                    FlowLayout(spacing: 6) {
+                        ForEach(game.collections.map(\.name), id: \.self) { name in
+                            tagChip(name, color: .purple)
+                        }
+                    }
+                }
+            }
+            if let error = viewModel.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func linksSection(_ game: Game) -> some View {
+        VStack(spacing: 8) {
+            if let rulesUrl = game.rulesUrl, !rulesUrl.isEmpty, let url = URL(string: rulesUrl) {
+                Link(destination: url) {
+                    HStack {
+                        Image(systemName: "doc.text")
+                        Text("Rules")
+                        Spacer()
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                }
+            }
+            let bggId = game.bggId
+            if bggId > 0 {
+                Link(destination: URL(string: "https://boardgamegeek.com/boardgame/\(bggId)")!) {
+                    HStack {
+                        Image(systemName: "gamecontroller")
+                        Text("View on BGG")
+                        Spacer()
+                        Image(systemName: "arrow.up.right.square")
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func deleteSection(_ game: Game) -> some View {
+        VStack {
+            if viewModel.showDeleteConfirm {
+                HStack {
+                    Text("Delete \"\(game.name)\"?")
+                    Button("Yes") {
+                        if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
+                    }
+                    .foregroundStyle(.red)
+                    .disabled(viewModel.isDeleting)
+                    Button("Cancel") { viewModel.showDeleteConfirm = false }
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Button("Delete game", role: .destructive) {
+                    viewModel.showDeleteConfirm = true
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func playersStr(_ game: Game) -> String {
+        if let min = game.minPlayers, let max = game.maxPlayers {
+            return min == max ? "\(min)" : "\(min)-\(max)"
+        }
+        return "—"
+    }
+}
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing).size
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
+                                      y: bounds.minY + result.positions[index].y), proposal: .unspecified)
+        }
+    }
+    struct FlowResult {
+        var size: CGSize = .zero
+        var positions: [CGPoint] = []
+        init(in width: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var x: CGFloat = 0; var y: CGFloat = 0; var lineHeight: CGFloat = 0
+            for subview in subviews {
+                let sz = subview.sizeThatFits(.unspecified)
+                if x + sz.width > width, x > 0 { x = 0; y += lineHeight + spacing; lineHeight = 0 }
+                positions.append(CGPoint(x: x, y: y))
+                lineHeight = max(lineHeight, sz.height)
+                x += sz.width + spacing
+            }
+            size = CGSize(width: width, height: y + lineHeight)
+        }
+    }
+}

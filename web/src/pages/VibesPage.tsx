@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react'
-import { api, ApiError, type Collection } from '../lib/api'
-import type { Game } from '../types/game'
+import { ApiError, type Collection } from '../lib/api'
 import GameListItem from '../components/GameListItem'
 import { useCollections } from '../hooks/useCollections'
+import { useDiscover } from '../hooks/useDiscover'
 
 const PALETTE = [
   { bg: '#dbeafe', text: '#1d4ed8', border: '#93c5fd' },
@@ -26,9 +26,7 @@ function pillColor(idx: number) {
 export default function VibesPage() {
   const { collections, createCollection, updateCollection, deleteCollection, loading: loadingCollections } = useCollections()
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [games, setGames] = useState<Game[]>([])
-  const [discoverTotal, setDiscoverTotal] = useState(0)
-  const [loadingGames, setLoadingGames] = useState(false)
+  const { games, total: discoverTotal, loading: loadingGames } = useDiscover(selectedId)
 
   const [managing, setManaging] = useState(false)
   const [newName, setNewName] = useState('')
@@ -43,7 +41,6 @@ export default function VibesPage() {
   function toggleManage() {
     setManaging(m => !m)
     setSelectedId(null)
-    setGames([])
     setNewName('')
     setCreateError(null)
     setEditingId(null)
@@ -92,7 +89,7 @@ export default function VibesPage() {
     try {
       await deleteCollection(id)
       setDeletingId(null)
-      if (selectedId === id) { setSelectedId(null); setGames([]) }
+      if (selectedId === id) setSelectedId(null)
     } catch {
       setDeletingId(null)
     }
@@ -101,23 +98,7 @@ export default function VibesPage() {
   // ref: vibes.DISCOVER.1 — GET /api/v1/discover filtered by collection_id
   // ref: vibes.DISCOVER.3 — response includes total count matching the filtered query
   function selectCollection(id: number) {
-    if (id === selectedId) {
-      setSelectedId(null)
-      setGames([])
-      return
-    }
-    setSelectedId(id)
-    setLoadingGames(true)
-    api.discover({ collection_id: id })
-      .then(res => {
-        setGames(res.data)
-        setDiscoverTotal(res.total)
-      })
-      .catch(() => {
-        setGames([])
-        setDiscoverTotal(0)
-      })
-      .finally(() => setLoadingGames(false))
+    setSelectedId(id === selectedId ? null : id)
   }
 
   const selectedName = collections.find(c => c.id === selectedId)?.name ?? ''

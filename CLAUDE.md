@@ -8,10 +8,17 @@ Personal board game collection app. Consolidated Go API + React frontend.
 
 ```
 mbgc/
-├── pkg/shared/          Go shared library (envelope, apierr, httpx)
 ├── services/
 │   └── api/             Single consolidated Go API (auth, games, collections, importer, profile)
 ├── web/                 React + Vite + TypeScript + Tailwind
+├── ios/                 SwiftUI iOS app — LOCAL-FIRST, no backend (Swift 6.2, SwiftData)
+│   ├── AGENTS.md        iOS architecture, data model, dead code map, next steps
+│   └── MBGC/
+│       ├── Models/      Game.swift, Collection.swift (SwiftData @Model)
+│       └── Networking/  BGGClient.swift, BGGXMLParser.swift, APIClient.swift (dead)
+├── docs/
+│   └── handoff/
+│       └── 2026-06-25-ios-local-first.md   Full iOS migration log (Sessions 1–3)
 ├── infra/               Terraform — GCP Cloud Run, Cloudflare, Supabase
 │   └── scripts/
 │       ├── bootstrap.sh       one-time infra provisioning + GitHub secrets sync
@@ -32,10 +39,24 @@ services/api  (JWT validation via JWKS + all route handlers)
   /api/v1/games/*        games, collections, player aids
   /api/v1/collections/*  vibes/collections CRUD
   /api/v1/import/*       BGG sync, CSV import
-  /readyz               health check
+  /readyz                health check
 ```
 
 JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
+
+```
+iOS app  (local-first — does NOT call services/api)
+      │
+      ├──▶  BGG XML API (public, no auth)
+      │       https://boardgamegeek.com/xmlapi2/thing?id=...&stats=1
+      │       BGGClient actor — 2 RPS, 4-attempt retry, batch 20
+      │
+      └──▶  SwiftData (on-device SQLite)
+              Models: Game (@bggId unique), Collection (Library seeded on first launch)
+```
+
+**iOS architecture changed 2026-06-25** — login removed, no JWT, no backend calls.
+Full log: `docs/handoff/2026-06-25-ios-local-first.md`. Agent rules: `ios/AGENTS.md`.
 
 ## CI/CD
 

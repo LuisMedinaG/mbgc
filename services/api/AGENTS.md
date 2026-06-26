@@ -4,11 +4,10 @@ Single Go API service. Handles JWT validation, profiles, games, collections, and
 
 ## Stack
 
-- **Language:** Go 1.25
+- **Language:** Go 1.26
 - **Auth:** Supabase ES256/JWKS — `internal/jwt/verifier.go`
 - **DB:** pgx/v5 + pgxpool → Supabase Postgres
-- **Shared:** `github.com/LuisMedinaG/mbgc/pkg/shared`
-- **Deployment:** GCP Cloud Run (`mbgc-api`) — build context is repo root
+- **Deployment: GCP Cloud Run (`mbgc-api`) — build context is repo root
 
 ## API surface
 
@@ -102,7 +101,7 @@ Coverage: auth 78%, importer 72%, catalog 61%, jwt 60%, profile 59%. CI enforces
 **Always:**
 - Include `user_id` in every DB query on user-owned data
 - Use `httpx.UserIDFromContext` to get user identity — never read from headers directly
-- Use `pkg/shared/apierr` sentinels for all error paths
+- Use `internal/apierr` sentinels for all error paths
 - Define store interfaces in each package for handler testability — `Service` depends on the interface, not concrete `*Store`
 - Use `httpx.DefaultClient` for outbound HTTP — never `http.DefaultClient`
 

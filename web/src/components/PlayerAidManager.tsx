@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { api, type PlayerAid } from '../lib/api'
+import { type PlayerAid } from '../lib/api'
+import { usePlayerAids } from '../hooks/usePlayerAids'
 
 interface Props {
   gameId: number
@@ -7,9 +8,8 @@ interface Props {
 }
 
 export default function PlayerAidManager({ gameId, initial }: Props) {
-  const [aids, setAids] = useState<PlayerAid[]>(initial)
+  const { aids, uploadPlayerAid, deletePlayerAid } = usePlayerAids(gameId, initial)
   const [lightbox, setLightbox] = useState<number | null>(null)
-  const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
   const [labelInput, setLabelInput] = useState('')
 
@@ -27,26 +27,21 @@ export default function PlayerAidManager({ gameId, initial }: Props) {
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploading(true)
     setUploadErr('')
     try {
       const label = labelInput.trim() || file.name.replace(/\.[^.]+$/, '')
-      const aid = await api.uploadPlayerAid(gameId, file, label)
-      setAids(prev => [...prev, aid])
+      await uploadPlayerAid.mutateAsync({ file, label })
       setLabelInput('')
       e.target.value = ''
     } catch (err) {
       setUploadErr(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setUploading(false)
     }
   }
 
   async function handleDelete(aid: PlayerAid) {
     if (!confirm(`Delete "${aid.label}"?`)) return
     try {
-      await api.deletePlayerAid(gameId, aid.id)
-      setAids(prev => prev.filter(a => a.id !== aid.id))
+      await deletePlayerAid.mutateAsync(aid.id)
       setLightbox(null)
     } catch { /* ignore */ }
   }
@@ -81,10 +76,10 @@ export default function PlayerAidManager({ gameId, initial }: Props) {
           <input type="text" placeholder="Label (optional)" value={labelInput}
             onChange={e => setLabelInput(e.target.value)}
             className="flex-1 min-w-[120px] px-3 py-[0.45rem] text-[0.85rem] border border-edge rounded-lg bg-parchment text-ink font-sans focus:outline-none focus:border-accent" />
-          <label className={`pressable inline-flex items-center gap-1 px-3.5 py-[0.45rem] text-[0.85rem] font-semibold rounded-lg border-none font-sans cursor-pointer ${uploading ? 'bg-edge text-muted cursor-not-allowed' : 'bg-accent text-white'}`}>
-            {uploading ? 'Uploading…' : '+ Upload'}
+          <label className={`pressable inline-flex items-center gap-1 px-3.5 py-[0.45rem] text-[0.85rem] font-semibold rounded-lg border-none font-sans cursor-pointer ${uploadPlayerAid.isPending ? 'bg-edge text-muted cursor-not-allowed' : 'bg-accent text-white'}`}>
+            {uploadPlayerAid.isPending ? 'Uploading…' : '+ Upload'}
             <input type="file" accept="image/png,image/jpeg,image/gif,image/webp"
-              onChange={handleUpload} disabled={uploading} hidden />
+              onChange={handleUpload} disabled={uploadPlayerAid.isPending} hidden />
           </label>
         </div>
 

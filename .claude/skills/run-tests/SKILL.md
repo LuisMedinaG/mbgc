@@ -7,41 +7,25 @@ description: Run Go unit tests for the backend. Use when asked to run tests or v
 
 Each service has its own test suite. Run from the service directory.
 
-## Per-service commands
+## Go API commands
 
 ```sh
-cd services/<name>   # gateway | auth | game | importer
-make test            # go test ./...
+cd services/api
 make test-v          # go test -v -race ./...  ← use before every PR
+make tidy            # go mod tidy
 make lint            # go vet ./...
-```
-
-## Run all services at once
-
-```sh
-for svc in gateway auth game importer; do
-  echo "=== $svc ===" && make -C services/$svc test
-done
 ```
 
 ## What's under test
 
-| Service | Key packages |
+| Package | Key coverage |
 |---------|-------------|
-| gateway | JWT validation (JWKS + HS256 fallback), middleware chain |
-| auth    | profile store, BGG username handling |
-| game    | filter logic, store queries |
-| importer | BGG HTTP client, sync logic |
-
-Shared library (`pkg/shared`) has its own tests — run `make test-v` there when touching exported types.
-
-## Before every PR
-
-```sh
-make test-v   # from the changed service directory
-```
-
-For changes to `pkg/shared` run `make test-v` in **every** consuming service (gateway, auth, game, importer).
+| internal/apierr | error sentinels and codes |
+| internal/httpx | response writing, middleware |
+| internal/jwt | JWKS + HS256 verification |
+| internal/catalog | game CRUD, filters, player aids |
+| internal/importer | BGG sync, CSV import |
+| internal/profile | profile management |
 
 ## Interpreting failures
 

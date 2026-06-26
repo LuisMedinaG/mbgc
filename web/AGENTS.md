@@ -12,9 +12,9 @@ React 19 + TypeScript strict + Tailwind v4 + Vite. Deployed to Cloudflare Pages;
 
 ## Auth flow
 
-1. User logs in via Supabase Auth SDK → receives access + refresh tokens
-2. Access token (15 min) stored in memory; refresh token in `httpOnly` cookie
-3. On 401 → `api.ts` auto-refreshes via Supabase refresh endpoint; on failure → `onAuthFailure` callback fires → logout
+1. User logs in through `services/api`, which proxies Supabase Auth.
+2. Access token (15 min) is stored in memory only; refresh token is set by the API as an `HttpOnly` cookie.
+3. On 401 → `api.ts` calls the refresh endpoint with `credentials: 'include'`; on failure → `onAuthFailure` callback fires → logout
 
 ## Commands
 
@@ -23,15 +23,15 @@ bun install
 bun run dev          # Vite dev server
 bun run build        # tsc -b && vite build → dist/
 bun run lint         # eslint
-bun run test:e2e     # Playwright — requires full backend stack running
+bun run test:e2e     # Playwright — mocked, desktop + iOS viewport (see web/e2e/README.md)
 ```
 
 ## Patterns
 
 - All API calls through `src/lib/api.ts` — never raw `fetch()` in components or hooks; all methods are typed
 - **Server state via TanStack Query** — all data fetching uses `useQuery`/`useMutation` from `@tanstack/react-query`. Query keys are in `src/lib/queryKeys.ts`; client config in `src/lib/queryClient.ts` (30s staleTime, 1 retry, no refetch-on-focus)
-- Hook conventions: `useGames(filters)` for the collection list (debounces search via `useDebounce`), `useGame(id)` for detail page, `useCollections()` for CRUD, `useProfile()` for profile + mutations. Never reach into the query cache from components — use the hooks.
-- Auth: access token stored in localStorage; refresh token in localStorage (see `api.ts` `tokens`)
+- Hook conventions: `useGames(filters)` for the collection list (debounces search via `useDebounce`), `useGame(id)` for detail page, `useCollections()` for CRUD, `useProfile()` for profile + mutations, `useImport()` / `useCsvImport()` for import flows, `useDiscover(collectionId)` for vibe discovery, and focused hooks like `useRulesUrl(gameId)` / `usePlayerAids(gameId, initial)` for detail subfeatures. Never reach into the query cache from components — use the hooks.
+- Auth: access token stored in memory; refresh token stored only in an HttpOnly cookie set by the API
 - Tailwind v4 CSS-first config (no `tailwind.config.js`) — custom design tokens in `src/index.css`
 - Routing via react-router-dom — never `window.location` redirects
 

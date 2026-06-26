@@ -26,24 +26,28 @@ func WriteError(w http.ResponseWriter, err error) {
 
 	switch {
 	case errors.Is(err, apierr.ErrNotFound):
-		status, code, msg = http.StatusNotFound, apierr.CodeNotFound, err.Error()
+		status, code, msg = http.StatusNotFound, apierr.CodeNotFound, apierr.ErrNotFound.Error()
 	case errors.Is(err, apierr.ErrDuplicate):
-		status, code, msg = http.StatusConflict, apierr.CodeDuplicate, err.Error()
+		status, code, msg = http.StatusConflict, apierr.CodeDuplicate, apierr.ErrDuplicate.Error()
 	case errors.Is(err, apierr.ErrUnauthorized), errors.Is(err, apierr.ErrWrongPassword):
 		status, code, msg = http.StatusUnauthorized, apierr.CodeUnauthorized, "unauthorized"
 	case errors.Is(err, apierr.ErrForbidden):
 		status, code, msg = http.StatusForbidden, apierr.CodeForbidden, "forbidden"
 	case errors.Is(err, apierr.ErrRateLimit):
-		status, code, msg = http.StatusTooManyRequests, apierr.CodeRateLimit, err.Error()
+		status, code, msg = http.StatusTooManyRequests, apierr.CodeRateLimit, apierr.ErrRateLimit.Error()
 	case errors.Is(err, apierr.ErrBadRequest):
-		status, code, msg = http.StatusBadRequest, apierr.CodeBadRequest, err.Error()
+		status, code, msg = http.StatusBadRequest, apierr.CodeBadRequest, apierr.ErrBadRequest.Error()
 	case errors.Is(err, apierr.ErrUnsupportedMediaType):
-		status, code, msg = http.StatusUnsupportedMediaType, apierr.CodeUnsupportedMediaType, err.Error()
+		status, code, msg = http.StatusUnsupportedMediaType, apierr.CodeUnsupportedMediaType, apierr.ErrUnsupportedMediaType.Error()
 	case errors.Is(err, apierr.ErrValidation):
-		status, code, msg = http.StatusUnprocessableEntity, apierr.CodeValidation, err.Error()
+		status, code, msg = http.StatusUnprocessableEntity, apierr.CodeValidation, apierr.ErrValidation.Error()
 	default:
 		slog.Error("unhandled error", "error", err)
 		status, code, msg = http.StatusInternalServerError, apierr.CodeInternal, "internal server error"
+	}
+
+	if status < 500 {
+		slog.Error("request error", "error", err, "status", status, "code", code)
 	}
 
 	WriteJSON(w, status, NewError(code, msg))

@@ -85,6 +85,16 @@ func TestLogin_Success(t *testing.T) {
 	if resp.Data.AccessToken != "at-123" {
 		t.Fatalf("expected at-123, got %s", resp.Data.AccessToken)
 	}
+	if resp.Data.RefreshToken != "" {
+		t.Fatal("refresh token must not be returned in JSON")
+	}
+	cookie := w.Result().Cookies()[0]
+	if cookie.Name != refreshCookieName || cookie.Value != "rt-456" {
+		t.Fatalf("expected refresh cookie, got %#v", cookie)
+	}
+	if !cookie.HttpOnly {
+		t.Fatal("refresh cookie must be HttpOnly")
+	}
 }
 
 func TestLogin_SupabaseUnreachable(t *testing.T) {
@@ -166,8 +176,8 @@ func TestRefresh_MissingToken(t *testing.T) {
 	r.Header.Set("Content-Type", "application/json")
 	h.refresh(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", w.Code)
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
 
@@ -180,8 +190,9 @@ func TestRefresh_SupabaseFailure(t *testing.T) {
 
 	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{"refresh_token":"rt"}`))
+	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", nil)
 	r.Header.Set("Content-Type", "application/json")
+	r.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "rt"})
 	h.refresh(w, r)
 
 	if w.Code != http.StatusUnauthorized {
@@ -202,12 +213,17 @@ func TestRefresh_Success(t *testing.T) {
 
 	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", strings.NewReader(`{"refresh_token":"rt"}`))
+	r := httptest.NewRequest("POST", "/api/v1/auth/refresh", nil)
 	r.Header.Set("Content-Type", "application/json")
+	r.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "rt"})
 	h.refresh(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	cookie := w.Result().Cookies()[0]
+	if cookie.Name != refreshCookieName || cookie.Value != "new-rt" || !cookie.HttpOnly {
+		t.Fatalf("expected rotated HttpOnly refresh cookie, got %#v", cookie)
 	}
 }
 
@@ -222,13 +238,18 @@ func TestLogout_AlwaysSucceeds(t *testing.T) {
 
 	h := NewHandler(nil, supa.URL, "fake-key", httpx.DefaultClient)
 	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/api/v1/auth/logout", strings.NewReader(`{"refresh_token":"rt"}`))
+	r := httptest.NewRequest("POST", "/api/v1/auth/logout", nil)
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Authorization", "Bearer at-123")
+	r.AddCookie(&http.Cookie{Name: refreshCookieName, Value: "rt"})
 	h.logout(w, r)
 
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("expected 204, got %d", w.Code)
+	}
+	cookie := w.Result().Cookies()[0]
+	if cookie.Name != refreshCookieName || cookie.MaxAge >= 0 {
+		t.Fatalf("expected clearing refresh cookie, got %#v", cookie)
 	}
 }
 

@@ -26,6 +26,7 @@ import (
 	apijwt "github.com/LuisMedinaG/mbgc/services/api/internal/jwt"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/profile"
 	"github.com/LuisMedinaG/mbgc/services/api/internal/seed"
+	"github.com/LuisMedinaG/mbgc/services/api/internal/supabase"
 	migrations "github.com/LuisMedinaG/mbgc/services/api/migrations"
 )
 
@@ -148,13 +149,18 @@ func main() {
 	profileSvc := profile.NewService(profileStore)
 	profileHandler := profile.NewHandler(profileSvc)
 
+	sbClient := supabase.New(cfg.SupabaseURL, cfg.ServiceRoleKey, httpx.DefaultClient)
 	catalogStore := catalog.NewStore(pool)
-	catalogHandler := catalog.NewHandler(catalogStore)
+	catalogHandler := catalog.NewHandler(catalogStore, sbClient)
 
 	bggClient := importer.NewClient(cfg.BGGToken, cfg.BGGCookie)
 	importStore := importer.NewStore(pool)
 	importSvc := importer.NewService(importStore, bggClient, catalogStore, profileSvc)
-	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
+	importHandler := importer.NewHandler(importSvc, importer.SyncLimits{
+		Basic: cfg.SyncLimitBasic,
+		Pro:   cfg.SyncLimitPro,
+		Admin: cfg.SyncLimitAdmin,
+	})
 
 	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
 	rateLimit := httpx.RateLimiter(5, 10)

@@ -41,8 +41,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROD_ENV="${SCRIPT_DIR}/../environments/prod"
 
 die()               { printf 'error: %s\n' "$1" >&2; exit 1; }
-prompt_secret()     { printf '%s: ' "$1"; stty -echo 2>/dev/null || true; read -r _v; stty echo 2>/dev/null || true; printf '\n'; printf '%s' "$_v"; }
+prompt_secret()     { printf '%s: ' "$1"; stty -echo 2>/dev/null || true; read -r _v; stty echo 2>/dev/null || true; printf '\n'; printf '%s' "$_v" | sed -e 's/[[:space:]]*$//'; }
 prompt_or_env()     { _val="${2:-}"; if [ -z "$_val" ]; then _val="$(prompt_secret "$1")"; fi; printf '%s' "$_val"; }
+prompt_or_env_req() { _val="$(prompt_or_env "$1" "$2")"; [ -n "$_val" ] || die "$1 cannot be empty"; printf '%s' "$_val"; }
 
 set_github_secret() {
   printf '%s' "$2" | gh secret set "$1" --repo "$REPO"
@@ -50,17 +51,18 @@ set_github_secret() {
 }
 
 set_cloudrun_env() {
-  # Build KEY=VALUE pairs for gcloud
+  # Build KEY=VALUE pairs for gcloud. Use '@@@' as the pair delimiter (vs
+  # default ',') since secret values (e.g. BGG_COOKIE) commonly contain commas.
   _pairs=""
   while [ "$#" -ge 2 ]; do
-    _pairs="${_pairs}${1}=${2},"
+    _pairs="${_pairs}${1}=${2}@@@"
     shift 2
   done
-  _pairs="${_pairs%,}"
+  _pairs="${_pairs%@@@}"
   gcloud run services update "$CLOUD_RUN_SERVICE" \
     --region "$CLOUD_RUN_REGION" \
     --project "$GCP_PROJECT" \
-    --set-env-vars "$_pairs" \
+    --set-env-vars "^@@@^${_pairs}" \
     --quiet
   printf '  ✓ Cloud Run %-38s updated\n' "${CLOUD_RUN_SERVICE}"
 }
@@ -86,8 +88,8 @@ rotate_cloudflare() {
   printf 'Get a new token at: dash.cloudflare.com → Profile → API Tokens\n'
   printf 'Required scopes: Zone:Edit, DNS:Edit, Cloudflare Pages:Edit\n\n'
 
-  CF_TOKEN="$(prompt_or_env 'Cloudflare API token' "${CLOUDFLARE_API_TOKEN:-}")"
-  CF_ZONE="$(prompt_or_env  'Cloudflare zone ID (lumedina.dev)' "${CLOUDFLARE_ZONE_ID:-}")"
+  CF_TOKEN="$(prompt_or_env_req 'Cloudflare API token' "${CLOUDFLARE_API_TOKEN:-}")"
+  CF_ZONE="$(prompt_or_env_req  'Cloudflare zone ID (lumedina.dev)' "${CLOUDFLARE_ZONE_ID:-}")"
 
   set_github_secret CLOUDFLARE_API_TOKEN      "$CF_TOKEN"
   set_github_secret TF_VAR_CLOUDFLARE_ZONE_ID "$CF_ZONE"
@@ -100,9 +102,9 @@ rotate_supabase() {
   printf 'S3 key: Supabase dashboard → Storage → S3 Connection → rotate\n'
   printf 'Access token: app.supabase.com → Account → Access Tokens\n\n'
 
-  S3_KEY="$(prompt_or_env    'Supabase S3 access key ID' "${S3_ACCESS_KEY_ID:-}")"
-  S3_SECRET="$(prompt_or_env 'Supabase S3 secret key'    "${S3_SECRET_ACCESS_KEY:-}")"
-  SB_TOKEN="$(prompt_or_env  'Supabase personal access token' "${SUPABASE_ACCESS_TOKEN:-}")"
+  S3_KEY="$(prompt_or_env_req    'Supabase S3 access key ID' "${S3_ACCESS_KEY_ID:-}")"
+  S3_SECRET="$(prompt_or_env_req 'Supabase S3 secret key'    "${S3_SECRET_ACCESS_KEY:-}")"
+  SB_TOKEN="$(prompt_or_env_req  'Supabase personal access token' "${SUPABASE_ACCESS_TOKEN:-}")"
 
   set_github_secret TF_BACKEND_ACCESS_KEY          "$S3_KEY"
   set_github_secret TF_BACKEND_SECRET_KEY          "$S3_SECRET"
@@ -110,7 +112,8 @@ rotate_supabase() {
   update_tfvars supabase_access_token              "$SB_TOKEN"
 
   printf '\n  ℹ After rotating S3 keys, also update environments/prod/backend.hcl with\n'
-  printf '    the new access key, then run: terraform init -reconfigure\n'
+  printf '    the new access key, then run (from environments/prod):\n'
+  printf '    terraform init -backend-config=backend.hcl -reconfigure\n'
 }
 
 rotate_api() {
@@ -118,10 +121,11 @@ rotate_api() {
   printf 'Service role key: Supabase dashboard → Settings → API\n'
   printf 'BGG token/cookie: copy from browser DevTools on boardgamegeek.com\n\n'
 
-  SVC_KEY="$(prompt_or_env 'Supabase service role key' "${SUPABASE_SERVICE_ROLE_KEY:-}")"
+  SVC_KEY="$(prompt_or_env_req 'Supabase service role key' "${SUPABASE_SERVICE_ROLE_KEY:-}")"
   BGG_TOKEN="$(prompt_or_env 'BGG token (leave blank to skip)' "${BGG_TOKEN:-}")"
   BGG_COOKIE="$(prompt_or_env 'BGG cookie (leave blank to skip)' "${BGG_COOKIE:-}")"
 
+  command -v gcloud >/dev/null 2>&1 || die "'gcloud' is required for Cloud Run updates"
   printf '\n  Updating Cloud Run env vars...\n'
   if [ -n "$BGG_TOKEN" ] && [ -n "$BGG_COOKIE" ]; then
     set_cloudrun_env SUPABASE_SERVICE_ROLE_KEY "$SVC_KEY" BGG_TOKEN "$BGG_TOKEN" BGG_COOKIE "$BGG_COOKIE"
@@ -137,9 +141,8 @@ rotate_api() {
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-command -v gh >/dev/null 2>&1     || die "'gh' is required (brew install gh)"
-command -v gcloud >/dev/null 2>&1 || die "'gcloud' is required for Cloud Run updates"
-gh auth status >/dev/null 2>&1    || die "Not authenticated with gh. Run: gh auth login"
+command -v gh >/dev/null 2>&1  || die "'gh' is required (brew install gh)"
+gh auth status >/dev/null 2>&1 || die "Not authenticated with gh. Run: gh auth login"
 
 GROUP="${1:-}"
 

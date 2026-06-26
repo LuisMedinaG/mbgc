@@ -8,6 +8,7 @@ When given a task, agents MUST:
 ## Setup & Build
 
 > Full first-time setup guide: **[SETUP.md](./SETUP.md)**
+> iOS-specific build/test: **[ios/AGENTS.md](./ios/AGENTS.md)**
 
 ```sh
 # Root Makefile — primary entry points:
@@ -16,7 +17,7 @@ make dev           # start API + web in tmux
 make db-migrate    # apply pending migrations
 make db-reset      # wipe + replay local DB
 make build         # build API + web
-make test          # run Go tests (pkg/shared + services/api with -race)
+make test          # run Go tests (services/api with -race)
 make lint          # lint Go + web + infra
 
 # services/api Makefile:
@@ -28,7 +29,11 @@ make tidy          # go mod tidy
 make dev           # Vite dev server
 make build         # tsc -b && vite build
 make lint
-make test-e2e      # Playwright — requires full stack running
+make test-e2e      # Playwright — mocked, no backend needed; spins up its own isolated Vite server
+
+# iOS (from ios/ — see ios/AGENTS.md for full details):
+# Primary: xcode-gen MCP tasks `build_sim` / `test_sim`
+# Fallback: xcodebuild -scheme MBGC -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 ```
 
 ### Admin user
@@ -85,19 +90,13 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
 - **Body limits:** All request bodies capped at 1MB via `httpx.LimitBodySize` middleware.
 - **HTTP client:** Use `httpx.DefaultClient` (10s timeout) for outbound HTTP — never `http.DefaultClient`.
 
-## go.work Workspace
-
-`go.work` + `replace github.com/LuisMedinaG/mbgc/pkg/shared v0.0.0 => ./pkg/shared` means `services/api` resolves `pkg/shared` locally — no version bump needed during development.
-
-When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` before opening a PR.
-
 ## Code Style (non-obvious rules)
 
 **Go:**
 - `slog` for structured logging — never `log.Printf` or `fmt.Println`
 - Wrap errors with `fmt.Errorf("%w", err)`; check with `errors.Is` / `errors.As`
-- Use `pkg/shared/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
-- Use `pkg/shared/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
+- Use `services/api/internal/apierr` sentinels — never expose raw `err.Error()` to HTTP clients
+- Use `services/api/internal/httpx.WriteJSON` / `WriteError` — never `json.NewEncoder(w).Encode` directly
 - Extract user identity via `httpx.UserIDFromContext` — the JWT middleware sets this in context
 - Use `httpx.DefaultClient` for outbound HTTP — never `http.DefaultClient`
 - Apply `httpx.LimitBodySize(1<<20)` to all JSON endpoints — 1MB cap
@@ -109,6 +108,9 @@ When touching `pkg/shared`: run `make tidy` and `make test-v` in `services/api` 
 - All API calls through `web/src/lib/api.ts` — never raw `fetch()` in components or hooks
 - Server state via TanStack Query (`@tanstack/react-query` v5) — use `useQuery`/`useMutation`; never hand-roll `useState`+`useEffect` for API calls. Query keys in `web/src/lib/queryKeys.ts`, client config in `web/src/lib/queryClient.ts`
 - Hook conventions: `useGames(filters)`, `useGame(id)`, `useCollections()`, `useProfile()` — one hook per domain, exported from `web/src/hooks/`
+
+**Swift (iOS):**
+- See [ios/AGENTS.md](./ios/AGENTS.md) for full iOS conventions — @Observable, SwiftData, Keychain, URLSession async/await, xcodegen
 
 ## Git Workflow
 
@@ -129,13 +131,12 @@ refactor/*
 
 **Always:**
 - Include `user_id` in every query on user-owned data — multi-tenancy enforced at SQL layer
-- Use `pkg/shared/apierr` sentinels for all error paths
+- Use `services/api/internal/apierr` sentinels for all error paths
 - Validate JWT in `services/api/internal/jwt/` middleware — never skip or trust forwarded headers from untrusted callers
 - Run `make test-v` before opening a PR
 - Define store interfaces per package — `Handler` depends on the interface, not concrete `*Store` (enables `httptest` handler tests without DB)
 
 **Ask first:**
-- Any change to `pkg/shared` exported types (`services/api` depends on it)
 - Auth flow modifications (JWT expiry, Supabase config, refresh logic, JWKS)
 - Running `supabase db push` — this writes to the hosted production database
 - New external service integrations or third-party dependencies
@@ -148,6 +149,7 @@ refactor/*
 - Expose raw `err.Error()` from DB or internal code to HTTP responses
 - Commit secrets, `.env` files, or service account credentials
 - Use `--no-verify` on commits
+- Manually edit `.pbxproj` or `.xcodeproj/` in iOS app — hook prevents this by design. Use `xcodegen generate` in `ios/` directory instead
 
 <!-- lean-ctx-compression -->
 OUTPUT STYLE: dense

@@ -24,9 +24,9 @@ func NewStore(db *pgxpool.Pool) *Store {
 func (s *Store) GetProfile(ctx context.Context, userID string) (*Profile, error) {
 	var p Profile
 	err := s.db.QueryRow(ctx,
-		`SELECT id, COALESCE(username, ''), bgg_username, is_admin, created_at, updated_at
+		`SELECT id, COALESCE(username, ''), bgg_username, is_admin, tier, created_at, updated_at
 		 FROM profile.users WHERE id = $1`, userID).
-		Scan(&p.ID, &p.Username, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.UpdatedAt)
+		Scan(&p.ID, &p.Username, &p.BGGUsername, &p.IsAdmin, &p.Tier, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, apierr.ErrNotFound
@@ -42,9 +42,9 @@ func (s *Store) UpsertProfile(ctx context.Context, userID string) (*Profile, err
 		`INSERT INTO profile.users (id)
 		 VALUES ($1)
 		 ON CONFLICT (id) DO UPDATE SET updated_at = now()
-		 RETURNING id, COALESCE(username, ''), bgg_username, is_admin, created_at, updated_at`,
+		 RETURNING id, COALESCE(username, ''), bgg_username, is_admin, tier, created_at, updated_at`,
 		userID).
-		Scan(&p.ID, &p.Username, &p.BGGUsername, &p.IsAdmin, &p.CreatedAt, &p.UpdatedAt)
+		Scan(&p.ID, &p.Username, &p.BGGUsername, &p.IsAdmin, &p.Tier, &p.CreatedAt, &p.UpdatedAt)
 	return &p, err
 }
 
@@ -59,6 +59,19 @@ func (s *Store) SetBGGUsername(ctx context.Context, userID, bggUsername string) 
 		return apierr.ErrNotFound
 	}
 	return nil
+}
+
+// GetTier returns the user's tier ("basic" or "pro"), defaulting to "basic" if not found.
+func (s *Store) GetTier(ctx context.Context, userID string) (string, error) {
+	var tier string
+	err := s.db.QueryRow(ctx, `SELECT tier FROM profile.users WHERE id = $1`, userID).Scan(&tier)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "basic", nil
+		}
+		return "basic", err
+	}
+	return tier, nil
 }
 
 // GetBGGUsername returns the configured BGG handle for the user, or "" if unset.
