@@ -1,6 +1,6 @@
 import Foundation
 
-struct BGGGame {
+struct BGGGame: Sendable {
     let bggId: Int
     let name: String
     let description: String

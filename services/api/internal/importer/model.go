@@ -14,6 +14,13 @@ type PreviewResult struct {
 	New   int `json:"new"`
 }
 
+// SyncLimits bundles the per-tier BGG sync quotas passed through the handler → service → store.
+type SyncLimits struct {
+	Basic int // max syncs per week for basic users
+	Pro   int // max syncs per day for pro users (≈hourly)
+	Admin int // hard daily cap for admins (safety net, not a business limit)
+}
+
 type CSVPreviewRow struct {
 	BGGID int    `json:"bgg_id"`
 	Name  string `json:"name,omitempty"`

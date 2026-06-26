@@ -91,6 +91,9 @@ struct CsvImportView: View {
             Section {
                 Text("\(previewRows.count) game\(previewRows.count == 1 ? "" : "s") found")
                     .foregroundStyle(.secondary)
+                if let importError {
+                    Text(importError).foregroundStyle(.red).font(.caption)
+                }
             }
             Section {
                 ForEach(previewRows) { row in
@@ -206,7 +209,7 @@ struct CsvImportView: View {
 
         do {
             let allIds = previewRows.map(\.bggId)
-            let existing = existingBggIds(from: allIds)
+            let existing = LocalLibrary.existingBggIds(in: modelContext, from: allIds)
             let toFetch = allIds.filter { !existing.contains($0) }
             let skipped = allIds.count - toFetch.count
 
@@ -239,21 +242,17 @@ struct CsvImportView: View {
                     failedIds.append(id)
                 }
             }
+            let library = try LocalLibrary.ensureDefaultCollection(in: modelContext)
+            LocalLibrary.add(newGames, to: library)
             try modelContext.save()
 
             importedGames = newGames
             importResult = ImportResult(imported: imported, skipped: skipped, failed: failedIds)
             step = .done
         } catch {
-            importError = "Import failed: \(error.localizedDescription)"
+            importError = (error as? BGGError)?.userMessage ?? "Import failed. Try again."
             step = .preview
         }
-    }
-
-    private func existingBggIds(from ids: [Int]) -> Set<Int> {
-        let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
-        let idSet = Set(ids)
-        return Set(all.map(\.bggId).filter { idSet.contains($0) })
     }
 
     private func reset() {

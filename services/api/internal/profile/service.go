@@ -8,6 +8,7 @@ type profileStore interface {
 	UpsertProfile(ctx context.Context, userID string) (*Profile, error)
 	SetBGGUsername(ctx context.Context, userID, bggUsername string) error
 	GetBGGUsername(ctx context.Context, userID string) (string, error)
+	GetTier(ctx context.Context, userID string) (string, error)
 }
 
 type Service struct {
@@ -38,4 +39,9 @@ func (s *Service) SetBGGUsername(ctx context.Context, userID, bggUsername string
 // GetBGGUsername returns the configured BGG handle, or "" if unset.
 func (s *Service) GetBGGUsername(ctx context.Context, userID string) (string, error) {
 	return s.store.GetBGGUsername(ctx, userID)
+}
+
+// GetTier returns the user's tier ("basic" or "pro").
+func (s *Service) GetTier(ctx context.Context, userID string) (string, error) {
+	return s.store.GetTier(ctx, userID)
 }

@@ -71,11 +71,7 @@ struct ContentView: View {
     // MARK: — Library seed
 
     private func seedLibraryIfNeeded() {
-        // Fetch all + filter in memory — avoids Bool predicate issues in SwiftData
-        let all = (try? modelContext.fetch(FetchDescriptor<Collection>())) ?? []
-        guard !all.contains(where: { $0.isDefault }) else { return }
-        let library = Collection(name: "Library", isDefault: true)
-        modelContext.insert(library)
+        guard (try? LocalLibrary.ensureDefaultCollection(in: modelContext)) != nil else { return }
         try? modelContext.save()
     }
 }

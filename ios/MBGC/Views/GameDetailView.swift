@@ -158,13 +158,14 @@ struct GameDetailView: View {
 
             if viewModel.editingCollections {
                 ForEach(allCollections) { col in
+                    let isSelected = col.isDefault || viewModel.selectedCollectionIds.contains(col.persistentModelID)
                     Button { viewModel.toggleCollection(col) } label: {
                         HStack {
-                            Image(systemName: viewModel.selectedCollectionIds.contains(col.persistentModelID)
-                                ? "checkmark.square.fill" : "square")
+                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                             Text(col.name)
                         }
                     }
+                    .disabled(col.isDefault)
                     .foregroundStyle(.primary)
                 }
                 if allCollections.isEmpty {
@@ -189,6 +190,9 @@ struct GameDetailView: View {
                         }
                     }
                 }
+            }
+            if let error = viewModel.errorMessage {
+                Text(error).font(.caption).foregroundStyle(.red)
             }
         }
         .padding()

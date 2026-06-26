@@ -10,7 +10,6 @@ struct VibesView: View {
     @State private var editingCollection: Collection?
     @State private var editName = ""
     @State private var editDesc = ""
-    @State private var showCreate = false
 
     var body: some View {
         NavigationStack {
@@ -58,9 +57,6 @@ struct VibesView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showCreate) {
-                CreateCollectionSheet()
-            }
             .sheet(item: $editingCollection) { col in
                 RenameCollectionSheet(collection: col, initialName: editName, initialDesc: editDesc)
             }
@@ -73,10 +69,6 @@ struct VibesView: View {
                 Text(viewModel.errorMessage ?? "")
             }
         }
-    }
-
-    func showCreateSheet() {
-        showCreate = true
     }
 
     private func collectionRow(_ col: Collection) -> some View {
@@ -115,6 +107,7 @@ struct CreateCollectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var desc = ""
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -132,16 +125,32 @@ struct CreateCollectionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        let col = Collection(name: name, desc: desc)
+                        let col = Collection(name: trimmedName, desc: desc)
                         modelContext.insert(col)
-                        try? modelContext.save()
-                        dismiss()
+                        do {
+                            try modelContext.save()
+                            dismiss()
+                        } catch {
+                            errorMessage = "Couldn't save collection."
+                        }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(trimmedName.isEmpty)
                 }
+            }
+            .alert("Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -153,6 +162,7 @@ struct RenameCollectionSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var desc: String
+    @State private var errorMessage: String?
 
     init(collection: Collection, initialName: String, initialDesc: String) {
         self.collection = collection
@@ -176,16 +186,33 @@ struct RenameCollectionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        collection.name = name
+                        guard !collection.isDefault else { return }
+                        collection.name = trimmedName
                         collection.desc = desc
-                        try? modelContext.save()
-                        dismiss()
+                        do {
+                            try modelContext.save()
+                            dismiss()
+                        } catch {
+                            errorMessage = "Couldn't save collection."
+                        }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(trimmedName.isEmpty)
                 }
+            }
+            .alert("Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { if !$0 { errorMessage = nil } }
+            )) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

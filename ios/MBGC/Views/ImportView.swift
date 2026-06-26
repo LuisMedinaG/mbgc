@@ -145,7 +145,7 @@ struct ImportView: View {
             appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
 
             appendSyncLog("Checking local library")
-            let existing = existingBggIds(from: bggIds)
+            let existing = LocalLibrary.existingBggIds(in: modelContext, from: bggIds)
             let newIds = bggIds.filter { !existing.contains($0) }
             let toFetch = Array(newIds.prefix(bggRegularImportLimit))
             let overLimit = max(0, newIds.count - toFetch.count)
@@ -153,7 +153,6 @@ struct ImportView: View {
             if overLimit > 0 { appendSyncLog("Limiting this sync to \(bggRegularImportLimit) new games") }
 
             guard !toFetch.isEmpty else {
-                UserDefaults.standard.set(Date(), forKey: bggLastSyncKey)
                 syncSummary = BGGImportSummary(imported: 0, skipped: existing.count, failed: [])
                 syncError = bggIds.isEmpty ? "No owned games found for this BGG username." : nil
                 appendSyncLog("Nothing new to import")
@@ -182,6 +181,8 @@ struct ImportView: View {
                 }
             }
 
+            let library = try LocalLibrary.ensureDefaultCollection(in: modelContext)
+            LocalLibrary.add(newGames, to: library)
             appendSyncLog("Saving \(newGames.count) game\(newGames.count == 1 ? "" : "s") locally")
             try modelContext.save()
             UserDefaults.standard.set(Date(), forKey: bggLastSyncKey)
@@ -201,16 +202,10 @@ struct ImportView: View {
     }
 
     private func importMessage(for error: Error) -> String {
-        guard case BGGError.http(status: 401) = error else {
-            return "Import failed: \(error.localizedDescription)"
+        if let error = error as? BGGError {
+            return error.userMessage
         }
-        return "BGG rejected the API token. Check the token and try again."
-    }
-
-    private func existingBggIds(from ids: [Int]) -> Set<Int> {
-        let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
-        let idSet = Set(ids)
-        return Set(all.map(\.bggId).filter { idSet.contains($0) })
+        return "Import failed. Try again."
     }
 
     private func cooldownMessage(now: Date = Date()) -> String? {
@@ -259,16 +254,23 @@ struct CollectionPickerView: View {
                 Button("Cancel") { onDone() }
             }
         }
+        .alert("Couldn't save", isPresented: Binding(
+            get: { destinationError != nil },
+            set: { if !$0 { destinationError = nil } }
+        )) {
+            Button("OK") { destinationError = nil }
+        } message: {
+            Text(destinationError ?? "")
+        }
     }
 
     private func addToCollection(_ col: Collection) {
-        let existing = Set(col.games.map(\.bggId))
-        col.games.append(contentsOf: games.filter { !existing.contains($0.bggId) })
+        LocalLibrary.add(games, to: col)
         do {
             try modelContext.save()
             onDone()
         } catch {
-            destinationError = "Couldn't save: \(error.localizedDescription)"
+            destinationError = "Couldn't save collection."
         }
     }
 }

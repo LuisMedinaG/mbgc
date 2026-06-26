@@ -17,8 +17,8 @@ import (
 )
 
 type importerStore interface {
-	CheckRateLimit(ctx context.Context, userID string, isAdmin bool, limitUser, limitAdmin int) error
-	RecordSync(ctx context.Context, userID string) error
+	CheckRateLimit(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error
+	RecordSync(ctx context.Context, userID string, tier string) error
 	LogSync(ctx context.Context, userID string, imported int, fullRefresh bool) error
 }
 
@@ -35,6 +35,7 @@ type gameService interface {
 
 type profileService interface {
 	GetBGGUsername(ctx context.Context, userID string) (string, error)
+	GetTier(ctx context.Context, userID string) (string, error)
 }
 
 type Service struct {
@@ -57,7 +58,7 @@ const (
 
 // ref: importer.BGG_SYNC.2 — sync is disabled when BGG credentials are not configured
 // ref: monitoring.SINK.5 — emits sync_start, sync_ok, or sync_error across the lifetime of a sync
-func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefresh bool, limitUser, limitAdmin int) (*SyncResult, error) {
+func (s *Service) Sync(r *http.Request, userID string, isAdmin bool, fullRefresh bool, limits SyncLimits) (*SyncResult, error) {
 	ctx := r.Context()
 	kind := syncKindIncremental
 	if fullRefresh {
@@ -69,7 +70,13 @@ func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefr
 		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
 		return nil, fmt.Errorf("%w: BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)", apierr.ErrInternal)
 	}
-	if err := s.store.CheckRateLimit(ctx, userID, isAdmin, limitUser, limitAdmin); err != nil {
+
+	tier, err := s.profSvc.GetTier(ctx, userID)
+	if err != nil {
+		tier = "basic" // fail open on tier lookup — enforce conservative limit
+	}
+
+	if err := s.store.CheckRateLimit(ctx, userID, isAdmin, tier, limits); err != nil {
 		// ref: monitoring.SINK.5 — sync_error at warn level for rate-limit (per-handoff, not a server fault)
 		level := slog.LevelWarn
 		if !errors.Is(err, apierr.ErrRateLimit) {
@@ -95,7 +102,7 @@ func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefr
 	if bggUsername == "" {
 		// ref: monitoring.SINK.5 — sync_ok with 0 imported when user has no BGG username configured
 		httpx.Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", 0)
-		if err := s.store.RecordSync(ctx, userID); err != nil {
+		if err := s.store.RecordSync(ctx, userID, tier); err != nil {
 			return nil, err
 		}
 		if err := s.store.LogSync(ctx, userID, 0, fullRefresh); err != nil {
@@ -150,7 +157,7 @@ func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefr
 		}
 	}
 
-	if err := s.store.RecordSync(ctx, userID); err != nil {
+	if err := s.store.RecordSync(ctx, userID, tier); err != nil {
 		// ref: monitoring.SINK.5 — sync_error at error level for store-layer failure
 		httpx.Record(r, "sync_error", slog.LevelError, "sync_kind", kind)
 		return nil, err

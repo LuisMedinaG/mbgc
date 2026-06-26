@@ -19,16 +19,16 @@ import (
 )
 
 type mockImporterStore struct {
-	checkRateLimitFn func(ctx context.Context, userID string, isAdmin bool, limitUser, limitAdmin int) error
-	recordSyncFn     func(ctx context.Context, userID string) error
+	checkRateLimitFn func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error
+	recordSyncFn     func(ctx context.Context, userID string, tier string) error
 	logSyncFn        func(ctx context.Context, userID string, imported int, fullRefresh bool) error
 }
 
-func (m *mockImporterStore) CheckRateLimit(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
-	return m.checkRateLimitFn(ctx, userID, isAdmin, lu, la)
+func (m *mockImporterStore) CheckRateLimit(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
+	return m.checkRateLimitFn(ctx, userID, isAdmin, tier, limits)
 }
-func (m *mockImporterStore) RecordSync(ctx context.Context, userID string) error {
-	return m.recordSyncFn(ctx, userID)
+func (m *mockImporterStore) RecordSync(ctx context.Context, userID string, tier string) error {
+	return m.recordSyncFn(ctx, userID, tier)
 }
 func (m *mockImporterStore) LogSync(ctx context.Context, userID string, imported int, fullRefresh bool) error {
 	return m.logSyncFn(ctx, userID, imported, fullRefresh)
@@ -74,6 +74,7 @@ func (m *mockGameService) UpsertBGGGame(ctx context.Context, userID string, g ca
 
 type mockProfileService struct {
 	getBGGUsernameFn func(ctx context.Context, userID string) (string, error)
+	getTierFn        func(ctx context.Context, userID string) (string, error)
 }
 
 func (m *mockProfileService) GetBGGUsername(ctx context.Context, userID string) (string, error) {
@@ -83,16 +84,23 @@ func (m *mockProfileService) GetBGGUsername(ctx context.Context, userID string) 
 	return "mytestuser", nil
 }
 
+func (m *mockProfileService) GetTier(ctx context.Context, userID string) (string, error) {
+	if m.getTierFn != nil {
+		return m.getTierFn(ctx, userID)
+	}
+	return "basic", nil
+}
+
 func okStore() *mockImporterStore {
 	return &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn:        func(ctx context.Context, userID string, imported int, fullRefresh bool) error { return nil },
 	}
 }
 
 func mkHandler(store importerStore, bgg bggClient, gs gameService) *Handler {
-	return NewHandler(NewService(store, bgg, gs, &mockProfileService{}), 3, 20)
+	return NewHandler(NewService(store, bgg, gs, &mockProfileService{}), SyncLimits{Basic: 1, Pro: 24, Admin: 100})
 }
 
 func TestSync_Unauthenticated(t *testing.T) {
@@ -115,10 +123,10 @@ func TestSync_BGGNotConfigured(t *testing.T) {
 
 func TestSync_RateLimited(t *testing.T) {
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
 			return apierr.ErrRateLimit
 		},
-		recordSyncFn: func(ctx context.Context, userID string) error { return nil },
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn:    func(ctx context.Context, userID string, imported int, fullRefresh bool) error { return nil },
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
@@ -145,8 +153,8 @@ func TestSync_Success(t *testing.T) {
 func TestSync_FullRefreshNonAdmin(t *testing.T) {
 	var got bool
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn: func(ctx context.Context, userID string, imported int, fr bool) error {
 			got = fr
 			return nil
@@ -166,8 +174,8 @@ func TestSync_FullRefreshNonAdmin(t *testing.T) {
 func TestSync_FullRefreshAdmin(t *testing.T) {
 	var got bool
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn: func(ctx context.Context, userID string, imported int, fr bool) error {
 			got = fr
 			return nil
@@ -520,10 +528,10 @@ func TestSync_EmitsSyncErrorOnBGGUnconfigured(t *testing.T) {
 func TestSync_EmitsSyncErrorOnRateLimited(t *testing.T) {
 	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
 			return apierr.ErrRateLimit
 		},
-		recordSyncFn: func(ctx context.Context, userID string) error { return nil },
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn:    func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
@@ -551,10 +559,10 @@ func TestSync_EmitsSyncErrorOnRateLimited(t *testing.T) {
 func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
 	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error {
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
 			return apierr.ErrInternal
 		},
-		recordSyncFn: func(ctx context.Context, userID string) error { return nil },
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn:    func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
@@ -579,8 +587,8 @@ func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
 func TestSync_EmitsSyncErrorOnStoreFailure(t *testing.T) {
 	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, lu, la int) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string) error { return apierr.ErrInternal },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
+		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return apierr.ErrInternal },
 		logSyncFn:        func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})

@@ -39,31 +39,33 @@ func TestStore_CanSync_FailsClosedOnDBError(t *testing.T) {
 	}
 }
 
-// ref: importer.RATE.3 — within-day under-limit allows; at-or-over-limit denies.
-func TestStore_CanSync_DailyQuotaEnforced(t *testing.T) {
-	today := truncateToDay(time.Now())
+// ref: importer.RATE.3 — within-window under-limit allows; at-or-over-limit denies.
+func TestStore_CanSync_QuotaEnforced(t *testing.T) {
+	// reset_at is a future timestamp — window is still open.
+	future := truncateToDay(time.Now().UTC()).Add(24 * time.Hour)
 	s := &Store{
 		canSyncRow: func(ctx context.Context, userID string) (int, time.Time, error) {
-			return 3, today, nil
+			return 3, future, nil
 		},
 	}
 	if ok, _ := s.CanSync(context.Background(), "user-1", 3); ok {
-		t.Fatal("count==limit must deny (count < limit is false)")
+		t.Fatal("count==limit must deny")
 	}
 	if ok, _ := s.CanSync(context.Background(), "user-1", 4); !ok {
 		t.Fatal("count<limit must allow")
 	}
 }
 
-// ref: importer.BGG_SYNC.5 — stale reset_date from a prior day must reset the quota.
-func TestStore_CanSync_ResetsAfterMidnight(t *testing.T) {
-	yesterday := truncateToDay(time.Now().AddDate(0, 0, -1))
+// ref: importer.BGG_SYNC.5 — expired window (reset_at in the past) resets the quota.
+func TestStore_CanSync_ResetsAfterWindowExpires(t *testing.T) {
+	// reset_at in the past → window has expired → fresh start allowed.
+	past := time.Now().UTC().Add(-24 * time.Hour)
 	s := &Store{
 		canSyncRow: func(ctx context.Context, userID string) (int, time.Time, error) {
-			return 99, yesterday, nil
+			return 99, past, nil
 		},
 	}
 	if ok, err := s.CanSync(context.Background(), "user-1", 3); !ok || err != nil {
-		t.Fatalf("stale reset_date should allow, got (%v, %v)", ok, err)
+		t.Fatalf("expired window should allow, got (%v, %v)", ok, err)
 	}
 }

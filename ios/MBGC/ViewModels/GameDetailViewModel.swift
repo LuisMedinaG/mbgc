@@ -24,6 +24,7 @@ final class GameDetailViewModel {
     }
 
     func toggleCollection(_ col: Collection) {
+        guard !col.isDefault else { return }
         if selectedCollectionIds.contains(col.persistentModelID) {
             selectedCollectionIds.remove(col.persistentModelID)
         } else {
@@ -34,15 +35,25 @@ final class GameDetailViewModel {
     func saveCollections(allCollections: [Collection], modelContext: ModelContext) {
         guard let game else { return }
         isSaving = true
-        game.collections = allCollections.filter { selectedCollectionIds.contains($0.persistentModelID) }
-        try? modelContext.save()
-        editingCollections = false
-        isSaving = false
+        defer { isSaving = false }
+        game.collections = allCollections.filter { $0.isDefault || selectedCollectionIds.contains($0.persistentModelID) }
+        do {
+            try modelContext.save()
+            editingCollections = false
+            errorMessage = nil
+        } catch {
+            errorMessage = "Couldn't save collections."
+        }
     }
 
     func updateRulesUrl(_ url: String, modelContext: ModelContext) {
         game?.rulesUrl = url
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+            errorMessage = nil
+        } catch {
+            errorMessage = "Couldn't save rules URL."
+        }
     }
 
     func deleteGame(modelContext: ModelContext) -> Bool {

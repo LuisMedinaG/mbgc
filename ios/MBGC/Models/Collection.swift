@@ -20,3 +20,28 @@ final class Collection {
         self.createdAt = isDefault ? Date.distantPast : Date()
     }
 }
+
+@MainActor
+enum LocalLibrary {
+    static func ensureDefaultCollection(in modelContext: ModelContext) throws -> Collection {
+        let all = try modelContext.fetch(FetchDescriptor<Collection>())
+        if let library = all.first(where: { $0.isDefault }) {
+            return library
+        }
+
+        let library = Collection(name: "Library", isDefault: true)
+        modelContext.insert(library)
+        return library
+    }
+
+    static func existingBggIds(in modelContext: ModelContext, from ids: [Int]) -> Set<Int> {
+        let idSet = Set(ids)
+        let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
+        return Set(all.map(\.bggId).filter { idSet.contains($0) })
+    }
+
+    static func add(_ games: [Game], to collection: Collection) {
+        let existing = Set(collection.games.map(\.bggId))
+        collection.games.append(contentsOf: games.filter { !existing.contains($0.bggId) })
+    }
+}

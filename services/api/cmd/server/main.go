@@ -156,7 +156,11 @@ func main() {
 	bggClient := importer.NewClient(cfg.BGGToken, cfg.BGGCookie)
 	importStore := importer.NewStore(pool)
 	importSvc := importer.NewService(importStore, bggClient, catalogStore, profileSvc)
-	importHandler := importer.NewHandler(importSvc, cfg.SyncLimitUser, cfg.SyncLimitAdmin)
+	importHandler := importer.NewHandler(importSvc, importer.SyncLimits{
+		Basic: cfg.SyncLimitBasic,
+		Pro:   cfg.SyncLimitPro,
+		Admin: cfg.SyncLimitAdmin,
+	})
 
 	// ref: api-layer.SEC.5 — 5 req/s burst 10 on login/refresh/logout prevents brute-force
 	rateLimit := httpx.RateLimiter(5, 10)

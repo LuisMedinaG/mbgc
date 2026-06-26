@@ -16,6 +16,27 @@ enum BGGError: Error, LocalizedError {
         case .transport(let err): "Network error: \(err.localizedDescription)"
         }
     }
+
+    var userMessage: String {
+        switch self {
+        case .badURL:
+            "Couldn't build the BGG request."
+        case .emptyResponse:
+            "BGG returned no game details. Try again later."
+        case .xmlParse:
+            "BGG returned an unreadable response. Try again later."
+        case .http(status: 401):
+            "BGG rejected the API token. Check the token and try again."
+        case .http(status: 202):
+            "BGG is still preparing the collection. Try again in a few minutes."
+        case .http(status: 429):
+            "BGG is rate limiting requests. Try again later."
+        case .http:
+            "BGG is unavailable right now. Try again later."
+        case .transport:
+            "Couldn't reach BGG. Check your connection and try again."
+        }
+    }
 }
 
 actor BGGClient {
