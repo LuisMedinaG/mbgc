@@ -278,19 +278,11 @@ struct CollectionDetailView: View {
             .frame(width: 60, height: 60)
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            VStack(alignment: .leading, spacing: 2) {
-                if let year = game.yearPublished, year > 0 {
-                    Text(game.name) + Text(" (\(year))").foregroundColor(.secondary)
-                } else {
-                    Text(game.name)
-                }
-                if let rating = game.rating, rating > 0 {
-                    Text(String(format: "★ %.1f", rating))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+            if let year = game.yearPublished, year > 0 {
+                Text(game.name) + Text(" (\(year))").foregroundColor(.secondary)
+            } else {
+                Text(game.name)
             }
-            .multilineTextAlignment(.leading)
         }
     }
 }

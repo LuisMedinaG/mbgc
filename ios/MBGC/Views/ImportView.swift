@@ -3,6 +3,7 @@ import SwiftUI
 
 private let bggUsernameKey = "profile.bggUsername"
 private let bggLastSyncKey = "import.bgg.lastSyncDate"
+private let bggCachedIdsKey = "import.bgg.cachedIds"
 private var bggToken: String? {
     let t = Bundle.main.object(forInfoDictionaryKey: "BGGToken") as? String ?? ""
     return t.isEmpty ? nil : t  // nil → BGGClient skips Authorization header; public collections still work
@@ -144,9 +145,19 @@ struct ImportView: View {
             appendSyncLog("Saving BGG username")
             UserDefaults.standard.set(username, forKey: bggUsernameKey)
 
-            appendSyncLog("Fetching owned BGG IDs")
-            let bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
-            appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
+            // Fast path: skip the BGG API call if we have a cached collection list.
+            // Games already stored locally skip fetchThings too — result is near-instant.
+            let cachedIds = UserDefaults.standard.array(forKey: bggCachedIdsKey) as? [Int] ?? []
+            let bggIds: [Int]
+            if !cachedIds.isEmpty {
+                bggIds = cachedIds
+                appendSyncLog("Using cached collection (\(cachedIds.count) games)")
+            } else {
+                appendSyncLog("Fetching owned BGG IDs")
+                bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
+                UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
+                appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
+            }
 
             appendSyncLog("Checking local library")
             let existing = LocalLibrary.existingBggIds(in: modelContext, from: bggIds)
@@ -192,7 +203,10 @@ struct ImportView: View {
             LocalLibrary.add(newGames, to: library)
             appendSyncLog("Saving \(newGames.count) new game\(newGames.count == 1 ? "" : "s") locally")
             try modelContext.save()
-            if !newGames.isEmpty { UserDefaults.standard.set(Date(), forKey: bggLastSyncKey) }
+            if !newGames.isEmpty {
+                UserDefaults.standard.set(Date(), forKey: bggLastSyncKey)
+                UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
+            }
 
             // Offer the WHOLE collection (new + already-local) to the destination picker.
             // LocalLibrary.add dedups, so adding already-present games is a no-op.
@@ -234,52 +248,64 @@ struct CollectionPickerView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
-    @State private var selectedId: PersistentIdentifier?
+    @State private var selectedIndex: Int = 0
     @State private var destinationError: String?
     @State private var showNewCollection = false
     @State private var newName = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 12) {
-                    Text("Add \(games.count) game\(games.count == 1 ? "" : "s") to:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 32) {
+            Spacer()
 
-                    ForEach(collections) { col in
-                        collectionCard(col)
-                    }
-
-                    Button { newName = ""; showNewCollection = true } label: {
-                        Label("New Collection", systemImage: "plus.circle.fill")
-                            .font(.headline)
-                            .foregroundStyle(.orange)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.orange.opacity(0.12))
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                }
-                .padding(20)
+            VStack(spacing: 6) {
+                Text("\(games.count) game\(games.count == 1 ? "" : "s") found")
+                    .font(.title2.bold())
+                Text("Import them to your list:")
+                    .foregroundStyle(.secondary)
             }
 
-            // Confirm bar
+            // Source → destination row
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Own").font(.headline)
+                    Text("\(games.count)").font(.subheadline).foregroundStyle(.secondary)
+                }
+                .frame(minWidth: 64)
+                .padding(14)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange, lineWidth: 2))
+
+                Image(systemName: "arrow.right")
+                    .foregroundStyle(.secondary)
+
+                Picker("", selection: $selectedIndex) {
+                    ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
+                        Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+                            .tag(idx)
+                    }
+                }
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity)
+                .padding(14)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange, lineWidth: 2))
+            }
+            .padding(.horizontal, 20)
+
+            Spacer()
+
             Button { confirm() } label: {
-                Text("Add to Collection")
+                Text("Import")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(selectedId == nil ? Color.gray : Color.orange)
-                    )
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.orange))
             }
-            .disabled(selectedId == nil)
             .padding(.horizontal, 20)
-            .padding(.bottom, 16)
+            .padding(.bottom, 8)
         }
         .navigationTitle("Add to collection")
         .navigationBarTitleDisplayMode(.inline)
@@ -287,17 +313,17 @@ struct CollectionPickerView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") { onDone(false) }
             }
-        }
-        .onAppear {
-            if selectedId == nil {
-                selectedId = collections.first(where: { $0.isDefault })?.persistentModelID
-                    ?? collections.first?.persistentModelID
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { newName = ""; showNewCollection = true } label: {
+                    Image(systemName: "plus.circle")
+                }
             }
         }
+        .onAppear { setDefaultSelection() }
+        .onChange(of: collections.count) { setDefaultSelection() }
         .alert("New Collection", isPresented: $showNewCollection) {
             TextField("Name", text: $newName)
-            Button("Create") { createCollection() }
-                .disabled(trimmedNewName.isEmpty)
+            Button("Create") { createAndSelect() }
             Button("Cancel", role: .cancel) {}
         }
         .alert("Couldn't save", isPresented: Binding(
@@ -310,56 +336,27 @@ struct CollectionPickerView: View {
         }
     }
 
-    private func collectionCard(_ col: Collection) -> some View {
-        let isSelected = selectedId == col.persistentModelID
-        return Button { selectedId = col.persistentModelID } label: {
-            HStack(spacing: 12) {
-                Image(systemName: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 40, height: 40)
-                    .background(col.isDefault ? Color.blue : Color.orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                Text(col.name)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
-                Spacer()
-                Text("\(col.games.count)")
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(isSelected ? Color.orange : Color(.systemGray3))
-            }
-            .padding(14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Color.orange : Color.clear, lineWidth: 2)
-            )
-        }
+    private func setDefaultSelection() {
+        selectedIndex = collections.firstIndex(where: { $0.isDefault }) ?? 0
     }
 
-    private var trimmedNewName: String {
-        newName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func createCollection() {
-        let col = Collection(name: trimmedNewName)
+    private func createAndSelect() {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let col = Collection(name: trimmed)
         modelContext.insert(col)
         do {
             try modelContext.save()
-            selectedId = col.persistentModelID
+            // Newly created collection will appear at end of @Query results
+            selectedIndex = max(0, collections.count - 1)
         } catch {
             destinationError = "Couldn't create collection."
         }
     }
 
     private func confirm() {
-        guard let selectedId,
-              let col = collections.first(where: { $0.persistentModelID == selectedId })
-        else { return }
+        guard selectedIndex < collections.count else { return }
+        let col = collections[selectedIndex]
         LocalLibrary.add(games, to: col)
         do {
             try modelContext.save()
