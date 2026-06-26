@@ -3,8 +3,9 @@ import SwiftUI
 
 private let bggUsernameKey = "profile.bggUsername"
 private let bggLastSyncKey = "import.bgg.lastSyncDate"
-private var bggToken: String {
-    Bundle.main.object(forInfoDictionaryKey: "BGGToken") as? String ?? ""
+private var bggToken: String? {
+    let t = Bundle.main.object(forInfoDictionaryKey: "BGGToken") as? String ?? ""
+    return t.isEmpty ? nil : t  // nil → BGGClient skips Authorization header; public collections still work
 }
 private let bggRegularImportLimit = 100
 private let bggImportCooldown: TimeInterval = 7 * 24 * 60 * 60
@@ -120,13 +121,8 @@ struct ImportView: View {
 
     private func importFromBGG() async {
         let username = bggUsername.trimmingCharacters(in: .whitespacesAndNewlines)
-        let token = bggToken
+        let token = bggToken  // nil when not configured — BGGClient will omit the auth header
         guard !username.isEmpty else { return }
-        guard !token.isEmpty else {
-            syncError = "This build has no BGG token configured."
-            syncLog = [syncError!]
-            return
-        }
         if let message = cooldownMessage() {
             syncError = message; syncLog = [message]; return
         }

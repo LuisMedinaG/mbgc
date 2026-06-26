@@ -242,29 +242,7 @@ Manages `GameDetailView` state: loading, collection membership editing, rules UR
 
 ---
 
-### 4.2 `ProfileViewModel` — `@MainActor @Observable final class`
-`ViewModels/ProfileViewModel.swift`
-
-BGG username persistence via `UserDefaults`. No network.
-
-**Storage key:** `"profile.bggUsername"`
-
-| Property | Type | Role |
-|---|---|---|
-| `bggUsername` | `String` | Current saved value |
-| `bggInput` | `String` | Live text field binding |
-| `isSaving` | `Bool` | |
-| `errorMessage` | `String?` | |
-| `successMessage` | `String?` | Shows "Saved" on success |
-
-| Method | What it does |
-|---|---|
-| `load() async` | Reads UserDefaults; populates both `bggUsername` and `bggInput` |
-| `saveBGG()` | Trims input; writes UserDefaults; sets `successMessage = "Saved"` |
-
----
-
-### 4.3 `VibesViewModel` — `@MainActor @Observable final class`
+### 4.2 `VibesViewModel` — `@MainActor @Observable final class`
 `ViewModels/VibesViewModel.swift`
 
 Thin CRUD wrapper for `Collection` objects. Reactive lists live in `VibesView` via `@Query` — this VM only holds mutation error state.
@@ -412,13 +390,6 @@ Two navigation links: "Import from BGG" → `ImportView`, "Import from CSV" → 
 
 ---
 
-### 5.9 `ProfileView`
-`Views/ProfileView.swift`
-
-`Form` with `TextField` bound to `viewModel.bggInput`. Save disabled when blank or unchanged. Loads via `.task { await viewModel.load() }`.
-
----
-
 ## 6. Key Data Flows
 
 ### 6.1 BGG Sync (ImportView)
@@ -496,9 +467,9 @@ ContentView.task → seedLibraryIfNeeded()
 ## 7. Cross-Cutting Concerns
 
 ### BGG API Token
-- **Current:** read from `Bundle.main.object(forInfoDictionaryKey: "BGGToken")` in `ImportView`.
-- **Intended:** `Keychain.swift` (listed in `AGENTS.md`); **the file does not exist**.
-- **CSV path:** `CsvImportView.importCSV()` calls `fetchThings(ids:)` with no token.
+- **Current:** read as `String?` from `Bundle.main` (`Info.plist` key `BGGToken = $(BGG_TOKEN)`). `nil` when build variable unset — BGGClient omits the `Authorization` header and the public BGG API still works.
+- **CSV path:** `CsvImportView.importCSV()` calls `fetchThings(ids:)` with no token (same behaviour).
+- **Private collections:** if a user has a private BGG collection, a token is required. No UI currently exists to enter one.
 
 ### Image Caching
 `MBGCApp.init()` overrides `URLCache.shared`:
@@ -534,9 +505,8 @@ ContentView.task → seedLibraryIfNeeded()
 
 | Issue | File | Priority |
 |---|---|---|
-| BGG token stored in `Info.plist` / `Bundle.main`, not Keychain | `ImportView.swift` | High — token exposed in binary |
-| `Keychain.swift` referenced in `AGENTS.md` but doesn't exist | — | High |
-| CSV import path sends no auth token to BGGClient | `CsvImportView.swift:importCSV()` | Medium |
+| No UI to enter a BGG token for private collections | `ImportView.swift` | Low — public collections work without one |
+| CSV import path sends no auth token to BGGClient | `CsvImportView.swift:importCSV()` | Low — same as above |
 | `Game.vibeNames`, `Game.vibeCollectionIds` are dead fields | `Models/Game.swift` | Low — delete when safe |
 | `GameDTO`, `GameDetailDTO` have no active network callers | `Models/Game.swift` | Low — delete when safe |
 | `LibraryView` is a placeholder stub | `Views/LibraryView.swift` | Roadmap |
