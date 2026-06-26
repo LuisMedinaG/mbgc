@@ -9,7 +9,6 @@ private func sanitizeName(_ name: String) -> String {
     return String(sanitized)
 }
 
-private let bggUsernameKey = "profile.bggUsername"
 private let bggLastSyncKey = "import.bgg.lastSyncDate"
 private let bggCachedIdsKey = "import.bgg.cachedIds"
 private var bggToken: String? {
@@ -115,9 +114,6 @@ struct ImportView: View {
         }
         .navigationTitle("Import from BGG")
         .navigationBarTitleDisplayMode(.large)
-        .onAppear {
-            bggUsername = UserDefaults.standard.string(forKey: bggUsernameKey) ?? ""
-        }
         .sheet(isPresented: $showDestinationPicker) {
             NavigationStack {
                 CollectionPickerView(games: selectedGames) { confirmed in
@@ -150,9 +146,6 @@ struct ImportView: View {
         defer { isSyncing = false; syncProgress = nil }
 
         do {
-            appendSyncLog("Saving BGG username")
-            UserDefaults.standard.set(username, forKey: bggUsernameKey)
-
             appendSyncLog("Fetching owned BGG IDs")
             let bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
             UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
