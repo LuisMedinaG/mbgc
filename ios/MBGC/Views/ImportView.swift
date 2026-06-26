@@ -260,52 +260,36 @@ struct CollectionPickerView: View {
             VStack(spacing: 6) {
                 Text("\(games.count) game\(games.count == 1 ? "" : "s") found")
                     .font(.title2.bold())
-                Text("Import them to your list:")
+                Text("Owned games only · No expansions")
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            // Source → destination row
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Own").font(.headline)
-                    Text("\(games.count)").font(.subheadline).foregroundStyle(.secondary)
+            Picker("", selection: $selectedIndex) {
+                ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
+                    Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+                        .tag(idx)
                 }
-                .frame(minWidth: 64)
-                .padding(14)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange, lineWidth: 2))
-
-                Image(systemName: "arrow.right")
-                    .foregroundStyle(.secondary)
-
-                Picker("", selection: $selectedIndex) {
-                    ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
-                        Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
-                            .tag(idx)
-                    }
-                }
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity)
-                .padding(14)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange, lineWidth: 2))
             }
+            .pickerStyle(.menu)
+            .padding(.horizontal, 20).padding(.vertical, 14)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange, lineWidth: 2))
             .padding(.horizontal, 20)
 
             Spacer()
 
             Button { confirm() } label: {
-                Text("Import")
-                    .font(.headline)
+                Text("Import \(games.count) game\(games.count == 1 ? "" : "s")")
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.orange))
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 18)
+                    .background(Capsule().fill(Color.orange))
+                    .shadow(color: Color.orange.opacity(0.4), radius: 12, y: 4)
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 8)
+            .padding(.bottom, 12)
         }
         .navigationTitle("Add to collection")
         .navigationBarTitleDisplayMode(.inline)
