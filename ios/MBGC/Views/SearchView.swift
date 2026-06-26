@@ -79,7 +79,7 @@ struct SearchView: View {
             }
 
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.callout)
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.body)
                 TextField("Board games, expansions…", text: $query)
                 if !query.isEmpty {
                     Button { query = "" } label: {
@@ -88,9 +88,10 @@ struct SearchView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 14)
             .background(Color(.secondarySystemBackground))
             .clipShape(Capsule())
+            .frame(height: 44)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)

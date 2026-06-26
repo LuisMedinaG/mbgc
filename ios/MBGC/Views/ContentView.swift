@@ -5,66 +5,85 @@ enum HomeTab { case discover, collection }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("appearanceMode") private var appearanceMode = "system"
     @State private var vibesViewModel = VibesViewModel()
     @State private var tab: HomeTab = .discover
+    @State private var collectionPath: [Collection] = []
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
 
+    private var preferredScheme: ColorScheme? {
+        switch appearanceMode {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
+
+    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
+    private var isInDetailView: Bool { !collectionPath.isEmpty && tab == .collection }
+
     var body: some View {
         Group {
             switch tab {
-            case .collection: VibesView(viewModel: vibesViewModel)
+            case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
             case .discover:   LibraryView()
             }
         }
         .safeAreaInset(edge: .bottom) {
-            HStack(alignment: .bottom) {
-                HomePillView(tab: $tab)
-                Spacer()
-                VStack(spacing: 10) {
-                    if tab == .collection {
-                        Button {
-                            showCreate = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 52, height: 52)
-                                .background(Color.orange)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                    }
+            if !isInDetailView {
+                HStack(alignment: .center) {
+                    HomePillView(tab: $tab)
+                    Spacer()
                     Button { showSearch = true } label: {
                         Image(systemName: "magnifyingglass")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, height: 44)
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color(.label))
+                            .frame(width: 54, height: 54)
                             .background(Color(.secondarySystemBackground))
                             .clipShape(Circle())
                     }
+                    .overlay(alignment: .top) {
+                        if tab == .collection && collectionPath.isEmpty {
+                            Button { showCreate = true } label: {
+                                Image(systemName: "plus")
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 52, height: 52)
+                                    .background(Color.orange)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .offset(y: -62)
+                        }
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
         }
         .overlay(alignment: .topTrailing) {
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, height: 36)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(Circle())
+            if !isInDetailView {
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color(.label))
+                        .frame(width: 44, height: 44)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(Circle())
+                }
+                .padding(.top, 8)
+                .padding(.trailing, 20)
             }
-            .padding(.top, 8)
-            .padding(.trailing, 16)
         }
-        .sheet(isPresented: $showSearch)   { SearchView() }
-        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
+        .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
         // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
-        .sheet(isPresented: $showCreate)   { CreateCollectionSheet() }
+        .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
+        .preferredColorScheme(preferredScheme)
+        .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
+        .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
     }
 
@@ -86,6 +105,7 @@ struct HomePillView: View {
         }
         .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
+        .sensoryFeedback(.selection, trigger: tab)
     }
 
     private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {

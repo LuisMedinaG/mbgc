@@ -32,9 +32,6 @@ export default function GameCard({ game }: Props) {
 
         <div className="flex items-center gap-1 mt-auto pt-0.5">
           <span className={weightClass(game.weight)}>{weightLabel(game.weight)}</span>
-          <span className="ml-auto text-xs font-bold text-rating">
-            ★ {game.rating.toFixed(1)}
-          </span>
         </div>
       </div>
     </Link>

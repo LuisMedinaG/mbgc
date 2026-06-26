@@ -40,6 +40,13 @@ enum LocalLibrary {
         return Set(all.map(\.bggId).filter { idSet.contains($0) })
     }
 
+    /// Local Game objects whose bggId is in `ids` — for routing an imported set to a collection.
+    static func games(matching ids: [Int], in modelContext: ModelContext) -> [Game] {
+        let idSet = Set(ids)
+        let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
+        return all.filter { idSet.contains($0.bggId) }
+    }
+
     static func add(_ games: [Game], to collection: Collection) {
         let existing = Set(collection.games.map(\.bggId))
         collection.games.append(contentsOf: games.filter { !existing.contains($0.bggId) })

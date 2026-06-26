@@ -281,7 +281,13 @@ enum BGGXMLParser {
                 ("&apos;", "'"),
                 ("&#039;", "'"),
                 ("&#39;", "'"),
-                ("&nbsp;", " ")
+                ("&nbsp;", " "),
+                ("&rsquo;", "'"),
+                ("&lsquo;", "'"),
+                ("&rdquo;", "\u{201D}"),
+                ("&ldquo;", "\u{201C}"),
+                ("&mdash;", "—"),
+                ("&ndash;", "–")
             ]
             for (entity, replacement) in entities {
                 result = result.replacingOccurrences(of: entity, with: replacement)
