@@ -17,15 +17,9 @@ iOS app
   │     fetchThings(ids:)                 https://boardgamegeek.com/xmlapi2/thing
   │     fetchCollection(username:token:)
   │
-  ├── Keychain (BGG API token only)
-  │
-  ├── SwiftData (on-device SQLite)
-  │     Game     — @Attribute(.unique) bggId
-  │     Collection — isDefault=true → Library (seeded on first launch)
-  │
-  └── APIClient  ──────────────────────▶  services/api  ← DEAD CODE
-        All methods return 401.             (no JWT, no login)
-        Do NOT re-enable or call these.
+  └── SwiftData (on-device SQLite)
+        Game     — @Attribute(.unique) bggId
+        Collection — isDefault=true → Library (seeded on first launch)
 ```
 
 **services/api is NOT used by the iOS app.** It still runs on Cloud Run for the
@@ -53,11 +47,9 @@ ios/MBGC/
 ├── Networking/
 │   ├── BGGClient.swift        actor — fetchThings(ids:token:), 5s pacing, 4-attempt retry
 │   ├── BGGXMLParser.swift     XMLParser delegate for /xmlapi2/thing XML
-│   ├── BGGGame.swift          Intermediate struct (mirrors Go importer.BGGGame)
-│   └── Keychain.swift         BGG API token storage only
+│   └── BGGGame.swift          Intermediate struct (mirrors Go importer.BGGGame)
 ├── ViewModels/
 │   ├── VibesViewModel.swift   SwiftData CRUD for Collection (no API calls)
-│   ├── ProfileViewModel.swift BGG username → UserDefaults (no API calls)
 │   └── GameDetailViewModel.swift  Local-first: SwiftData CRUD (no API calls)
 ├── Views/
 │   ├── ContentView.swift      Tab switcher — seeds Library on first launch
@@ -67,7 +59,7 @@ ios/MBGC/
 │   ├── ImportView.swift       Import page: side-by-side BGG/CSV modes, CollectionPickerView
 │   ├── GameDetailView.swift   Detail — reads SwiftData cache, collection CRUD
 │   ├── SearchView.swift       Search — local-first filtering via @Query
-│   └── ProfileView.swift      BGG username field, saves to UserDefaults
+│   └── SettingsView.swift     Import links only
 └── project.yml                XcodeGen config (iOS 17, Swift 6, bundle: app.lumedina.mbgc)
 ```
 
@@ -78,7 +70,6 @@ ios/MBGC/
 ### Game
 - `@Attribute(.unique) var bggId: Int` — this is the **primary key** now, not a server `id`
 - `init(bggGame: BGGGame)` — use for all local imports
-- `init(dto: GameDTO)` — legacy path, maps `dto.bggId ?? dto.id` (kept for future re-sync)
 - Fetch by bggId: `#Predicate { $0.bggId == someId }`
 
 ### Collection
@@ -92,8 +83,9 @@ ios/MBGC/
 - NOT stored in Keychain, NOT synced to backend
 
 ### BGG API token
-- Stored in iOS Keychain under key `"bgg.apiToken"`
-- Never store in repo files, `.env`, screenshots, or handoff docs
+- Optional build-time `BGGToken` from `Secrets.xcconfig` / `Info.plist`
+- No user-entered token UI or Keychain storage exists yet
+- Never store real tokens in repo files, `.env`, screenshots, or handoff docs
 
 ---
 
@@ -119,8 +111,7 @@ ios/MBGC/
 
 | File / Symbol | Why dead | Cleanup action |
 |---|---|---|
-| `Keychain.swift` | Stores BGG API token | Keep |
-| `Game.vibeNames`, `vibeCollectionIds` | Server-side vibes, unused locally | Delete after local vibes are built |
+| — | — | None currently tracked |
 
 ---
 
@@ -154,8 +145,8 @@ Exception: sheets must be standalone `View` structs with their own
 `@Environment(\.modelContext)` (SwiftUI doesn't reliably propagate context into computed
 view properties used as sheet content).
 
-**Do NOT call `APIClient` methods.** They all require a JWT that doesn't exist.
-Any new data feature must go through `BGGClient` or SwiftData directly.
+**Do NOT add or call a backend API client.** Any new iOS data feature must go
+through `BGGClient` or SwiftData directly.
 
 **BGG rate limiting.** `BGGClient` paces requests at ~5s via `Task.sleep`. Do not add
 parallel fetches without updating the rate-limit budget — BGG will 429/5xx the IP.
@@ -170,4 +161,4 @@ Sourced via `BGGClient.fetchCollection(username:token:)`:
 - Diff against existing SwiftData `bggId`s
 - Fetch missing metadata using `BGGClient.fetchThings(ids:token:onProgress:)`
 - Insert `Game` objects → call `onComplete?(newGames)` → show `CollectionPickerView`
-- Cooldown logic: gated to once per 7 days via `UserDefaults` (last sync date stored).
+- Cooldown logic: gated to once per 7 days via `UserDefaults` (last sync date stored). In `DEBUG` builds the cooldown is skipped entirely (`#if !DEBUG` guard in `ImportView.importFromBGG()`) — run freely during development.

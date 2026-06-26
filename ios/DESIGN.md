@@ -77,16 +77,12 @@ Primary persistent entity. One row per unique BGG game ID.
 | `languageDependence` | `Int?` | Derived from poll votes (0–5) |
 | `recommendedPlayers` | `[Int]?` | Derived from poll votes |
 | `collections` | `[Collection]` | Many-to-many inverse; owned by `Collection.games` |
-| `vibeNames` | `[String]` | **Dead** — legacy DTO field |
-| `vibeCollectionIds` | `[Int]?` | **Dead** — legacy DTO field |
 
 **Initializers:**
 - `init(bggGame: BGGGame)` — primary import path; calls `apply(_:BGGGame)`.
-- `init(dto: GameDTO)` — legacy path; no active callers.
 
 **Mutation methods:**
 - `update(from bggGame: BGGGame)` — re-applies all fields (used during re-sync).
-- `update(from dto: GameDTO)` — legacy; no active callers.
 
 ---
 
@@ -123,11 +119,7 @@ SwiftData owns the join table implicitly via `@Relationship(inverse:)` on `Colle
 
 ### 2.4 Supporting Types
 
-| Type | Kind | File | Role |
-|---|---|---|---|
-| `GameDTO` | `struct : Decodable, Identifiable` | `Models/Game.swift` | Wire-format bridge from `services/api`; no active network callers |
-| `GameDetailDTO` | `typealias GameDTO` | `Models/Game.swift` | Same type, semantic alias |
-| `VibeRefDTO` | `struct : Decodable` | `Models/Game.swift` | `id: Int, name: String`; used by `GameDTO` only |
+No backend DTO bridge types remain in the iOS app.
 
 ---
 
@@ -353,7 +345,8 @@ BGG sync UI. Reads BGG username from `UserDefaults["profile.bggUsername"]`. Enfo
 - `bggRegularImportLimit = 100` — max new games per sync
 - `bggImportCooldown = 7 * 24 * 60 * 60` s
 
-**Flow:** fetch collection IDs → diff against local → fetch metadata → insert → `CollectionPickerView`
+**Flow:** fetch collection IDs → diff against local → fetch metadata → insert → `CollectionPickerView`.
+Debug builds intentionally bypass the cooldown for local development.
 
 ---
 
@@ -467,9 +460,9 @@ ContentView.task → seedLibraryIfNeeded()
 ## 7. Cross-Cutting Concerns
 
 ### BGG API Token
-- **Current:** read as `String?` from `Bundle.main` (`Info.plist` key `BGGToken = $(BGG_TOKEN)`). `nil` when build variable unset — BGGClient omits the `Authorization` header and the public BGG API still works.
+- **Current:** optional build-time token read as `String?` from `Bundle.main` (`Info.plist` key `BGGToken = $(BGG_TOKEN)`). `nil` when build variable unset — BGGClient omits the `Authorization` header and the public BGG API still works.
 - **CSV path:** `CsvImportView.importCSV()` calls `fetchThings(ids:)` with no token (same behaviour).
-- **Private collections:** if a user has a private BGG collection, a token is required. No UI currently exists to enter one.
+- **Private collections:** if a user has a private BGG collection, a token is required. No UI or Keychain storage currently exists to enter one.
 
 ### Image Caching
 `MBGCApp.init()` overrides `URLCache.shared`:
@@ -478,6 +471,7 @@ ContentView.task → seedLibraryIfNeeded()
 
 ### Rate Limiting (app-side)
 - **BGG sync cooldown:** 7 days, enforced in `ImportView` via `UserDefaults`.
+- **Debug builds:** cooldown is bypassed for local development.
 - **BGGClient request delay:** 5 s between network requests, enforced by actor.
 
 ### Error Handling
@@ -505,10 +499,8 @@ ContentView.task → seedLibraryIfNeeded()
 
 | Issue | File | Priority |
 |---|---|---|
-| No UI to enter a BGG token for private collections | `ImportView.swift` | Low — public collections work without one |
+| No UI/Keychain storage for private-collection BGG tokens | `ImportView.swift` | Low — public collections work without one |
 | CSV import path sends no auth token to BGGClient | `CsvImportView.swift:importCSV()` | Low — same as above |
-| `Game.vibeNames`, `Game.vibeCollectionIds` are dead fields | `Models/Game.swift` | Low — delete when safe |
-| `GameDTO`, `GameDetailDTO` have no active network callers | `Models/Game.swift` | Low — delete when safe |
 | `LibraryView` is a placeholder stub | `Views/LibraryView.swift` | Roadmap |
 | No unit tests for ViewModels or Views | — | Medium |
 | BGG sync cooldown (7 days) enforced app-side only, not server-side for iOS | `ImportView.swift` | Low |

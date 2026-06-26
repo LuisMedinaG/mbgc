@@ -15,6 +15,7 @@ components:
     requirements:
       1: A regular local BGG sync imports at most 100 new games.
       2: A regular local BGG sync can run at most once per 7 days when it imports new games.
+      2-1: Debug builds may bypass the cooldown for local development.
       3: Admin rebuild and larger import limits are deferred until real authenticated admin support exists.
 
 constraints:
@@ -23,4 +24,8 @@ constraints:
       1: The app stores no BGG password, backend JWT, or admin override for BGG import.
       2: The app uses BGG's public XML API with conservative retry behavior for queued or throttled responses.
       3: The app explains BGG authentication failures without exposing raw transport errors.
-      4: The app stores a user-provided BGG API token only in Keychain.
+      4:
+        requirement: The app stores a user-provided BGG API token only in Keychain.
+        deprecated: true
+        4-note: Deferred until user-entered private-collection tokens exist.
+      5: The app omits BGG authorization when no build-time token is configured.

@@ -63,7 +63,7 @@ Home
 
 ## Collections shown
 
-Driven by API (`useCollections`/`VibesViewModel`). One default collection
+Driven by SwiftData `@Query` plus `VibesViewModel`. One default collection
 **"Library"** always present. Others (Wishlist, shared) appear as the user
 creates/joins them.
 

@@ -123,9 +123,11 @@ struct ImportView: View {
         let username = bggUsername.trimmingCharacters(in: .whitespacesAndNewlines)
         let token = bggToken  // nil when not configured — BGGClient will omit the auth header
         guard !username.isEmpty else { return }
+        #if !DEBUG
         if let message = cooldownMessage() {
             syncError = message; syncLog = [message]; return
         }
+        #endif
 
         isSyncing = true
         syncProgress = "Fetching BGG collection…"
