@@ -237,6 +237,31 @@ enum SelectionAction: String, Identifiable {
     var id: String { rawValue }
 }
 
+enum GameSort: String, CaseIterable, Identifiable {
+    case name, rating, complexity, players, playtime, published
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .name: "Name"
+        case .rating: "Rating"
+        case .complexity: "Complexity"
+        case .players: "Players"
+        case .playtime: "Playtime"
+        case .published: "Published"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .name: "textformat.abc"
+        case .rating: "star"
+        case .complexity: "brain"
+        case .players: "person.2"
+        case .playtime: "clock"
+        case .published: "calendar"
+        }
+    }
+}
+
 struct CollectionDetailView: View {
     let collection: Collection
     @Environment(\.modelContext) private var modelContext
@@ -245,11 +270,32 @@ struct CollectionDetailView: View {
     @State private var showAddGames = false
     @State private var showFilters = false
     @State private var filters = GameFilters()
+    @State private var sortOrder: GameSort = .name
+    @State private var sortAscending = true
     @State private var isSelecting = false
     @State private var selectedIds: Set<Int> = []
     @State private var pendingAction: SelectionAction?
 
-    private var sortedGames: [Game] { collection.games.sorted { $0.name < $1.name } }
+    private var sortedGames: [Game] {
+        let asc = sortAscending
+        return collection.games.sorted { a, b in
+            switch sortOrder {
+            case .name:       return asc ? a.name < b.name : a.name > b.name
+            case .rating:     return asc ? (a.rating ?? 0) < (b.rating ?? 0) : (a.rating ?? 0) > (b.rating ?? 0)
+            case .complexity: return asc ? (a.weight ?? 0) < (b.weight ?? 0) : (a.weight ?? 0) > (b.weight ?? 0)
+            case .players:    return asc ? (a.minPlayers ?? Int.max) < (b.minPlayers ?? Int.max) : (a.minPlayers ?? 0) > (b.minPlayers ?? 0)
+            case .playtime:   return asc ? (a.playtime ?? Int.max) < (b.playtime ?? Int.max) : (a.playtime ?? 0) > (b.playtime ?? 0)
+            case .published:  return asc ? (a.yearPublished ?? 0) < (b.yearPublished ?? 0) : (a.yearPublished ?? 0) > (b.yearPublished ?? 0)
+            }
+        }
+    }
+
+    private var sortDirectionLabel: String {
+        switch sortOrder {
+        case .name: return sortAscending ? "A → Z" : "Z → A"
+        default:    return sortAscending ? "Low → High" : "High → Low"
+        }
+    }
     private var filteredGames: [Game] { filters.apply(sortedGames) }
     private var selectedGames: [Game] { filteredGames.filter { selectedIds.contains($0.bggId) } }
     private var otherCollections: [Collection] { allCollections.filter { $0.persistentModelID != collection.persistentModelID } }
@@ -269,7 +315,7 @@ struct CollectionDetailView: View {
                 )
             } else {
                 List {
-                    if !filters.isEmpty && !isSelecting {
+                    if !filters.isEmpty {
                         filterPillsBar
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             .listRowSeparator(.hidden)
@@ -307,7 +353,7 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
-        .navigationBarBackButtonHidden(isSelecting)
+
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             if isSelecting {
@@ -321,6 +367,26 @@ struct CollectionDetailView: View {
                 }
             } else {
                 if !collection.games.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Menu {
+                            Section {
+                                Button {
+                                    sortAscending.toggle()
+                                } label: {
+                                    Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
+                                }
+                            }
+                            Section {
+                                Picker("Sort By", selection: $sortOrder) {
+                                    ForEach(GameSort.allCases) { sort in
+                                        Label(sort.label, systemImage: sort.icon).tag(sort)
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down")
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Select") { isSelecting = true }
                     }

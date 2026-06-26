@@ -33,14 +33,20 @@ struct ContentView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if !isInDetailView {
-                HStack(alignment: .bottom) {
+                HStack(alignment: .center) {
                     HomePillView(tab: $tab)
                     Spacer()
-                    VStack(spacing: 10) {
+                    Button { showSearch = true } label: {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 20, weight: .medium))
+                            .foregroundStyle(Color(.label))
+                            .frame(width: 54, height: 54)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(Circle())
+                    }
+                    .overlay(alignment: .top) {
                         if tab == .collection && collectionPath.isEmpty {
-                            Button {
-                                showCreate = true
-                            } label: {
+                            Button { showCreate = true } label: {
                                 Image(systemName: "plus")
                                     .font(.title2.weight(.semibold))
                                     .foregroundStyle(.white)
@@ -48,14 +54,7 @@ struct ContentView: View {
                                     .background(Color.orange)
                                     .clipShape(RoundedRectangle(cornerRadius: 14))
                             }
-                        }
-                        Button { showSearch = true } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .frame(width: 44, height: 44)
-                                .background(Color(.secondarySystemBackground))
-                                .clipShape(Circle())
+                            .offset(y: -62)
                         }
                     }
                 }

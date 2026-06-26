@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		06F4D737679B788780E7F98D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF538B299162A6D4819794D5 /* ContentView.swift */; };
+		1592D4AEF7EDC7899F0F1EBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */; };
 		1AE5F179806A31E8719F84F7 /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FB54336829DBBC66ECFAEC /* ImportView.swift */; };
 		405F7579E675C4135E9EB978 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CCB0E019B538D583D338CA /* SearchView.swift */; };
 		44CD545581A7A4C805CF5D93 /* Collection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5D5C010301E549F84FE830 /* Collection.swift */; };
@@ -49,7 +50,8 @@
 		57A3327FCE88990AF0D527C5 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		5FF2F7C0A1246DFA97A32129 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		62288FD9B5C3E5AC1E934102 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
-		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99C1F0CBB227E63609C23F0A /* MBGCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBGCApp.swift; sourceTree = "<group>"; };
 		A0076C98DF51184321766D82 /* BGGClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGClient.swift; sourceTree = "<group>"; };
 		A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
@@ -58,7 +60,7 @@
 		BFF36E1CC65BF3B805532A8B /* BGGXMLParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGXMLParserTests.swift; sourceTree = "<group>"; };
 		C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CD671A7394CE1D23B5C50B9B /* BGGGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGGame.swift; sourceTree = "<group>"; };
-		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8B1B3026AF2474E8CCBCEDA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -146,6 +148,7 @@
 		C9EDA381B269283B99948662 /* MBGC */ = {
 			isa = PBXGroup;
 			children = (
+				7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */,
 				E8B1B3026AF2474E8CCBCEDA /* Info.plist */,
 				99C1F0CBB227E63609C23F0A /* MBGCApp.swift */,
 				403AB77285806076FE6909AB /* Models */,
@@ -182,6 +185,7 @@
 			buildConfigurationList = DA3C08EFF1F33E721C57D77F /* Build configuration list for PBXNativeTarget "MBGC" */;
 			buildPhases = (
 				52F8B1FF7995645B6E0A1613 /* Sources */,
+				471E4E83F6349A426EE4F3C9 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -201,7 +205,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					FF95678E676736D017659FA2 = {
 						DevelopmentTeam = T9YNQ73MS3;
@@ -228,6 +232,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		471E4E83F6349A426EE4F3C9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1592D4AEF7EDC7899F0F1EBA /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		52F8B1FF7995645B6E0A1613 /* Sources */ = {
@@ -345,7 +360,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -430,7 +444,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
