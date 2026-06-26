@@ -275,6 +275,7 @@ struct CollectionDetailView: View {
     @State private var isSelecting = false
     @State private var selectedIds: Set<Int> = []
     @State private var pendingAction: SelectionAction?
+    @State private var showEditCollection = false
 
     private var sortedGames: [Game] {
         let asc = sortAscending
@@ -310,7 +311,7 @@ struct CollectionDetailView: View {
                     description: Text(
                         collection.isDefault
                             ? "Import from BGG or CSV to add games to your Library."
-                            : "Tap + to add games from your Library."
+                            : "Tap ··· to add games from your Library."
                     )
                 )
             } else {
@@ -344,6 +345,28 @@ struct CollectionDetailView: View {
                                     .toolbar(.visible, for: .navigationBar)) {
                                     gameRow(game)
                                 }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        collection.games.removeAll { $0.bggId == game.bggId }
+                                        try? modelContext.save()
+                                    } label: {
+                                        Label("Delete", systemImage: "trash")
+                                    }
+                                    Button {
+                                        selectedIds = [game.bggId]
+                                        pendingAction = .move
+                                    } label: {
+                                        Label("Move", systemImage: "arrow.right.circle")
+                                    }
+                                    .tint(.orange)
+                                    Button {
+                                        selectedIds = [game.bggId]
+                                        pendingAction = .copy
+                                    } label: {
+                                        Label("Copy", systemImage: "plus.square.on.square")
+                                    }
+                                    .tint(.blue)
+                                }
                             }
                         }
                     }
@@ -368,42 +391,36 @@ struct CollectionDetailView: View {
             } else {
                 if !collection.games.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
+                        Button { showFilters = true } label: {
+                            Image(systemName: filters.isEmpty
+                                ? "line.3.horizontal.decrease.circle"
+                                : "line.3.horizontal.decrease.circle.fill")
+                        }
+                        .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Section {
-                                Button {
-                                    sortAscending.toggle()
-                                } label: {
-                                    Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
-                                }
+                            Button { sortAscending.toggle() } label: {
+                                Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
                             }
-                            Section {
-                                Picker("Sort By", selection: $sortOrder) {
-                                    ForEach(GameSort.allCases) { sort in
-                                        Label(sort.label, systemImage: sort.icon).tag(sort)
-                                    }
-                                }
+                            Picker("Sort By", selection: $sortOrder) {
+                                ForEach(GameSort.allCases) { s in Label(s.label, systemImage: s.icon).tag(s) }
                             }
                         } label: {
                             Image(systemName: "arrow.up.arrow.down")
                         }
                     }
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button("Select") { isSelecting = true }
-                    }
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button { showFilters = true } label: {
-                            Image(systemName: filters.isEmpty
-                                ? "line.3.horizontal.decrease.circle"
-                                : "line.3.horizontal.decrease.circle.fill")
+                        Button { isSelecting = true } label: {
+                            Image(systemName: "checkmark.circle")
                         }
                     }
                 }
-                if !collection.isDefault {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showAddGames = true } label: {
-                            Image(systemName: "plus")
-                        }
-                    }
+                if #available(iOS 26.0, *) {
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    collectionMenu
                 }
             }
         }
@@ -435,6 +452,9 @@ struct CollectionDetailView: View {
         .sheet(isPresented: $showFilters) {
             FilterView(filters: $filters)
         }
+        .sheet(isPresented: $showEditCollection) {
+            RenameCollectionSheet(collection: collection, initialName: collection.name, initialDesc: collection.desc)
+        }
         .sheet(item: $pendingAction) { action in
             CollectionActionSheet(
                 action: action,
@@ -446,6 +466,41 @@ struct CollectionDetailView: View {
                 else { selectedIds.removeAll() }
             }
         }
+    }
+
+    private var collectionMenu: some View {
+        Menu {
+            if !collection.isDefault {
+                Button { showAddGames = true } label: {
+                    Label("Add Games", systemImage: "plus")
+                }
+                Divider()
+                Button { showEditCollection = true } label: {
+                    Label("Edit Collection", systemImage: "pencil")
+                }
+            }
+            ShareLink(item: shareText) {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
+            if !collection.isDefault {
+                Divider()
+                Button(role: .destructive) { deleteCollection() } label: {
+                    Label("Delete List", systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
+    }
+
+    private var shareText: String {
+        let lines = filteredGames.map { "• \($0.name)" }.joined(separator: "\n")
+        return "\(collection.name)\n\(lines)"
+    }
+
+    private func deleteCollection() {
+        modelContext.delete(collection)
+        try? modelContext.save()
     }
 
     private func toggleSelection(_ game: Game) {
