@@ -7,7 +7,11 @@ private var bggToken: String? {
     let t = Bundle.main.object(forInfoDictionaryKey: "BGGToken") as? String ?? ""
     return t.isEmpty ? nil : t  // nil → BGGClient skips Authorization header; public collections still work
 }
+#if DEBUG
+private let bggRegularImportLimit = 250
+#else
 private let bggRegularImportLimit = 100
+#endif
 private let bggImportCooldown: TimeInterval = 7 * 24 * 60 * 60
 
 private struct BGGImportSummary {
