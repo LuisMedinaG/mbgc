@@ -191,14 +191,16 @@ Unify only when the third duplicate appears:
 - `AppStorageKeys` for UserDefaults keys.
 - `BGGImportStatus` if CSV and username import converge further.
 
-## Recommended next sequence
+## Recommended next sequence (triaged 2026-06-26)
 
-1. Resolve token spec drift: either update docs/spec for build-time token or implement Keychain token entry.
-2. Add tests for `LocalLibrary.add` duplicate behavior and default Library creation using an in-memory SwiftData container.
-3. Add BGG thing XML parser fixtures for names, descriptions, ratings, player counts, language dependence, and duplicate links.
-4. Decide whether `ProfileView` is part of Settings; if not, delete it until needed.
-5. Add VoiceOver labels to custom icon-only controls before release.
-6. Keep `ImportView` as one file until one more workflow lands; then split the pure import logic from the view.
+| # | Item | Status |
+|---|---|---|
+| 1 | Resolve token spec drift | ✅ Already done — `bgg-import.feature.yaml` has `SECURITY.4` marked `deprecated: true`; `ios/AGENTS.md` correctly documents build-time Info.plist token |
+| 2 | Tests: `LocalLibrary.add` duplicate + default Library | ⏳ Still needed |
+| 3 | Tests: BGG thing XML parser fixtures | ⏳ Still needed |
+| 4 | Decide `ProfileView` / delete if unused | ✅ Already done — file does not exist |
+| 5 | VoiceOver labels on icon-only controls | ⏳ Do before App Store submission |
+| 6 | `ImportView` split | ⏸ Skip — YAGNI until third workflow lands |
 
 ## Verification
 

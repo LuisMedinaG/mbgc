@@ -3,8 +3,8 @@
 iOS app for MBGC. **Local-first.** No login, no backend calls. Data comes from
 BGG's public XML API and is stored on-device via SwiftData.
 
-> **Last updated:** 2026-06-25 — Sessions 1–5 complete. Full import flow with destination picker.
-> Full change log: `docs/handoff/2026-06-25-ios-local-first.md`
+> **Last updated:** 2026-06-26 — Sessions 1–6 complete. iOS 26 deployment target, collection UI refactor, native glass toolbar.
+> Change logs: `docs/handoff/2026-06-25-ios-local-first.md`, `.handoff/2026-06-26-ios-foundation-review.md`
 
 ---
 
@@ -115,6 +115,21 @@ ios/MBGC/
 
 ---
 
+## Next steps (prioritized, triaged 2026-06-26)
+
+Do:
+1. **Tests — `LocalLibrary` duplicate/default-collection behavior** using in-memory SwiftData container. This guards the core import invariant.
+2. **Tests — BGG thing XML parser fixtures** (names, ratings, player counts, language dependence). Parser is currently untested; any change is blind.
+3. **VoiceOver labels** on icon-only toolbar controls. Required before App Store submission.
+
+Skip until needed:
+- `ImportView` split — wait for a third workflow to appear (YAGNI)
+- `CollectionFormSheet` unification — only 2 forms exist
+- CSV escaped-quote fix — known edge case, not breaking
+- Keychain token UI — only needed for private BGG collections; `bgg-import.SECURITY.4` already marked deprecated in feature spec
+
+---
+
 ## Build commands
 
 ```sh
@@ -126,7 +141,7 @@ xcodebuild -scheme MBGC \
   -destination 'platform=iOS Simulator,id=<UDID>' \
   build
 
-# Current booted simulator (2026-06-25)
+# Current booted simulator (2026-06-26)
 # iPhone 17 Pro  AE64B0C3-C281-4517-A4C0-06523E7C6B95
 ```
 
