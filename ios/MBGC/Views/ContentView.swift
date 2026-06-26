@@ -21,6 +21,9 @@ struct ContentView: View {
         }
     }
 
+    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
+    private var isInDetailView: Bool { !collectionPath.isEmpty && tab == .collection }
+
     var body: some View {
         Group {
             switch tab {
@@ -29,47 +32,51 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            HStack(alignment: .bottom) {
-                HomePillView(tab: $tab)
-                Spacer()
-                VStack(spacing: 10) {
-                    if tab == .collection && collectionPath.isEmpty {
-                        Button {
-                            showCreate = true
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title2.weight(.semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 52, height: 52)
-                                .background(Color.orange)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+            if !isInDetailView {
+                HStack(alignment: .bottom) {
+                    HomePillView(tab: $tab)
+                    Spacer()
+                    VStack(spacing: 10) {
+                        if tab == .collection && collectionPath.isEmpty {
+                            Button {
+                                showCreate = true
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.title2.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 52, height: 52)
+                                    .background(Color.orange)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                        }
+                        Button { showSearch = true } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .frame(width: 44, height: 44)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(Circle())
                         }
                     }
-                    Button { showSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .frame(width: 44, height: 44)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(Circle())
-                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
         }
         .overlay(alignment: .topTrailing) {
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 36, height: 36)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(Circle())
+            if !isInDetailView {
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(Circle())
+                }
+                .padding(.top, 8)
+                .padding(.trailing, 16)
             }
-            .padding(.top, 8)
-            .padding(.trailing, 16)
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
         .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }

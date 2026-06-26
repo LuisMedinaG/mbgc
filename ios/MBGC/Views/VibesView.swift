@@ -232,11 +232,25 @@ struct RenameCollectionSheet: View {
 
 // MARK: — Collection Detail
 
+enum SelectionAction: String, Identifiable {
+    case copy, move
+    var id: String { rawValue }
+}
+
 struct CollectionDetailView: View {
     let collection: Collection
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Game.name) private var allGames: [Game]
+    @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
     @State private var showAddGames = false
+    @State private var isSelecting = false
+    @State private var selectedIds: Set<Int> = []
+    @State private var pendingAction: SelectionAction?
+
+    private var sortedGames: [Game] { collection.games.sorted { $0.name < $1.name } }
+    private var selectedGames: [Game] { sortedGames.filter { selectedIds.contains($0.bggId) } }
+    private var otherCollections: [Collection] { allCollections.filter { $0.persistentModelID != collection.persistentModelID } }
+    private var allSelected: Bool { !sortedGames.isEmpty && selectedIds.count == sortedGames.count }
 
     var body: some View {
         Group {
@@ -251,10 +265,22 @@ struct CollectionDetailView: View {
                     )
                 )
             } else {
-                List(collection.games.sorted { $0.name < $1.name }, id: \.bggId) { game in
-                    NavigationLink(destination: GameDetailView(gameId: game.bggId)
-                        .toolbar(.visible, for: .navigationBar)) {
-                        gameRow(game)
+                List(sortedGames, id: \.bggId) { game in
+                    if isSelecting {
+                        Button { toggleSelection(game) } label: {
+                            HStack(spacing: 14) {
+                                Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selectedIds.contains(game.bggId) ? Color.accentColor : .secondary)
+                                    .font(.title3)
+                                gameRow(game)
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                    } else {
+                        NavigationLink(destination: GameDetailView(gameId: game.bggId)
+                            .toolbar(.visible, for: .navigationBar)) {
+                            gameRow(game)
+                        }
                     }
                 }
                 .listStyle(.plain)
@@ -262,19 +288,85 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
+        .navigationBarBackButtonHidden(isSelecting)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
-            if !collection.isDefault {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showAddGames = true } label: {
-                        Image(systemName: "plus")
+            if isSelecting {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(allSelected ? "Deselect All" : "Select All") {
+                        selectedIds = allSelected ? [] : Set(sortedGames.map(\.bggId))
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { exitSelection() }
+                }
+            } else {
+                if !collection.games.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Select") { isSelecting = true }
+                    }
+                }
+                if !collection.isDefault {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showAddGames = true } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if isSelecting {
+                HStack(spacing: 0) {
+                    Spacer()
+                    Button("Copy All") { pendingAction = .copy }
+                        .disabled(selectedIds.isEmpty)
+                    Spacer()
+                    Divider().frame(height: 20)
+                    Spacer()
+                    Button("Move All") { pendingAction = .move }
+                        .disabled(selectedIds.isEmpty)
+                    Spacer()
+                    Divider().frame(height: 20)
+                    Spacer()
+                    Button("Delete All", role: .destructive) { deleteSelected() }
+                        .disabled(selectedIds.isEmpty)
+                    Spacer()
+                }
+                .padding(.vertical, 16)
+                .background(.regularMaterial)
             }
         }
         .sheet(isPresented: $showAddGames) {
             AddGamesSheet(collection: collection, allGames: allGames)
         }
+        .sheet(item: $pendingAction) { action in
+            CollectionActionSheet(
+                action: action,
+                games: selectedGames,
+                source: collection,
+                destinations: otherCollections
+            ) {
+                if action == .move { exitSelection() }
+                else { selectedIds.removeAll() }
+            }
+        }
+    }
+
+    private func toggleSelection(_ game: Game) {
+        if selectedIds.contains(game.bggId) { selectedIds.remove(game.bggId) }
+        else { selectedIds.insert(game.bggId) }
+    }
+
+    private func deleteSelected() {
+        collection.games.removeAll { selectedIds.contains($0.bggId) }
+        try? modelContext.save()
+        selectedIds.removeAll()
+    }
+
+    private func exitSelection() {
+        isSelecting = false
+        selectedIds.removeAll()
     }
 
     private func gameRow(_ game: Game) -> some View {
@@ -293,6 +385,46 @@ struct CollectionDetailView: View {
                 Text(game.name).bold().font(.subheadline)
             }
         }
+    }
+}
+
+// MARK: — Collection action sheet (copy / move)
+
+struct CollectionActionSheet: View {
+    let action: SelectionAction
+    let games: [Game]
+    let source: Collection
+    let destinations: [Collection]
+    let onComplete: () -> Void
+
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(destinations) { col in
+                Button(col.name) {
+                    LocalLibrary.add(games, to: col)
+                    if action == .move {
+                        let ids = Set(games.map(\.bggId))
+                        source.games.removeAll { ids.contains($0.bggId) }
+                    }
+                    try? modelContext.save()
+                    onComplete()
+                    dismiss()
+                }
+                .foregroundStyle(.primary)
+            }
+            .listStyle(.plain)
+            .navigationTitle(action == .copy ? "Copy to..." : "Move to...")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium])
     }
 }
 
