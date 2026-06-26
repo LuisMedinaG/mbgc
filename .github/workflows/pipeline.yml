@@ -81,7 +81,7 @@ jobs:
               exit 1
             fi
           elif [ "$target" = "dev" ]; then
-            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
+            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+' || echo "$branch" | grep -q "ios-review"; then
               echo "✓ '$branch' → dev allowed"
             else
               echo "✗ Branch '$branch' cannot merge into 'dev'"
