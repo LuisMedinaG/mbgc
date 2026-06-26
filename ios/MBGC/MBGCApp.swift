@@ -11,21 +11,10 @@ struct MBGCApp: App {
         URLCache.shared = URLCache(memoryCapacity: 50 * 1024 * 1024, diskCapacity: 200 * 1024 * 1024)
     }
 
-    @AppStorage("appearanceMode") private var appearanceMode = "system"
-
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .preferredColorScheme(colorScheme)
         }
         .modelContainer(for: [Game.self, Collection.self])
-    }
-
-    private var colorScheme: ColorScheme? {
-        switch appearanceMode {
-        case "light": return .light
-        case "dark":  return .dark
-        default:      return nil
-        }
     }
 }

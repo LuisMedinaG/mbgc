@@ -225,6 +225,9 @@ struct RenameCollectionSheet: View {
 
 struct CollectionDetailView: View {
     let collection: Collection
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Game.name) private var allGames: [Game]
+    @State private var showAddGames = false
 
     var body: some View {
         Group {
@@ -234,12 +237,12 @@ struct CollectionDetailView: View {
                     systemImage: "gamecontroller",
                     description: Text(
                         collection.isDefault
-                            ? "Import a CSV to add games to your Library."
-                            : "Add games to this collection from the game detail screen."
+                            ? "Import from BGG or CSV to add games to your Library."
+                            : "Tap + to add games from your Library."
                     )
                 )
             } else {
-                List(collection.games, id: \.bggId) { game in
+                List(collection.games.sorted { $0.name < $1.name }, id: \.bggId) { game in
                     NavigationLink(destination: GameDetailView(gameId: game.bggId)
                         .toolbar(.visible, for: .navigationBar)) {
                         gameRow(game)
@@ -251,6 +254,18 @@ struct CollectionDetailView: View {
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            if !collection.isDefault {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showAddGames = true } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showAddGames) {
+            AddGamesSheet(collection: collection, allGames: allGames)
+        }
     }
 
     private func gameRow(_ game: Game) -> some View {
@@ -276,6 +291,73 @@ struct CollectionDetailView: View {
                 }
             }
             .multilineTextAlignment(.leading)
+        }
+    }
+}
+
+// MARK: — Add Games from Library sheet
+
+struct AddGamesSheet: View {
+    let collection: Collection
+    let allGames: [Game]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var selected: Set<Int> = []
+    @State private var searchText = ""
+
+    private var alreadyInCollection: Set<Int> { Set(collection.games.map(\.bggId)) }
+
+    private var candidates: [Game] {
+        let eligible = allGames.filter { !alreadyInCollection.contains($0.bggId) }
+        guard !searchText.isEmpty else { return eligible }
+        return eligible.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(candidates, id: \.bggId) { game in
+                Button {
+                    if selected.contains(game.bggId) { selected.remove(game.bggId) }
+                    else { selected.insert(game.bggId) }
+                } label: {
+                    HStack(spacing: 14) {
+                        Image(systemName: selected.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(selected.contains(game.bggId) ? Color.orange : .secondary)
+                        AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
+                            img.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: { Color(.systemGray5) }
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        VStack(alignment: .leading, spacing: 2) {
+                            if let year = game.yearPublished, year > 0 {
+                                Text(game.name) + Text(" (\(year))").foregroundColor(.secondary)
+                            } else {
+                                Text(game.name)
+                            }
+                        }
+                        .font(.subheadline)
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
+            .listStyle(.plain)
+            .searchable(text: $searchText, prompt: "Search games")
+            .navigationTitle("Add to \(collection.name)")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add (\(selected.count))") {
+                        let toAdd = allGames.filter { selected.contains($0.bggId) }
+                        LocalLibrary.add(toAdd, to: collection)
+                        try? modelContext.save()
+                        dismiss()
+                    }
+                    .disabled(selected.isEmpty)
+                }
+            }
         }
     }
 }

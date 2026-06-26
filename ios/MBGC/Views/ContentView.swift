@@ -5,12 +5,21 @@ enum HomeTab { case discover, collection }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("appearanceMode") private var appearanceMode = "system"
     @State private var vibesViewModel = VibesViewModel()
     @State private var tab: HomeTab = .discover
     @State private var collectionPath: [Collection] = []
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
+
+    private var preferredScheme: ColorScheme? {
+        switch appearanceMode {
+        case "light": return .light
+        case "dark":  return .dark
+        default:      return nil
+        }
+    }
 
     var body: some View {
         Group {
@@ -62,10 +71,11 @@ struct ContentView: View {
             .padding(.top, 8)
             .padding(.trailing, 16)
         }
-        .sheet(isPresented: $showSearch)   { SearchView() }
-        .sheet(isPresented: $showSettings) { SettingsView() }
+        .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
+        .sheet(isPresented: $showSettings) { SettingsView().preferredColorScheme(preferredScheme) }
         // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
-        .sheet(isPresented: $showCreate)   { CreateCollectionSheet() }
+        .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
+        .preferredColorScheme(preferredScheme)
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
