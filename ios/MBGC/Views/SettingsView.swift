@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Binding var isPresented: Bool
     @AppStorage("appearanceMode") private var appearanceMode = "system"
 
     var body: some View {
@@ -18,7 +19,7 @@ struct SettingsView: View {
                 }
 
                 Section("Import") {
-                    NavigationLink { ImportView() } label: {
+                    NavigationLink { ImportView(dismissAll: { isPresented = false }) } label: {
                         SettingsRow(icon: "arrow.down.circle.fill", color: .orange, label: "Import from BGG")
                     }
                     NavigationLink { CsvImportView() } label: {

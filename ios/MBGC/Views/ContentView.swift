@@ -72,7 +72,7 @@ struct ContentView: View {
             .padding(.trailing, 16)
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
-        .sheet(isPresented: $showSettings) { SettingsView().preferredColorScheme(preferredScheme) }
+        .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
         // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
         .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
         .preferredColorScheme(preferredScheme)
