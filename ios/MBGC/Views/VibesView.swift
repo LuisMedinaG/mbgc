@@ -3,6 +3,14 @@ import SwiftUI
 
 // MARK: — Collections list
 
+private func sanitizeName(_ name: String) -> String {
+    let maxLength = 50
+    let sanitized = name
+        .filter { $0 != "[" && $0 != "]" }
+        .prefix(maxLength)
+    return String(sanitized)
+}
+
 struct VibesView: View {
     let viewModel: VibesViewModel
     @Binding var path: [Collection]
@@ -130,7 +138,8 @@ struct CreateCollectionSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        let col = Collection(name: trimmedName, desc: desc)
+                        let sanitized = sanitizeName(trimmedName)
+                        let col = Collection(name: sanitized, desc: desc)
                         modelContext.insert(col)
                         do {
                             try modelContext.save()
@@ -192,7 +201,7 @@ struct RenameCollectionSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         guard !collection.isDefault else { return }
-                        collection.name = trimmedName
+                        collection.name = sanitizeName(trimmedName)
                         collection.desc = desc
                         do {
                             try modelContext.save()
@@ -279,9 +288,9 @@ struct CollectionDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             if let year = game.yearPublished, year > 0 {
-                Text(game.name) + Text(" (\(year))").foregroundColor(.secondary)
+                Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
             } else {
-                Text(game.name)
+                Text(game.name).bold().font(.subheadline)
             }
         }
     }
@@ -320,14 +329,13 @@ struct AddGamesSheet: View {
                         } placeholder: { Color(.systemGray5) }
                         .frame(width: 44, height: 44)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 0) {
                             if let year = game.yearPublished, year > 0 {
-                                Text(game.name) + Text(" (\(year))").foregroundColor(.secondary)
+                                Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
                             } else {
-                                Text(game.name)
+                                Text(game.name).bold().font(.subheadline)
                             }
                         }
-                        .font(.subheadline)
                     }
                     .foregroundStyle(.primary)
                 }

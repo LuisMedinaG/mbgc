@@ -1,6 +1,14 @@
 import SwiftData
 import SwiftUI
 
+private func sanitizeName(_ name: String) -> String {
+    let maxLength = 50
+    let sanitized = name
+        .filter { $0 != "[" && $0 != "]" }
+        .prefix(maxLength)
+    return String(sanitized)
+}
+
 private let bggUsernameKey = "profile.bggUsername"
 private let bggLastSyncKey = "import.bgg.lastSyncDate"
 private let bggCachedIdsKey = "import.bgg.cachedIds"
@@ -58,7 +66,7 @@ struct ImportView: View {
                             } else {
                                 Image(systemName: "arrow.down.circle.fill")
                             }
-                            Text(isSyncing ? "Importing from BGG" : "Import from BGG")
+                            Text(isSyncing ? "Importing" : "Import")
                         }
                         .font(.headline)
                         .foregroundStyle(.white)
@@ -93,7 +101,7 @@ struct ImportView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
                                 Label(message, systemImage: "circle.fill")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(statusColor(for: message))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -145,19 +153,10 @@ struct ImportView: View {
             appendSyncLog("Saving BGG username")
             UserDefaults.standard.set(username, forKey: bggUsernameKey)
 
-            // Fast path: skip the BGG API call if we have a cached collection list.
-            // Games already stored locally skip fetchThings too — result is near-instant.
-            let cachedIds = UserDefaults.standard.array(forKey: bggCachedIdsKey) as? [Int] ?? []
-            let bggIds: [Int]
-            if !cachedIds.isEmpty {
-                bggIds = cachedIds
-                appendSyncLog("Using cached collection (\(cachedIds.count) games)")
-            } else {
-                appendSyncLog("Fetching owned BGG IDs")
-                bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
-                UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
-                appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
-            }
+            appendSyncLog("Fetching owned BGG IDs")
+            let bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
+            UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
+            appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
 
             appendSyncLog("Checking local library")
             let existing = LocalLibrary.existingBggIds(in: modelContext, from: bggIds)
@@ -238,6 +237,17 @@ struct ImportView: View {
         guard nextSync > now else { return nil }
         return "BGG import is available again \(nextSync.formatted(date: .abbreviated, time: .shortened))."
     }
+
+    private func statusColor(for message: String) -> Color {
+        if message.contains("Fetched") || message.contains("Found") || message.contains("Saving") || message.contains("cached") {
+            return .green
+        } else if message.contains("Failed") || message.contains("Couldn't") || message.contains("error") {
+            return .red
+        } else if message.contains("Skipping") || message.contains("Limiting") {
+            return .yellow
+        }
+        return .secondary
+    }
 }
 
 // MARK: — Collection Picker (shared by ImportView + CsvImportView)
@@ -281,7 +291,7 @@ struct CollectionPickerView: View {
             Spacer()
 
             Button { confirm() } label: {
-                Text("Import \(games.count) game\(games.count == 1 ? "" : "s")")
+                Text("Import")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 40)
@@ -327,7 +337,8 @@ struct CollectionPickerView: View {
     private func createAndSelect() {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let col = Collection(name: trimmed)
+        let sanitized = sanitizeName(trimmed)
+        let col = Collection(name: sanitized)
         modelContext.insert(col)
         do {
             try modelContext.save()
