@@ -243,14 +243,17 @@ struct CollectionDetailView: View {
     @Query(sort: \Game.name) private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
     @State private var showAddGames = false
+    @State private var showFilters = false
+    @State private var filters = GameFilters()
     @State private var isSelecting = false
     @State private var selectedIds: Set<Int> = []
     @State private var pendingAction: SelectionAction?
 
     private var sortedGames: [Game] { collection.games.sorted { $0.name < $1.name } }
-    private var selectedGames: [Game] { sortedGames.filter { selectedIds.contains($0.bggId) } }
+    private var filteredGames: [Game] { filters.apply(sortedGames) }
+    private var selectedGames: [Game] { filteredGames.filter { selectedIds.contains($0.bggId) } }
     private var otherCollections: [Collection] { allCollections.filter { $0.persistentModelID != collection.persistentModelID } }
-    private var allSelected: Bool { !sortedGames.isEmpty && selectedIds.count == sortedGames.count }
+    private var allSelected: Bool { !filteredGames.isEmpty && selectedIds.count == filteredGames.count }
 
     var body: some View {
         Group {
@@ -264,8 +267,14 @@ struct CollectionDetailView: View {
                             : "Tap + to add games from your Library."
                     )
                 )
+            } else if filteredGames.isEmpty {
+                ContentUnavailableView(
+                    "No Matches",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("No games match your current filters.")
+                )
             } else {
-                List(sortedGames, id: \.bggId) { game in
+                List(filteredGames, id: \.bggId) { game in
                     if isSelecting {
                         Button { toggleSelection(game) } label: {
                             HStack(spacing: 14) {
@@ -294,7 +303,7 @@ struct CollectionDetailView: View {
             if isSelecting {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(allSelected ? "Deselect All" : "Select All") {
-                        selectedIds = allSelected ? [] : Set(sortedGames.map(\.bggId))
+                        selectedIds = allSelected ? [] : Set(filteredGames.map(\.bggId))
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -304,6 +313,13 @@ struct CollectionDetailView: View {
                 if !collection.games.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Select") { isSelecting = true }
+                    }
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { showFilters = true } label: {
+                            Image(systemName: filters.isEmpty
+                                ? "line.3.horizontal.decrease.circle"
+                                : "line.3.horizontal.decrease.circle.fill")
+                        }
                     }
                 }
                 if !collection.isDefault {
@@ -339,6 +355,9 @@ struct CollectionDetailView: View {
         }
         .sheet(isPresented: $showAddGames) {
             AddGamesSheet(collection: collection, allGames: allGames)
+        }
+        .sheet(isPresented: $showFilters) {
+            FilterView(filters: $filters)
         }
         .sheet(item: $pendingAction) { action in
             CollectionActionSheet(
