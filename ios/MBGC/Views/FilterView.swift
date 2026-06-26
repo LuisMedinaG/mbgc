@@ -143,7 +143,7 @@ enum LanguageDependence: Int, CaseIterable, Identifiable {
     var color: Color {
         switch self {
         case .none: return .green
-        case .some: return .green
+        case .some: return Color(red: 0.5, green: 0.82, blue: 0.1)  // lime, distinct from none
         case .moderate: return .yellow
         case .extensive: return .orange
         case .unplayable: return .red
@@ -312,20 +312,27 @@ struct FilterView: View {
 
     private var enabledFields: [FilterField] { FilterField.allCases.filter { filters.specs[$0] != nil } }
     private var otherFields: [FilterField] { FilterField.allCases.filter { filters.specs[$0] == nil } }
+    private var hasEnabledFilters: Bool { !enabledFields.isEmpty || mechanicsExpanded || languageExpanded || titleExpanded }
+    private var hasOtherFilters: Bool { !otherFields.isEmpty || !mechanicsExpanded || !languageExpanded || !titleExpanded }
 
     var body: some View {
         NavigationStack {
             List {
-                if !enabledFields.isEmpty {
+                if hasEnabledFilters {
                     Section("Enabled filters") {
                         ForEach(enabledFields) { field in filterRow(field) }
+                        if mechanicsExpanded { mechanicsRow }
+                        if languageExpanded { languageFilterRow }
+                        if titleExpanded { titleFilterRow }
                     }
                 }
-                Section(enabledFields.isEmpty ? "Select filters" : "Other filters") {
-                    ForEach(otherFields) { field in filterRow(field) }
-                    mechanicsRow
-                    languageFilterRow
-                    titleFilterRow
+                if hasOtherFilters {
+                    Section(hasEnabledFilters ? "Other filters" : "Select filters") {
+                        ForEach(otherFields) { field in filterRow(field) }
+                        if !mechanicsExpanded { mechanicsRow }
+                        if !languageExpanded { languageFilterRow }
+                        if !titleExpanded { titleFilterRow }
+                    }
                 }
             }
             .navigationTitle("Filters")
@@ -390,7 +397,9 @@ struct FilterView: View {
                     exactInputs[field] = mode == .exactly ? field.formatValue(v) : nil
                 }
             }
-        } label: { pillLabel(spec?.mode.rawValue ?? "Off", color: spec?.mode.color) }
+        } label: {
+            pillLabel(spec?.mode.rawValue ?? "Off", color: spec?.mode.color)
+        }
     }
 
     private func sliderControl(_ field: FilterField, spec: FilterSpec) -> some View {
@@ -501,7 +510,6 @@ struct FilterView: View {
     }
 
     private func languageOptionRow(_ ld: LanguageDependence) -> some View {
-        // Read live from binding inside action — don't capture `on` to avoid stale closure
         let on = filters.languages.contains(ld.rawValue)
         return Button {
             if filters.languages.contains(ld.rawValue) {
@@ -510,13 +518,13 @@ struct FilterView: View {
                 filters.languages.insert(ld.rawValue)
             }
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: on ? "\(ld.icon).fill" : ld.icon)
-                    .frame(width: 22)
-                    .foregroundStyle(on ? ld.color : .secondary)
-                VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 12) {
+                Image(systemName: ld.icon)
+                    .font(.system(size: 18))
+                    .frame(width: 24)
+                    .foregroundStyle(on ? ld.color : ld.color.opacity(0.35))
+                VStack(alignment: .leading, spacing: 2) {
                     Text(ld.title).font(.subheadline.weight(on ? .semibold : .regular))
-                        .foregroundStyle(on ? .primary : .secondary)
                     Text(ld.subtitle).font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -531,11 +539,11 @@ struct FilterView: View {
                     }
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)  // isolates tap from list row gesture recognizer
+        .buttonStyle(.plain)
     }
 
     // MARK: - Title row
@@ -560,8 +568,10 @@ struct FilterView: View {
                 TextField("Type to filter…", text: $filters.titleQuery)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                    .padding(8)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+                    .font(.body)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 11)
+                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
             }
         }
         .padding(.vertical, titleExpanded ? 4 : 0)
@@ -572,9 +582,15 @@ struct FilterView: View {
 
     private func pillLabel(_ text: String, color: Color?) -> some View {
         HStack(spacing: 4) {
-            Text(text).foregroundStyle(color ?? .secondary)
-            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+            Text(text)
+                .foregroundStyle(color ?? .secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .font(.footnote.weight(.medium))
+        .fixedSize(horizontal: true, vertical: false)
     }
 }

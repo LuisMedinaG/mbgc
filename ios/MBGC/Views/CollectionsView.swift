@@ -14,6 +14,9 @@ private func sanitizeName(_ name: String) -> String {
 struct CollectionsView: View {
     let viewModel: CollectionsViewModel
     @Binding var path: [Collection]
+    var onSearch: () -> Void = {}
+    var onSettings: () -> Void = {}
+    var onCreate: () -> Void = {}
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
     @State private var editingCollection: Collection?
@@ -22,28 +25,18 @@ struct CollectionsView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(alignment: .leading, spacing: 0) {
-                // Custom title — matches the large header style in design
-                Text("Collection")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, 20)
-                    .padding(.top, 60)
-                    .padding(.bottom, 4)
-
+            Group {
                 if collections.isEmpty {
-                    Spacer()
                     ContentUnavailableView(
                         "No Collections",
                         systemImage: "square.stack",
                         description: Text("Tap + to create your first collection.")
                     )
-                    Spacer()
                 } else {
                     List(collections) { col in
                         NavigationLink(value: col) {
                             collectionRow(col)
                         }
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if !col.isDefault {
                                 Button(role: .destructive) {
@@ -62,14 +55,22 @@ struct CollectionsView: View {
                             }
                         }
                     }
-                    .listStyle(.plain)
                 }
             }
+            .navigationTitle("Collection")
             .navigationDestination(for: Collection.self) { col in
                 CollectionDetailView(collection: col)
                     .toolbar(.visible, for: .navigationBar)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Settings", systemImage: "gearshape", action: onSettings)
+                }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("Search", systemImage: "magnifyingglass", action: onSearch)
+                    Button("New Collection", systemImage: "plus", action: onCreate)
+                }
+            }
             .sheet(item: $editingCollection) { col in
                 RenameCollectionSheet(collection: col, initialName: editName, initialDesc: editDesc)
             }
@@ -105,11 +106,7 @@ struct CollectionsView: View {
 
     private func collectionIcon(_ col: Collection) -> some View {
         Image(systemName: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(.white)
-            .frame(width: 48, height: 48)
-            .background(col.isDefault ? Color.blue : Color.orange)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .foregroundStyle(col.isDefault ? .blue : .orange)
     }
 }
 

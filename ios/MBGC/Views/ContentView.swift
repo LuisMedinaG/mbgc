@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-enum HomeTab { case discover, collection }
+enum HomeTab: Hashable { case discover, collection }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -16,111 +16,47 @@ struct ContentView: View {
     private var preferredScheme: ColorScheme? {
         switch appearanceMode {
         case "light": return .light
-        case "dark":  return .dark
-        default:      return nil
+        case "dark": return .dark
+        default: return nil
         }
     }
 
-    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
-    private var isInDetailView: Bool { !collectionPath.isEmpty && tab == .collection }
-
     var body: some View {
-        Group {
-            switch tab {
-            case .collection: CollectionsView(viewModel: collectionsViewModel, path: $collectionPath)
-            case .discover:   DiscoverView()
-            }
+        TabView(selection: $tab) {
+            DiscoverView(
+                onSearch: { showSearch = true },
+                onSettings: { showSettings = true }
+            )
+            .tabItem { Label("Discover", systemImage: "binoculars") }
+            .tag(HomeTab.discover)
+
+            CollectionsView(
+                viewModel: collectionsViewModel,
+                path: $collectionPath,
+                onSearch: { showSearch = true },
+                onSettings: { showSettings = true },
+                onCreate: { showCreate = true }
+            )
+            .tabItem { Label("Collection", systemImage: "square.stack") }
+            .tag(HomeTab.collection)
         }
-        .safeAreaInset(edge: .bottom) {
-            if !isInDetailView {
-                HStack(alignment: .center) {
-                    HomePillView(tab: $tab)
-                    Spacer()
-                    Button { showSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(Color(.label))
-                            .frame(width: 54, height: 54)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(Circle())
-                    }
-                    .overlay(alignment: .top) {
-                        if tab == .collection && collectionPath.isEmpty {
-                            Button { showCreate = true } label: {
-                                Image(systemName: "plus")
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 52, height: 52)
-                                    .background(Color.orange)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                            }
-                            .offset(y: -62)
-                        }
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-            }
+        .sheet(isPresented: $showSearch) {
+            SearchView().preferredColorScheme(preferredScheme)
         }
-        .overlay(alignment: .topTrailing) {
-            if !isInDetailView {
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color(.label))
-                        .frame(width: 44, height: 44)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(Circle())
-                }
-                .padding(.top, 8)
-                .padding(.trailing, 20)
-            }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme)
         }
-        .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
-        .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
-        // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
-        .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
+        .sheet(isPresented: $showCreate) {
+            CreateCollectionSheet().preferredColorScheme(preferredScheme)
+        }
         .preferredColorScheme(preferredScheme)
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
     }
 
-    // MARK: — Library seed
-
     private func seedLibraryIfNeeded() {
         guard (try? LocalLibrary.ensureDefaultCollection(in: modelContext)) != nil else { return }
         try? modelContext.save()
-    }
-}
-
-struct HomePillView: View {
-    @Binding var tab: HomeTab
-
-    var body: some View {
-        HStack(spacing: 0) {
-            pillButton("Discover", icon: "binoculars.fill", for: .discover)
-            pillButton("Collection", icon: "square.stack.fill", for: .collection)
-        }
-        .background(Color(.secondarySystemBackground))
-        .clipShape(Capsule())
-        .sensoryFeedback(.selection, trigger: tab)
-    }
-
-    private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {
-        Button { tab = target } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                Text(label)
-                    .font(.caption2.weight(tab == target ? .semibold : .regular))
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .foregroundStyle(tab == target ? Color(.systemBackground) : .secondary)
-            .background(tab == target ? Color(.label) : Color.clear)
-            .clipShape(Capsule())
-        }
     }
 }

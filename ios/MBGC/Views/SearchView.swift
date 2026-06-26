@@ -15,13 +15,7 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Search")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-
+            Group {
                 if query.trimmingCharacters(in: .whitespaces).isEmpty {
                     ContentUnavailableView("Search your library",
                         systemImage: "magnifyingglass",
@@ -37,15 +31,19 @@ struct SearchView: View {
                         }
                         .foregroundStyle(.primary)
                     }
-                    .listStyle(.plain)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle("Search")
+            .searchable(text: $query, prompt: "Board games, expansions...")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .navigationDestination(for: Int.self) { gameId in
                 GameDetailView(gameId: gameId)
                     .toolbar(.visible, for: .navigationBar)
             }
-            .safeAreaInset(edge: .bottom) { bottomBar }
         }
     }
 
@@ -70,34 +68,4 @@ struct SearchView: View {
         }
     }
 
-    private var bottomBar: some View {
-        HStack(spacing: 10) {
-            Button { dismiss() } label: {
-                Image(systemName: "rectangle.stack")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(Circle())
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.body)
-                TextField("Board games, expansions…", text: $query)
-                if !query.isEmpty {
-                    Button { query = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(Capsule())
-            .frame(height: 44)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
-    }
 }

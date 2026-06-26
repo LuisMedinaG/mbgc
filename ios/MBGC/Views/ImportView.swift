@@ -31,6 +31,7 @@ private struct BGGImportSummary {
 struct ImportView: View {
     var dismissAll: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var bggUsername = ""
     @State private var showDestinationPicker = false
@@ -43,77 +44,65 @@ struct ImportView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("BGG Username")
-                        .font(.headline)
-                    TextField("Your BoardGameGeek username", text: $bggUsername)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+            VStack(alignment: .leading, spacing: 20) {
+                Spacer(minLength: 120)
+
+                Image("BGGPoweredBy")
+                    .resizable()
+                    .renderingMode(.original)
+                    .scaledToFit()
+                    .frame(width: 156)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("BoardGameGeek\nImport")
+                        .font(.title.bold())
+                    Text("It might take a while if your collection is big.")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.secondary)
                 }
 
-                VStack(spacing: 12) {
-                    Button {
-                        Task { await importFromBGG() }
-                    } label: {
-                        HStack {
-                            if isSyncing {
-                                ProgressView().tint(.white)
-                            } else {
-                                Image(systemName: "arrow.down.circle.fill")
-                            }
-                            Text(isSyncing ? "Importing" : "Import")
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(!canImportBGG || isSyncing ? Color.gray : Color.blue)
-                        )
-                    }
-                    .disabled(!canImportBGG || isSyncing)
+                TextField("Username", text: $bggUsername)
+                    .font(.title3.weight(.semibold))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textFieldStyle(.plain)
+                    .padding(.top, 12)
 
-                    if !canImportBGG {
-                        Text("Enter your BGG username to sync your collection")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text("Sync up to \(bggRegularImportLimit) new owned games. Available once every 7 days.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-
-                    if let syncProgress {
-                        Text(syncProgress).font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let syncError {
-                        Text(syncError).font(.caption).foregroundStyle(.red)
-                    }
-                    if let syncSummary {
-                        Text("Imported \(syncSummary.imported) · Skipped \(syncSummary.skipped) · Failed \(syncSummary.failed.count)")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if !syncLog.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
-                                Label(message, systemImage: "circle.fill")
-                                    .font(.caption).foregroundStyle(statusColor(for: message))
-                            }
-                        }
+                statusView
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 28)
+            .padding(.bottom, 112)
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                Task { await importFromBGG() }
+            } label: {
+                if isSyncing {
+                    ProgressView()
                         .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
+                } else {
+                    Text("Continue")
+                        .frame(maxWidth: .infinity)
                 }
             }
-            .padding(20)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(!canImportBGG || isSyncing)
+            .padding(.horizontal, 28)
+            .padding(.vertical, 12)
+            .background(.background)
         }
-        .navigationTitle("Import from BGG")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationTitle("")
+        .navigationBarBackButtonHidden(true)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Close", systemImage: "xmark") {
+                    if let dismissAll { dismissAll() }
+                    else { dismiss() }
+                }
+            }
+        }
         .sheet(isPresented: $showDestinationPicker) {
             NavigationStack {
                 CollectionPickerView(games: selectedGames) { confirmed in
@@ -123,6 +112,44 @@ struct ImportView: View {
                 }
             }
             .presentationDetents([.medium, .large])
+        }
+    }
+
+    @ViewBuilder
+    private var statusView: some View {
+        if isSyncing || syncProgress != nil || syncError != nil || syncSummary != nil || !syncLog.isEmpty {
+            GroupBox("Status") {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let syncProgress {
+                        Text(syncProgress)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    if let syncError {
+                        Text(syncError)
+                            .font(.subheadline)
+                            .foregroundStyle(.red)
+                    }
+                    if let syncSummary {
+                        Text("Imported \(syncSummary.imported) · Skipped \(syncSummary.skipped) · Failed \(syncSummary.failed.count)")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    if !syncLog.isEmpty {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
+                                    Label(message, systemImage: "circle.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(statusColor(for: message))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(maxHeight: 160)
+                    }
+                }
+            }
         }
     }
 
@@ -257,42 +284,22 @@ struct CollectionPickerView: View {
     @State private var newName = ""
 
     var body: some View {
-        VStack(spacing: 32) {
-            Spacer()
-
-            VStack(spacing: 6) {
+        Form {
+            Section {
                 Text("\(games.count) game\(games.count == 1 ? "" : "s") found")
-                    .font(.title2.bold())
+                    .font(.headline)
                 Text("Owned games only · No expansions")
-                    .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            Picker("", selection: $selectedIndex) {
-                ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
-                    Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
-                        .tag(idx)
+            Section("Destination") {
+                Picker("Collection", selection: $selectedIndex) {
+                    ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
+                        Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+                            .tag(idx)
+                    }
                 }
             }
-            .pickerStyle(.menu)
-            .padding(.horizontal, 20).padding(.vertical, 14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange, lineWidth: 2))
-            .padding(.horizontal, 20)
-
-            Spacer()
-
-            Button { confirm() } label: {
-                Text("Import")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 18)
-                    .background(Capsule().fill(Color.orange))
-                    .shadow(color: Color.orange.opacity(0.4), radius: 12, y: 4)
-            }
-            .padding(.bottom, 12)
         }
         .navigationTitle("Add to collection")
         .navigationBarTitleDisplayMode(.inline)
@@ -305,6 +312,16 @@ struct CollectionPickerView: View {
                     Image(systemName: "plus.circle")
                 }
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Button("Import") { confirm() }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(collections.isEmpty)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
+                .padding(.vertical, 12)
+                .background(.background)
         }
         .onAppear { setDefaultSelection() }
         .onChange(of: collections.count) { setDefaultSelection() }

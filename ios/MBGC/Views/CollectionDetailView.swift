@@ -152,6 +152,7 @@ struct CollectionDetailView: View {
         .navigationBarTitleDisplayMode(.large)
 
         .toolbar(.visible, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             if isSelecting {
                 ToolbarItem(placement: .topBarLeading) {

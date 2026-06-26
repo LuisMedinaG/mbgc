@@ -7,9 +7,7 @@ final class GameDetailViewModel {
     var game: Game?
     var selectedCollectionIds: Set<PersistentIdentifier> = []
     var isSaving = false
-    var isDeleting = false
     var errorMessage: String?
-    var showDeleteConfirm = false
     var editingCollections = false
 
     func load(gameId: Int, modelContext: ModelContext) {
@@ -46,27 +44,4 @@ final class GameDetailViewModel {
         }
     }
 
-    func updateRulesUrl(_ url: String, modelContext: ModelContext) {
-        game?.rulesUrl = url
-        do {
-            try modelContext.save()
-            errorMessage = nil
-        } catch {
-            errorMessage = "Couldn't save rules URL."
-        }
-    }
-
-    func deleteGame(modelContext: ModelContext) -> Bool {
-        guard let game else { return false }
-        isDeleting = true
-        modelContext.delete(game)
-        do {
-            try modelContext.save()
-            return true
-        } catch {
-            errorMessage = "Couldn't delete game."
-            isDeleting = false
-            return false
-        }
-    }
 }
