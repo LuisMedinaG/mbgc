@@ -3,10 +3,10 @@ import SwiftData
 
 @MainActor
 @Observable
-final class VibesViewModel {
+final class CollectionsViewModel {
     var errorMessage: String?
 
-    // Collections are driven by @Query in VibesView — no local array needed.
+    // Collections are driven by @Query in CollectionsView — no local array needed.
 
     func create(name: String, description: String, modelContext: ModelContext) {
         let col = Collection(name: name, desc: description)

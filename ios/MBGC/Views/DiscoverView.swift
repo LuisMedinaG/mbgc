@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct LibraryView: View {
+struct DiscoverView: View {
     var body: some View {
         NavigationStack {
             ContentUnavailableView(

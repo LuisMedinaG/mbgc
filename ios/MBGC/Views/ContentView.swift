@@ -6,7 +6,7 @@ enum HomeTab { case discover, collection }
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appearanceMode") private var appearanceMode = "system"
-    @State private var vibesViewModel = VibesViewModel()
+    @State private var collectionsViewModel = CollectionsViewModel()
     @State private var tab: HomeTab = .discover
     @State private var collectionPath: [Collection] = []
     @State private var showSearch = false
@@ -27,8 +27,8 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch tab {
-            case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
-            case .discover:   LibraryView()
+            case .collection: CollectionsView(viewModel: collectionsViewModel, path: $collectionPath)
+            case .discover:   DiscoverView()
             }
         }
         .safeAreaInset(edge: .bottom) {
