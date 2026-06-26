@@ -27,7 +27,7 @@ struct VibesView: View {
                 Text("Collection")
                     .font(.largeTitle.bold())
                     .padding(.horizontal, 20)
-                    .padding(.top, 32)
+                    .padding(.top, 60)
                     .padding(.bottom, 4)
 
                 if collections.isEmpty {

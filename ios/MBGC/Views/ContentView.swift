@@ -67,14 +67,14 @@ struct ContentView: View {
             if !isInDetailView {
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(Color(.label))
+                        .frame(width: 44, height: 44)
                         .background(Color(.secondarySystemBackground))
                         .clipShape(Circle())
                 }
                 .padding(.top, 8)
-                .padding(.trailing, 16)
+                .padding(.trailing, 20)
             }
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
