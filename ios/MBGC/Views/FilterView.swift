@@ -99,11 +99,76 @@ struct FilterSpec: Equatable {
     var value: Double
 }
 
+enum TitleMatch: String, CaseIterable, Identifiable {
+    case include = "Include"
+    case exclude = "Exclude"
+    var id: String { rawValue }
+}
+
+// BGG language-dependence poll levels (1–5).
+enum LanguageDependence: Int, CaseIterable, Identifiable {
+    case none = 1, some, moderate, extensive, unplayable
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .none: return "No necessary in-game text"
+        case .some: return "Some necessary text"
+        case .moderate: return "Moderate in-game text"
+        case .extensive: return "Extensive use of text"
+        case .unplayable: return "All in-game text necessary"
+        }
+    }
+
+    var subtitle: String {
+        switch self {
+        case .none: return "Can be played in any language."
+        case .some: return "Easy to recall or needs a small cheat sheet."
+        case .moderate: return "Needs a reference sheet or translated aids."
+        case .extensive: return "Massive conversion needed to be playable."
+        case .unplayable: return "Unplayable in another language."
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .none: return "circle"
+        case .some: return "triangle"
+        case .moderate: return "diamond"
+        case .extensive: return "pentagon"
+        case .unplayable: return "hexagon"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .none: return .green
+        case .some: return .green
+        case .moderate: return .yellow
+        case .extensive: return .orange
+        case .unplayable: return .red
+        }
+    }
+}
+
 struct GameFilters: Equatable {
     var specs: [FilterField: FilterSpec] = [:]
+    var mechanics: Set<String> = []
+    var languages: Set<Int> = []
+    var titleQuery: String = ""
+    var titleMode: TitleMatch = .include
 
-    var isEmpty: Bool { specs.isEmpty }
-    var activeCount: Int { specs.count }
+    private var trimmedTitle: String { titleQuery.trimmingCharacters(in: .whitespaces) }
+
+    var isEmpty: Bool {
+        specs.isEmpty && mechanics.isEmpty && languages.isEmpty && trimmedTitle.isEmpty
+    }
+    var activeCount: Int {
+        specs.count
+            + (mechanics.isEmpty ? 0 : 1)
+            + (languages.isEmpty ? 0 : 1)
+            + (trimmedTitle.isEmpty ? 0 : 1)
+    }
 
     func apply(_ games: [Game]) -> [Game] {
         guard !isEmpty else { return games }
@@ -113,6 +178,17 @@ struct GameFilters: Equatable {
     private func passes(_ game: Game) -> Bool {
         for (field, spec) in specs {
             if !fieldMatches(field, spec: spec, game: game) { return false }
+        }
+        if !mechanics.isEmpty, Set(game.mechanics ?? []).isDisjoint(with: mechanics) {
+            return false
+        }
+        if !languages.isEmpty {
+            guard let ld = game.languageDependence, languages.contains(ld) else { return false }
+        }
+        if !trimmedTitle.isEmpty {
+            let contains = game.name.localizedCaseInsensitiveContains(trimmedTitle)
+            if titleMode == .include, !contains { return false }
+            if titleMode == .exclude, contains { return false }
         }
         return true
     }
@@ -151,12 +227,88 @@ struct GameFilters: Equatable {
     }
 }
 
+// MARK: - MechanicsPickerSheet
+
+private struct MechanicsPickerSheet: View {
+    @Binding var selected: Set<String>
+    let mechanics: [String]
+    @Environment(\.dismiss) private var dismiss
+    @State private var search = ""
+    // Local mirror avoids @Binding inside ForEach closures (Swift 6.2 overload ambiguity)
+    @State private var localSelected: Set<String> = []
+
+    private func items() -> [String] {
+        search.isEmpty ? mechanics : mechanics.filter { $0.localizedCaseInsensitiveContains(search) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            mechanicsList()
+                .navigationTitle("Mechanics")
+                .navigationBarTitleDisplayMode(.inline)
+                .onAppear { localSelected = selected }
+                .searchable(text: $search, placement: .toolbar, prompt: "Search")
+                .autocorrectionDisabled()
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") { selected = localSelected; dismiss() }.fontWeight(.semibold)
+                    }
+                }
+        }
+        .presentationDetents([.medium])
+    }
+
+    @ViewBuilder
+    private func mechanicsList() -> some View {
+        let visible = items()
+        if mechanics.isEmpty {
+            ContentUnavailableView(
+                "No Games in Collection",
+                systemImage: "books.vertical",
+                description: Text("Add games to use this filter.")
+            )
+        } else if visible.isEmpty {
+            ContentUnavailableView.search(text: search)
+        } else {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(visible, id: \.self) { (m: String) in
+                        Button {
+                            if localSelected.contains(m) { localSelected.remove(m) }
+                            else { localSelected.insert(m) }
+                        } label: {
+                            HStack {
+                                Text(m).foregroundStyle(.primary)
+                                Spacer()
+                                if localSelected.contains(m) {
+                                    Image(systemName: "checkmark").foregroundStyle(Color.accentColor).fontWeight(.semibold)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        Divider().padding(.leading, 16)
+                    }
+                }
+            }
+            .background(Color(.systemBackground))
+        }
+    }
+}
+
 // MARK: - FilterView
 
 struct FilterView: View {
     @Binding var filters: GameFilters
+    var availableMechanics: [String] = []
     @Environment(\.dismiss) private var dismiss
     @State private var exactInputs: [FilterField: String] = [:]
+    @State private var mechanicsExpanded = false
+    @State private var languageExpanded = false
+    @State private var titleExpanded = false
+    @State private var showMechanicsSheet = false
 
     private var enabledFields: [FilterField] { FilterField.allCases.filter { filters.specs[$0] != nil } }
     private var otherFields: [FilterField] { FilterField.allCases.filter { filters.specs[$0] == nil } }
@@ -166,24 +318,36 @@ struct FilterView: View {
             List {
                 if !enabledFields.isEmpty {
                     Section("Enabled filters") {
-                        ForEach(enabledFields) { field in
-                            filterRow(field)
-                        }
+                        ForEach(enabledFields) { field in filterRow(field) }
                     }
                 }
                 Section(enabledFields.isEmpty ? "Select filters" : "Other filters") {
-                    ForEach(otherFields) { field in
-                        filterRow(field)
-                    }
+                    ForEach(otherFields) { field in filterRow(field) }
+                    mechanicsRow
+                    languageFilterRow
+                    titleFilterRow
                 }
             }
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showMechanicsSheet) {
+                MechanicsPickerSheet(selected: $filters.mechanics, mechanics: availableMechanics)
+            }
+            .onAppear {
+                mechanicsExpanded = !filters.mechanics.isEmpty
+                languageExpanded = !filters.languages.isEmpty
+                titleExpanded = !filters.titleQuery.isEmpty
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear All") { filters.specs.removeAll() }
-                        .foregroundStyle(.red)
-                        .disabled(filters.isEmpty)
+                    Button("Clear All") {
+                        filters = GameFilters()
+                        mechanicsExpanded = false
+                        languageExpanded = false
+                        titleExpanded = false
+                    }
+                    .foregroundStyle(.red)
+                    .disabled(filters.isEmpty)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
@@ -193,6 +357,8 @@ struct FilterView: View {
         }
     }
 
+    // MARK: - Numeric filter rows
+
     @ViewBuilder
     private func filterRow(_ field: FilterField) -> some View {
         let spec = filters.specs[field]
@@ -201,74 +367,41 @@ struct FilterView: View {
                 Image(systemName: field.icon)
                     .frame(width: 24)
                     .foregroundStyle(field.color)
-                Text(field.rawValue)
-                    .font(.body)
+                Text(field.rawValue).font(.subheadline)
                 Spacer()
                 modeMenu(field, spec: spec)
             }
-
             if let spec {
-                if spec.mode == .exactly {
-                    exactlyInput(field)
-                } else {
-                    sliderControl(field, spec: spec)
-                }
+                if spec.mode == .exactly { exactlyInput(field) }
+                else { sliderControl(field, spec: spec) }
             }
         }
         .padding(.vertical, spec != nil ? 4 : 0)
-        .animation(.easeInOut(duration: 0.2), value: spec != nil)
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
     }
 
     private func modeMenu(_ field: FilterField, spec: FilterSpec?) -> some View {
         Menu {
-            Button("Off") {
-                filters.specs[field] = nil
-                exactInputs[field] = nil
-            }
+            Button("Off") { filters.specs[field] = nil; exactInputs[field] = nil }
             ForEach(FilterMode.allCases) { mode in
                 Button(mode.rawValue) {
                     let v = filters.specs[field]?.value ?? field.defaultValue
                     filters.specs[field] = FilterSpec(mode: mode, value: v)
-                    if mode == .exactly {
-                        exactInputs[field] = field.formatValue(v)
-                    } else {
-                        exactInputs[field] = nil
-                    }
+                    exactInputs[field] = mode == .exactly ? field.formatValue(v) : nil
                 }
             }
-        } label: {
-            HStack(spacing: 3) {
-                Text(spec?.mode.rawValue ?? "Off")
-                    .foregroundStyle(spec?.mode.color ?? .secondary)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-            .font(.subheadline.weight(.medium))
-            .padding(.vertical, 4)
-            .padding(.leading, 8)
-            .contentShape(Rectangle())
-        }
+        } label: { pillLabel(spec?.mode.rawValue ?? "Off", color: spec?.mode.color) }
     }
 
     private func sliderControl(_ field: FilterField, spec: FilterSpec) -> some View {
         VStack(spacing: 2) {
-            Slider(
-                value: Binding(
-                    get: { spec.value },
-                    set: { filters.specs[field]?.value = $0 }
-                ),
-                in: field.range,
-                step: field.step
-            )
-            .tint(spec.mode.color)
-
+            Slider(value: Binding(get: { spec.value }, set: { filters.specs[field]?.value = $0 }),
+                   in: field.range, step: field.step)
+                .tint(spec.mode.color)
             HStack {
                 Spacer()
                 Text(field.formatValue(spec.value) + (field.unit.map { " \($0)" } ?? ""))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
+                    .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
             }
         }
     }
@@ -276,28 +409,172 @@ struct FilterView: View {
     @ViewBuilder
     private func exactlyInput(_ field: FilterField) -> some View {
         VStack(spacing: 4) {
-            TextField(
-                "Value",
-                text: Binding(
-                    get: { exactInputs[field] ?? field.formatValue(filters.specs[field]?.value ?? field.defaultValue) },
-                    set: { newVal in
-                        exactInputs[field] = newVal
-                        guard let d = Double(newVal), field.range.contains(d) else { return }
-                        filters.specs[field]?.value = d
-                    }
-                )
-            )
+            TextField("Value", text: Binding(
+                get: { exactInputs[field] ?? field.formatValue(filters.specs[field]?.value ?? field.defaultValue) },
+                set: { newVal in
+                    exactInputs[field] = newVal
+                    guard let d = Double(newVal), field.range.contains(d) else { return }
+                    filters.specs[field]?.value = d
+                }
+            ))
             .keyboardType(field.isInteger ? .numberPad : .decimalPad)
             .font(.system(size: 52, weight: .semibold))
             .multilineTextAlignment(.center)
-
             if let unit = field.unit {
-                Text(unit)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(unit).font(.callout).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+
+    // MARK: - Mechanics row
+
+    private var mechanicsRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "gearshape.2").frame(width: 24).foregroundStyle(.indigo)
+                Text("Mechanics").font(.subheadline)
+                Spacer()
+                Menu {
+                    Button("Off") { mechanicsExpanded = false; filters.mechanics = [] }
+                    Button("Select") { mechanicsExpanded = true }
+                } label: {
+                    pillLabel(mechanicsExpanded ? (filters.mechanics.isEmpty ? "Select" : "\(filters.mechanics.count) on") : "Off",
+                              color: mechanicsExpanded ? .indigo : nil)
+                }
+            }
+            if mechanicsExpanded {
+                Button {
+                    showMechanicsSheet = true
+                } label: {
+                    HStack {
+                        Text(filters.mechanics.isEmpty ? "Select mechanics…" : filters.mechanics.sorted().joined(separator: ", "))
+                            .font(.subheadline)
+                            .foregroundStyle(filters.mechanics.isEmpty ? .secondary : .primary)
+                            .lineLimit(1)
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.vertical, mechanicsExpanded ? 4 : 0)
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+    }
+
+    // MARK: - Language dependency row
+
+    private var languageFilterRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "character.book.closed").frame(width: 24).foregroundStyle(.teal)
+                Text("Language Dependency").font(.subheadline)
+                Spacer()
+                Menu {
+                    Button("Off") { languageExpanded = false; filters.languages = [] }
+                    Button("Select") { languageExpanded = true }
+                } label: {
+                    pillLabel(languageExpanded ? (filters.languages.isEmpty ? "Select" : "\(filters.languages.count) on") : "Off",
+                              color: languageExpanded ? .teal : nil)
+                }
+            }
+            if languageExpanded {
+                VStack(spacing: 0) {
+                    ForEach(LanguageDependence.allCases) { ld in
+                        languageOptionRow(ld)
+                        if ld.rawValue < LanguageDependence.allCases.last!.rawValue {
+                            Divider().padding(.leading, 36)
+                        }
+                    }
+                }
+                .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+            }
+        }
+        .padding(.vertical, languageExpanded ? 4 : 0)
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+    }
+
+    private func languageOptionRow(_ ld: LanguageDependence) -> some View {
+        // Read live from binding inside action — don't capture `on` to avoid stale closure
+        let on = filters.languages.contains(ld.rawValue)
+        return Button {
+            if filters.languages.contains(ld.rawValue) {
+                filters.languages.remove(ld.rawValue)
+            } else {
+                filters.languages.insert(ld.rawValue)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: on ? "\(ld.icon).fill" : ld.icon)
+                    .frame(width: 22)
+                    .foregroundStyle(on ? ld.color : .secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(ld.title).font(.subheadline.weight(on ? .semibold : .regular))
+                        .foregroundStyle(on ? .primary : .secondary)
+                    Text(ld.subtitle).font(.caption2).foregroundStyle(.secondary)
+                }
+                Spacer()
+                ZStack {
+                    Circle()
+                        .fill(on ? ld.color : Color.secondary.opacity(0.2))
+                        .frame(width: 22, height: 22)
+                    if on {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)  // isolates tap from list row gesture recognizer
+    }
+
+    // MARK: - Title row
+
+    private var titleFilterRow: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "textformat").frame(width: 24).foregroundStyle(.pink)
+                Text("Title").font(.subheadline)
+                Spacer()
+                Menu {
+                    Button("Off") { titleExpanded = false; filters.titleQuery = "" }
+                    ForEach(TitleMatch.allCases) { m in
+                        Button(m.rawValue) { titleExpanded = true; filters.titleMode = m }
+                    }
+                } label: {
+                    pillLabel(titleExpanded ? filters.titleMode.rawValue : "Off",
+                              color: titleExpanded ? .pink : nil)
+                }
+            }
+            if titleExpanded {
+                TextField("Type to filter…", text: $filters.titleQuery)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(8)
+                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(.vertical, titleExpanded ? 4 : 0)
+        .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
+    }
+
+    // MARK: - Shared
+
+    private func pillLabel(_ text: String, color: Color?) -> some View {
+        HStack(spacing: 4) {
+            Text(text).foregroundStyle(color ?? .secondary)
+            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+        }
+        .font(.footnote.weight(.medium))
     }
 }

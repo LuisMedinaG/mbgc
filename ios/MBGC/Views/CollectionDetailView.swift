@@ -71,6 +71,7 @@ struct CollectionDetailView: View {
         }
     }
     private var filteredGames: [Game] { filters.apply(sortedGames) }
+    private var availableMechanics: [String] { Set(collection.games.flatMap { $0.mechanics ?? [] }).sorted() }
     private var selectedGames: [Game] { filteredGames.filter { selectedIds.contains($0.bggId) } }
     private var otherCollections: [Collection] { allCollections.filter { $0.persistentModelID != collection.persistentModelID } }
     private var allSelected: Bool { !filteredGames.isEmpty && selectedIds.count == filteredGames.count }
@@ -242,7 +243,7 @@ struct CollectionDetailView: View {
             AddGamesSheet(collection: collection, allGames: allGames)
         }
         .sheet(isPresented: $showFilters) {
-            FilterView(filters: $filters)
+            FilterView(filters: $filters, availableMechanics: availableMechanics)
         }
         .sheet(isPresented: $showEditCollection) {
             RenameCollectionSheet(collection: collection, initialName: collection.name, initialDesc: collection.desc)
