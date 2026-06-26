@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var vibesViewModel = VibesViewModel()
     @State private var tab: HomeTab = .discover
+    @State private var collectionPath: [Collection] = []
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
@@ -14,7 +15,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch tab {
-            case .collection: VibesView(viewModel: vibesViewModel)
+            case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
             case .discover:   LibraryView()
             }
         }
@@ -23,7 +24,7 @@ struct ContentView: View {
                 HomePillView(tab: $tab)
                 Spacer()
                 VStack(spacing: 10) {
-                    if tab == .collection {
+                    if tab == .collection && collectionPath.isEmpty {
                         Button {
                             showCreate = true
                         } label: {
@@ -65,6 +66,8 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
         // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
         .sheet(isPresented: $showCreate)   { CreateCollectionSheet() }
+        .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
+        .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
     }
 
@@ -86,6 +89,7 @@ struct HomePillView: View {
         }
         .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
+        .sensoryFeedback(.selection, trigger: tab)
     }
 
     private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {

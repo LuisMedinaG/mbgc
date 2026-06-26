@@ -5,6 +5,7 @@ import SwiftUI
 
 struct VibesView: View {
     let viewModel: VibesViewModel
+    @Binding var path: [Collection]
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
     @State private var editingCollection: Collection?
@@ -12,7 +13,7 @@ struct VibesView: View {
     @State private var editDesc = ""
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             VStack(alignment: .leading, spacing: 0) {
                 // Custom title — matches the large header style in design
                 Text("Collection")
@@ -31,7 +32,7 @@ struct VibesView: View {
                     Spacer()
                 } else {
                     List(collections) { col in
-                        NavigationLink(destination: CollectionDetailView(collection: col)) {
+                        NavigationLink(value: col) {
                             collectionRow(col)
                         }
                         .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
@@ -55,6 +56,10 @@ struct VibesView: View {
                     }
                     .listStyle(.plain)
                 }
+            }
+            .navigationDestination(for: Collection.self) { col in
+                CollectionDetailView(collection: col)
+                    .toolbar(.visible, for: .navigationBar)
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $editingCollection) { col in
