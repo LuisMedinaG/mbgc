@@ -76,6 +76,8 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
 - Transaction pooler port `6543` — avoid; breaks session features
 - Format: `postgresql://postgres.[ref]:[pw]@aws-0-us-west-2.pooler.supabase.com:5432/postgres`
 
+**Remote Auth hardening:** Enable Auth → Providers → Email → Secure password check (HIBP) in the Supabase Dashboard. Management API config updates currently do not persist this toggle.
+
 ## JWT / Auth (services/api)
 
 - **Primary path:** ES256/RS256 via JWKS (`${SUPABASE_URL}/auth/v1/.well-known/jwks.json`).
