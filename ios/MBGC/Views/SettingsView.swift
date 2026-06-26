@@ -7,7 +7,12 @@ struct SettingsView: View {
                 NavigationLink {
                     ImportView()
                 } label: {
-                    Label("Import Games", systemImage: "arrow.down.circle")
+                    Label("Import from BGG", systemImage: "arrow.down.circle")
+                }
+                NavigationLink {
+                    CsvImportView()
+                } label: {
+                    Label("Import from CSV", systemImage: "doc.text")
                 }
             }
             .navigationTitle("Settings")

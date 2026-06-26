@@ -45,7 +45,7 @@ long-running sync.
 
 ### Phase 1 — Durable job core (pure Go + migration, no infra changes)
 
-1. New migration `services/api/migrations/006_import_jobs.{up,down}.sql`:
+1. New migration `services/api/migrations/008_import_jobs.{up,down}.sql`:
    ```sql
    CREATE TABLE importer.import_jobs (
      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

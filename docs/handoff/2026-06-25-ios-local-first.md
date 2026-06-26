@@ -1,7 +1,7 @@
 # iOS Local-First Handoff
 
 **Date:** 2026-06-25
-**Status:** Sessions 1–5 complete. Full import flow, collection picker, UI polish. Option A (BGG username sync) is next.
+**Status:** Sessions 1–6 complete. All screens local. Only APIClient.swift and ImportViewModel.swift are dead code. Option A (BGG username sync) already wired in ImportView — just needs backend to be bypassed.
 
 ---
 
@@ -78,18 +78,18 @@ Implemented Option D: CSV file import that fetches game metadata directly from B
 
 ## Remaining dead code
 
-The auth plumbing in `APIClient.swift` is still present but unreachable. Clean it up in a future pass once all server-side paths are confirmed dead:
-- `login()`, `refreshTokens()`, `logout()` (~35 lines)
-- 401 retry logic in `send()` (~20 lines)
-- `Keychain.swift` (41 lines) — only used by the removed auth token storage
-- `Tokens` enum
+**No screen calls `APIClient` anymore.** All data paths are local (SwiftData or BGGClient).
 
-Screens still calling `APIClient` (all fail silently — no auth token):
-- `SearchView` → `APIClient.listGames()` — needs Option A or Option C
-- `GameDetailView` → `APIClient.getGame()` — falls back to SwiftData cache (works for locally imported games)
-- `VibesView` create/update/delete → `APIClient.*Collection()` — needs local SwiftData Collection model
-- `CollectionDetailView` → `APIClient.discover()` — needs local data
-- `ProfileViewModel.saveBGG()` → `APIClient.setBGGUsername()` — needs Option A
+Dead files safe to delete in one cleanup commit:
+| File | Reason |
+|------|--------|
+| `ios/MBGC/Networking/APIClient.swift` | Entire file — all callers removed |
+| `ios/MBGC/ViewModels/ImportViewModel.swift` | `ImportView` manages its own state inline; this VM is never instantiated |
+
+Still alive (not dead):
+| File | Why kept |
+|------|----------|
+| `ios/MBGC/Networking/Keychain.swift` | Used by `ImportView` to persist the BGG API token securely |
 
 ---
 
@@ -295,6 +295,44 @@ Unified all project docs to reflect the local-first iOS architecture:
 | `CLAUDE.md` | Updated Request Flow section — split web and iOS flows; updated directory tree |
 | `.handoff/ios-status.md` | Marked SUPERSEDED with pointer to handoff doc |
 | `.handoff/ios-api-needs.md` | Marked SUPERSEDED — iOS no longer calls services/api |
+
+---
+
+---
+
+## What was done (Session 6 — SearchView, GameDetailView, GameDetailViewModel)
+
+Last session to complete Option D. Rewired the two remaining APIClient callers to local SwiftData and deleted `LibraryViewModel`.
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `ios/MBGC/Views/SearchView.swift` | Rewritten: `@Query<Game>(sort: \Game.name)` + in-memory `localizedCaseInsensitiveContains` filter. No network call, no loading state, no APIClient. Removed "recent games" (session-only, no persistence). |
+| `ios/MBGC/ViewModels/GameDetailViewModel.swift` | Rewritten: `var game: Game?` (SwiftData model, not DTO). `load()` is now synchronous. All mutations (collections, rulesUrl, delete) are SwiftData saves. No APIClient. Uses `PersistentIdentifier` for collection selection in edit mode. |
+| `ios/MBGC/Views/GameDetailView.swift` | Updated to work with `Game` directly instead of `GameDetailDTO`. "Vibes" section → "Collections" section, backed by `@Query<Collection>`. `deleteGame` is now synchronous (no Task wrapper needed). Fixed field name: `game.gameDescription` (was `game.description`). Categories/mechanics use `?? []` since `Game` stores them as optional. |
+| `ios/MBGC/ViewModels/LibraryViewModel.swift` | **Deleted** — LibraryView is a stub; no callers remain. |
+
+### App screen status after Session 6
+
+| Screen | Status | Notes |
+|--------|--------|-------|
+| Discover tab | ⏳ Placeholder | "Coming soon" — future random-pick feature |
+| Collection tab | ✅ | `@Query<Collection>`, full CRUD, Library seeded on first launch |
+| Collection detail | ✅ | `collection.games` SwiftData relationship |
+| Search | ✅ | `@Query<Game>` local filter, instant |
+| Game detail | ✅ | Reads from SwiftData, edits collections locally, deletes locally |
+| Import (BGG username) | ✅ | `BGGClient.fetchCollection` + `fetchThings` → SwiftData (7-day cooldown, Keychain token) |
+| Import (CSV) | ✅ | Local CSV parse → `BGGClient.fetchThings` → SwiftData |
+| Collection picker (post-import) | ✅ | `CollectionPickerView` in `ImportView.swift` |
+| Settings | ✅ | Import only (no Profile link, no logout) |
+| Profile | ✅ | BGG username persisted to `UserDefaults` |
+
+### Architecture notes
+
+- `GameDetailViewModel.game` is now `Game?` (SwiftData `@Model`) — not `GameDetailDTO?`. The view reads fields directly off the model.
+- Collection membership (formerly "vibes") is a SwiftData many-to-many relationship: `Game.collections ↔ Collection.games`. Editing uses `PersistentIdentifier` for stable identity across SwiftData context.
+- `SearchView` filtering is in-memory — fine for local libraries (hundreds of games). If libraries exceed ~5,000 games, add `#Predicate` with a server-side index instead.
 
 ---
 

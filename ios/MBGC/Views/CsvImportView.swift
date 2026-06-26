@@ -21,9 +21,6 @@ private struct CSVRow: Identifiable {
 struct CsvImportView: View {
     @Environment(\.modelContext) private var modelContext
 
-    /// Called with imported Game objects after the user picks a destination.
-    var onComplete: (([Game]) -> Void)?
-
     @State private var step: CSVStep = .upload
     @State private var selectedFile: URL?
     @State private var previewRows: [CSVRow] = []
@@ -33,6 +30,7 @@ struct CsvImportView: View {
     @State private var importError: String?
     @State private var showingPicker = false
     @State private var importedGames: [Game] = []
+    @State private var showDestinationPicker = false
 
     var body: some View {
         Form {
@@ -44,6 +42,14 @@ struct CsvImportView: View {
             }
         }
         .navigationTitle("Import from CSV")
+        .sheet(isPresented: $showDestinationPicker) {
+            NavigationStack {
+                CollectionPickerView(games: importedGames) {
+                    showDestinationPicker = false
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .fileImporter(
             isPresented: $showingPicker,
             allowedContentTypes: [UTType.commaSeparatedText, UTType.plainText]
@@ -148,7 +154,7 @@ struct CsvImportView: View {
                 if !importedGames.isEmpty {
                     Section {
                         Button("Add to a collection…") {
-                            onComplete?(importedGames)
+                            showDestinationPicker = true
                         }
                     }
                 }

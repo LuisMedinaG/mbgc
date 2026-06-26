@@ -134,6 +134,7 @@ ios/*.ipa
 ios/.build/
 ios/Carthage/Build/
 ios/Components/iOSInjectionProject/
+ios/Secrets.xcconfig
 
 # macOS
 ##############################################################################

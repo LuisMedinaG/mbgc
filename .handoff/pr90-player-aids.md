@@ -1,4 +1,13 @@
-# Handoff: PR #90 — Player Aid Storage + Catalog Filter Fix
+# Handoff: PR #90 — Player Aid Storage + Catalog Filter Fix [SUPERSEDED for iOS]
+
+> **This file is stale as of 2026-06-25 regarding iOS.** The iOS app was migrated to a local-first
+> architecture — no login, no backend calls. The iOS player aid work described below
+> is superseded. If player aids are implemented on iOS, they must be implemented
+> on-device using local storage (e.g. document directory) instead of the Go API.
+>
+> Current iOS architecture: `ios/AGENTS.md` and `docs/handoff/2026-06-25-ios-local-first.md`
+
+---
 
 ## Backend Changes (merged to dev)
 
