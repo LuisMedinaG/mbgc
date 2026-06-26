@@ -126,6 +126,7 @@ export interface MockAllOverrides {
   profile?: { bggUsername?: string; isAdmin?: boolean; username?: string }
   games?: { empty?: boolean; data?: typeof FIXTURE_GAMES }
   collections?: { empty?: boolean; data?: typeof FIXTURE_COLLECTIONS }
+  bggPreview?: { total?: number; owned?: number; new?: number }
   bggSync?: { status?: number; body?: { imported: number; skipped: number; failed: number }; error?: string }
   csvImport?: { previewStatus?: number; previewError?: string; importStatus?: number }
   auth?: { loginStatus?: number; loginError?: string }
@@ -340,6 +341,20 @@ export async function mockProfile(page: Page): Promise<void> {
   })
 }
 
+/** Mock POST /api/v1/import/bgg/preview */
+export async function mockBGGPreview(
+  page: Page,
+  opts: { total?: number; owned?: number; new?: number } = {},
+): Promise<void> {
+  await page.route('**/api/v1/import/bgg/preview', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: { total: opts.total ?? 10, owned: opts.owned ?? 2, new: opts.new ?? 8 } }),
+    }),
+  )
+}
+
 /** Mock POST /api/v1/import/sync (BGG sync) */
 export async function mockBGGSync(
   page: Page,
@@ -445,6 +460,7 @@ export async function mockAll(page: Page, overrides: MockAllOverrides = {}): Pro
   await mockGetGame(page)
   await mockDeleteGame(page)
   await mockCollections(page)
+  await mockBGGPreviewWithOverride(page, overrides.bggPreview)
   await mockBGGSyncWithOverride(page, overrides.bggSync)
   await mockCSVImportWithOverride(page, overrides.csvImport)
 }
@@ -518,6 +534,13 @@ async function mockListGamesWithOverride(
       }),
     })
   })
+}
+
+async function mockBGGPreviewWithOverride(
+  page: Page,
+  override: MockAllOverrides['bggPreview'],
+): Promise<void> {
+  await mockBGGPreview(page, override ?? {})
 }
 
 async function mockBGGSyncWithOverride(

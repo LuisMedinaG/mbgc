@@ -419,9 +419,6 @@ struct CollectionDetailView: View {
                         }
                     }
                 }
-                if #available(iOS 26.0, *) {
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     collectionMenu
                 }
