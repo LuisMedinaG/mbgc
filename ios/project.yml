@@ -2,7 +2,7 @@ name: MBGC
 options:
   bundleIdPrefix: app.lumedina
   deploymentTarget:
-    iOS: "17.0"
+    iOS: "26.0"
 configFiles:
   Debug: Secrets.xcconfig
   Release: Secrets.xcconfig
@@ -16,7 +16,7 @@ targets:
   MBGC:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     sources:
       - path: MBGC
     settings:

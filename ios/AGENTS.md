@@ -29,7 +29,7 @@ web app. The iOS app is fully decoupled from the backend.
 
 ## Stack
 
-- Swift 6.2, iOS 17+, SwiftUI, SwiftData, URLSession async/await
+- Swift 6.2, iOS 26+, SwiftUI, SwiftData, URLSession async/await
 - `@Observable` everywhere — never `ObservableObject`, `@StateObject`, Combine
 - XcodeGen for project file generation
 - Zero third-party dependencies
@@ -60,7 +60,7 @@ ios/MBGC/
 │   ├── GameDetailView.swift   Detail — reads SwiftData cache, collection CRUD
 │   ├── SearchView.swift       Search — local-first filtering via @Query
 │   └── SettingsView.swift     Import links only
-└── project.yml                XcodeGen config (iOS 17, Swift 6, bundle: app.lumedina.mbgc)
+└── project.yml                XcodeGen config (iOS 26, Swift 6, bundle: app.lumedina.mbgc)
 ```
 
 ---

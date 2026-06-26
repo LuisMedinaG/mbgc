@@ -163,15 +163,13 @@ struct CollectionDetailView: View {
                 }
             } else {
                 if !collection.games.isEmpty {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItemGroup(placement: .topBarTrailing) {
                         Button { showFilters = true } label: {
                             Image(systemName: filters.isEmpty
                                 ? "line.3.horizontal.decrease.circle"
                                 : "line.3.horizontal.decrease.circle.fill")
                         }
                         .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button { sortAscending.toggle() } label: {
                                 Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
@@ -183,12 +181,11 @@ struct CollectionDetailView: View {
                             Image(systemName: isDefaultSort ? "arrow.up.arrow.down" : sortOrder.icon)
                         }
                         .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
                         Button { isSelecting = true } label: {
                             Image(systemName: "checkmark.circle")
                         }
                     }
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     collectionMenu
@@ -284,7 +281,7 @@ struct CollectionDetailView: View {
                 }
             }
         } label: {
-            Image(systemName: "ellipsis.circle")
+            Image(systemName: "ellipsis")
         }
     }
 
