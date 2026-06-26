@@ -322,7 +322,10 @@ struct CollectionDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             if let year = game.yearPublished, year > 0 {
-                Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
+                HStack(spacing: 0) {
+                    Text(game.name).bold().font(.subheadline)
+                    Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
+                }
             } else {
                 Text(game.name).bold().font(.subheadline)
             }
@@ -435,7 +438,10 @@ struct AddGamesSheet: View {
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         VStack(alignment: .leading, spacing: 0) {
                             if let year = game.yearPublished, year > 0 {
-                                Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
+                                HStack(spacing: 0) {
+                                    Text(game.name).bold().font(.subheadline)
+                                    Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
+                                }
                             } else {
                                 Text(game.name).bold().font(.subheadline)
                             }

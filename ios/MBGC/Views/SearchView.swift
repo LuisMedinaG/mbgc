@@ -60,7 +60,10 @@ struct SearchView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
 
             if let year = game.yearPublished, year > 0 {
-                Text("\(game.name) ") + Text("(\(year))").foregroundColor(.secondary)
+                HStack(spacing: 0) {
+                    Text("\(game.name) ")
+                    Text("(\(year))").foregroundColor(.secondary)
+                }
             } else {
                 Text(game.name)
             }
