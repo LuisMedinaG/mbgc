@@ -36,6 +36,16 @@ enum FilterField: String, CaseIterable, Identifiable {
         }
     }
 
+    var color: Color {
+        switch self {
+        case .rating: return .yellow
+        case .weight: return .purple
+        case .playtime: return .blue
+        case .players: return .green
+        case .yearPublished: return .orange
+        }
+    }
+
     var range: ClosedRange<Double> {
         switch self {
         case .rating: return 1...10
@@ -190,7 +200,7 @@ struct FilterView: View {
             HStack {
                 Image(systemName: field.icon)
                     .frame(width: 24)
-                    .foregroundStyle(spec?.mode.color ?? .secondary)
+                    .foregroundStyle(field.color)
                 Text(field.rawValue)
                     .font(.body)
                 Spacer()
@@ -235,6 +245,9 @@ struct FilterView: View {
                     .foregroundStyle(.secondary)
             }
             .font(.subheadline.weight(.medium))
+            .padding(.vertical, 4)
+            .padding(.leading, 8)
+            .contentShape(Rectangle())
         }
     }
 

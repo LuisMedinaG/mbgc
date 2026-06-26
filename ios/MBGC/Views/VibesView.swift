@@ -383,7 +383,7 @@ struct CollectionDetailView: View {
         .toolbar {
             if isSelecting {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(allSelected ? "Deselect All" : "Select All") {
+                    Button(allSelected ? "Deselect all" : "Select all") {
                         selectedIds = allSelected ? [] : Set(filteredGames.map(\.bggId))
                     }
                 }
@@ -429,24 +429,48 @@ struct CollectionDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isSelecting {
-                HStack(spacing: 0) {
+                HStack {
+                    HStack(spacing: 0) {
+                        Button("Copy All") {
+                            selectedIds = Set(filteredGames.map(\.bggId))
+                            pendingAction = .copy
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+
+                        Rectangle()
+                            .fill(Color(.separator))
+                            .frame(width: 0.5, height: 20)
+
+                        Button("Move All") {
+                            selectedIds = Set(filteredGames.map(\.bggId))
+                            pendingAction = .move
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                    }
+                    .font(.body.weight(.medium))
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+
                     Spacer()
-                    Button("Copy All") { pendingAction = .copy }
-                        .disabled(selectedIds.isEmpty)
-                    Spacer()
-                    Divider().frame(height: 20)
-                    Spacer()
-                    Button("Move All") { pendingAction = .move }
-                        .disabled(selectedIds.isEmpty)
-                    Spacer()
-                    Divider().frame(height: 20)
-                    Spacer()
-                    Button("Delete All", role: .destructive) { deleteSelected() }
-                        .disabled(selectedIds.isEmpty)
-                    Spacer()
+
+                    Button { deleteSelected() } label: {
+                        Text("Delete All")
+                            .font(.body.weight(.medium))
+                            .foregroundStyle(selectedIds.isEmpty ? Color.secondary : Color.red)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.plain)
+                    .background(.regularMaterial)
+                    .clipShape(Capsule())
+                    .disabled(selectedIds.isEmpty)
                 }
-                .padding(.vertical, 16)
-                .background(.regularMaterial)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
             }
         }
         .sheet(isPresented: $showAddGames) {
