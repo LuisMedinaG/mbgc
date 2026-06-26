@@ -22,6 +22,8 @@ func NewHandler(svc *Service, limitUser, limitAdmin int) *Handler {
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
 	// ref: importer.BGG_SYNC.1 — POST /api/v1/import/sync
 	mux.Handle("POST /api/v1/import/sync", auth(http.HandlerFunc(h.Sync)))
+	// pre-fetch BGG collection counts (new vs owned) before a sync
+	mux.Handle("POST /api/v1/import/bgg/preview", auth(http.HandlerFunc(h.BGGPreview)))
 	// ref: importer.CSV_IMPORT.2 — POST /api/v1/import/csv/preview
 	mux.Handle("POST /api/v1/import/csv/preview", auth(http.HandlerFunc(h.CSVPreview)))
 	// ref: importer.CSV_IMPORT.7 — POST /api/v1/import/csv
@@ -42,6 +44,19 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 	bggUsername := httpx.UsernameFromContext(r.Context())
 
 	result, err := h.svc.Sync(r, userID, bggUsername, isAdmin, fullRefresh, h.syncLimitUser, h.syncLimitAdmin)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, httpx.New(result))
+}
+
+func (h *Handler) BGGPreview(w http.ResponseWriter, r *http.Request) {
+	userID, ok := httpx.RequireUserID(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.PreviewCollection(r.Context(), userID)
 	if err != nil {
 		httpx.WriteError(w, err)
 		return

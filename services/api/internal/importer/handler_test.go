@@ -605,3 +605,21 @@ func TestSync_EmitsSyncErrorOnStoreFailure(t *testing.T) {
 		t.Errorf("did not expect sync_ok on store failure, got: %s", buf.String())
 	}
 }
+
+func TestPreviewCollection_CountsNewVsOwned(t *testing.T) {
+	bgg := &mockBGGClient{
+		available:         true,
+		fetchCollectionFn: func(context.Context, string) ([]int, error) { return []int{1, 2, 3}, nil },
+	}
+	gs := &mockGameService{
+		gameExistsFn: func(_ context.Context, _ string, id int) (bool, error) { return id == 2, nil },
+	}
+	svc := NewService(okStore(), bgg, gs, &mockProfileService{})
+	res, err := svc.PreviewCollection(context.Background(), "u1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Total != 3 || res.Owned != 1 || res.New != 2 {
+		t.Errorf("got total=%d owned=%d new=%d, want 3/1/2", res.Total, res.Owned, res.New)
+	}
+}

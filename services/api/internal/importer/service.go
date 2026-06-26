@@ -136,13 +136,14 @@ func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefr
 		}
 		for _, g := range games {
 			data := bggGameToGameData(g)
-			_, created, err := s.gameSvc.UpsertBGGGame(ctx, userID, data)
+			gid, created, err := s.gameSvc.UpsertBGGGame(ctx, userID, data)
 			if err != nil {
 				result.Failed = append(result.Failed, strconv.Itoa(g.BGGID))
 				continue
 			}
 			if created {
 				result.Imported++
+				result.ImportedIDs = append(result.ImportedIDs, gid)
 			} else {
 				result.Skipped++
 			}
@@ -162,6 +163,36 @@ func (s *Service) Sync(r *http.Request, userID, _ string, isAdmin bool, fullRefr
 	// ref: monitoring.SINK.5 — sync_ok with imported game count
 	httpx.Record(r, "sync_ok", slog.LevelInfo, "sync_kind", kind, "game_count", result.Imported)
 	return result, nil
+}
+
+// PreviewCollection fetches the user's BGG collection and reports how many games
+// are new vs already owned — no metadata fetch, so it's a single BGG call.
+// ponytail: not rate-limited; one outbound BGG list call, cheaper than a full sync.
+func (s *Service) PreviewCollection(ctx context.Context, userID string) (*PreviewResult, error) {
+	if !s.bgg.Available() {
+		return nil, fmt.Errorf("%w: BGG sync is not configured (no BGG_TOKEN or BGG_COOKIE)", apierr.ErrInternal)
+	}
+	bggUsername, err := s.profSvc.GetBGGUsername(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("fetching BGG username: %w", err)
+	}
+	if bggUsername == "" {
+		return &PreviewResult{}, nil
+	}
+	bggIDs, err := s.bgg.FetchCollection(ctx, bggUsername)
+	if err != nil {
+		return nil, fmt.Errorf("fetching BGG collection: %w", err)
+	}
+	res := &PreviewResult{Total: len(bggIDs)}
+	for _, id := range bggIDs {
+		exists, err := s.gameSvc.GameExistsByBGGID(ctx, userID, id)
+		if err == nil && exists {
+			res.Owned++
+		} else {
+			res.New++
+		}
+	}
+	return res, nil
 }
 
 func bggGameToGameData(g BGGGame) catalog.BGGGameData {

@@ -223,9 +223,16 @@ export interface DiscoverResponse {
 }
 
 export interface SyncResult {
-  imported: number
-  skipped:  number
-  failed:   number
+  imported:      number
+  skipped:       number
+  failed:        number
+  imported_ids?: number[]
+}
+
+export interface BGGPreviewResult {
+  total: number
+  owned: number
+  new:   number
 }
 
 export interface CSVPreviewRow {
@@ -406,6 +413,11 @@ export const api = {
   },
 
   // Import
+  async previewBGG(): Promise<BGGPreviewResult> {
+    const r = await request<{ data: BGGPreviewResult }>('POST', '/import/bgg/preview', undefined)
+    return r.data
+  },
+
   async syncBGG(fullRefresh = false): Promise<SyncResult> {
     const path = fullRefresh ? '/import/sync?full_refresh=true' : '/import/sync'
     const r = await request<{ data: SyncResult }>('POST', path, undefined)

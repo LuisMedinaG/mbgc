@@ -1,26 +1,56 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ApiError } from '../lib/api'
+import { ApiError, type BGGPreviewResult, type SyncResult } from '../lib/api'
 import { useProfile } from '../hooks/useProfile'
 import { useImport } from '../hooks/useImport'
 
 export default function ImportPage() {
   const { profile } = useProfile()
-  const { syncBGG } = useImport()
+  const { previewBGG, syncBGG, createListWithGames } = useImport()
   const bggUsername = profile?.bgg_username ?? ''
 
-  const [syncError, setSyncError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [fullRefresh, setFullRefresh] = useState(false)
+  const [preview, setPreview] = useState<BGGPreviewResult | null>(null)
+  const [result, setResult] = useState<SyncResult | null>(null)
+  const [listName, setListName] = useState('')
+  const [listDone, setListDone] = useState<string | null>(null)
 
-  async function handleSync() {
-    syncBGG.reset()
-    setSyncError(null)
+  async function handlePreview() {
+    setError(null); setResult(null); setListDone(null)
     try {
-      await syncBGG.mutateAsync(fullRefresh)
+      setPreview(await previewBGG.mutateAsync())
     } catch (e) {
-      setSyncError(e instanceof ApiError ? e.message : 'Sync failed')
+      setError(e instanceof ApiError ? e.message : 'Preview failed')
     }
   }
+
+  async function handleSync() {
+    setError(null)
+    try {
+      setResult(await syncBGG.mutateAsync(fullRefresh))
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Sync failed')
+    }
+  }
+
+  async function handleCreateList() {
+    if (!listName.trim() || !result?.imported_ids?.length) return
+    try {
+      await createListWithGames.mutateAsync({ name: listName.trim(), gameIds: result.imported_ids })
+      setListDone(listName.trim())
+      setListName('')
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not create list')
+    }
+  }
+
+  function restart() {
+    setPreview(null); setResult(null); setError(null); setListDone(null)
+  }
+
+  const willAdd = preview ? (fullRefresh ? preview.total : preview.new) : 0
+  const importedIds = result?.imported_ids ?? []
 
   return (
     <div className="flex flex-col gap-5 pt-1">
@@ -56,30 +86,91 @@ export default function ImportPage() {
           <span className="text-[0.78rem] text-muted">(re-fetch all games)</span>
         </label>
 
-        {syncError && <div className="alert-error">{syncError}</div>}
+        {error && <div className="alert-error">{error}</div>}
 
-        {syncBGG.data && (
-          <div className="bg-[#d1fae5] rounded-lg px-4 py-3 flex gap-6">
+        {/* Preview: how many will be added */}
+        {preview && !result && (
+          <div className="bg-edge/40 rounded-lg px-4 py-3 text-[0.875rem] text-ink">
+            <strong>{willAdd}</strong> {willAdd === 1 ? 'game' : 'games'} will be added
+            <span className="text-muted"> · {preview.owned} already owned · {preview.total} in collection</span>
+          </div>
+        )}
+
+        {/* Result: colored status bullets */}
+        {result && (
+          <div className="bg-edge/30 rounded-lg px-4 py-3 flex gap-6">
             {([
-              { label: 'Imported', value: syncBGG.data.imported },
-              { label: 'Skipped',  value: syncBGG.data.skipped },
-              { label: 'Failed',   value: syncBGG.data.failed },
+              { label: 'Imported', value: result.imported, color: '#059669' },
+              { label: 'Skipped',  value: result.skipped,  color: '#d97706' },
+              { label: 'Failed',   value: failedCount(result), color: '#dc2626' },
             ] as const).map(s => (
-              <div key={s.label}>
-                <div className="font-heading text-[1.25rem] font-bold text-[#065f46]">{s.value}</div>
-                <div className="text-[0.72rem] text-[#065f46] uppercase tracking-wider">{s.label}</div>
+              <div key={s.label} className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ background: s.color }} />
+                <div>
+                  <div className="font-heading text-[1.25rem] font-bold" style={{ color: s.color }}>{s.value}</div>
+                  <div className="text-[0.72rem] text-muted uppercase tracking-wider">{s.label}</div>
+                </div>
               </div>
             ))}
           </div>
         )}
 
-        <button
-          onClick={handleSync}
-          disabled={syncBGG.isPending || !bggUsername}
-          className="pressable btn btn-primary self-start disabled:opacity-50"
-        >
-          {syncBGG.isPending ? 'Syncing…' : 'Sync from BGG'}
-        </button>
+        {/* Create a list from the imported games */}
+        {result && importedIds.length > 0 && (
+          listDone ? (
+            <p className="text-[0.875rem] text-[#059669]">
+              Added {importedIds.length} {importedIds.length === 1 ? 'game' : 'games'} to <strong>{listDone}</strong>.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <label className="text-[0.78rem] font-semibold text-muted">Add these {importedIds.length} games to a new list</label>
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  value={listName}
+                  onChange={e => setListName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateList()}
+                  placeholder="List name"
+                  className="form-input flex-1 min-w-[12rem]"
+                />
+                <button
+                  onClick={handleCreateList}
+                  disabled={!listName.trim() || createListWithGames.isPending}
+                  className="pressable btn btn-secondary disabled:opacity-50"
+                >
+                  {createListWithGames.isPending ? 'Creating…' : 'Create list'}
+                </button>
+              </div>
+            </div>
+          )
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3 flex-wrap">
+          {!preview && (
+            <button
+              onClick={handlePreview}
+              disabled={previewBGG.isPending || !bggUsername}
+              className="pressable btn btn-primary self-start disabled:opacity-50"
+            >
+              {previewBGG.isPending ? 'Checking…' : 'Preview'}
+            </button>
+          )}
+          {preview && !result && (
+            <>
+              <button
+                onClick={handleSync}
+                disabled={syncBGG.isPending || willAdd === 0}
+                className="pressable btn btn-primary disabled:opacity-50"
+              >
+                {syncBGG.isPending ? 'Syncing…' : `Import ${willAdd} game${willAdd !== 1 ? 's' : ''}`}
+              </button>
+              <button onClick={restart} className="pressable btn btn-secondary">Cancel</button>
+            </>
+          )}
+          {result && (
+            <button onClick={restart} className="pressable btn btn-secondary">Sync again</button>
+          )}
+        </div>
       </section>
 
       {/* CSV Import */}
@@ -92,4 +183,10 @@ export default function ImportPage() {
       </section>
     </div>
   )
+}
+
+// Backend sends `failed` as a list of BGG IDs (omitempty), the type narrows it to a count.
+function failedCount(r: SyncResult): number {
+  const f = r.failed as unknown
+  return Array.isArray(f) ? f.length : Number(f) || 0
 }
