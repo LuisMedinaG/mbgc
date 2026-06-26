@@ -3,8 +3,8 @@
 iOS app for MBGC. **Local-first.** No login, no backend calls. Data comes from
 BGG's public XML API and is stored on-device via SwiftData.
 
-> **Last updated:** 2026-06-26 — Sessions 1–6 complete. iOS 26 deployment target, collection UI refactor, native glass toolbar.
-> Change logs: `docs/handoff/2026-06-25-ios-local-first.md`, `.handoff/2026-06-26-ios-foundation-review.md`
+> **Last updated:** 2026-06-26 (audited) — Sessions 1–6 complete. iOS 26 deployment target, collection UI refactor, native glass toolbar, BGG token SecureField + Keychain.
+> Change logs: `docs/handoff/2026-06-25-ios-local-first.md`, `docs/handoff/2026-06-26-ios-foundation-review.md`
 
 ---
 
@@ -45,21 +45,23 @@ ios/MBGC/
 │   ├── Game.swift             @Model — bggId is @Attribute(.unique) primary key
 │   └── Collection.swift       @Model — isDefault=true reserved for Library
 ├── Networking/
-│   ├── BGGClient.swift        actor — fetchThings(ids:token:), 5s pacing, 4-attempt retry
+│   ├── BGGClient.swift        actor — fetchThings(ids:token:), 5s pacing, 4-attempt retry (Bearer token support)
 │   ├── BGGXMLParser.swift     XMLParser delegate for /xmlapi2/thing XML
-│   └── BGGGame.swift          Intermediate struct (mirrors Go importer.BGGGame)
+│   ├── BGGGame.swift          Intermediate struct (mirrors Go importer.BGGGame)
+│   └── APIClient.swift        Dead code — never called, remove in future cleanup
 ├── ViewModels/
 │   ├── VibesViewModel.swift   SwiftData CRUD for Collection (no API calls)
 │   └── GameDetailViewModel.swift  Local-first: SwiftData CRUD (no API calls)
 ├── Views/
 │   ├── ContentView.swift      Tab switcher — seeds Library on first launch
 │   ├── LibraryView.swift      Discover tab — empty state placeholder
-│   ├── VibesView.swift        Collection tab — @Query collections, CRUD sheets
+│   ├── VibesView.swift        Collection tab — @Query collections, CRUD sheets, native glass toolbar
+│   ├── CollectionDetailView.swift  Detail view per collection — game rows, edit/delete sheet
 │   ├── CsvImportView.swift    CSV → BGG fetch → SwiftData → calls onComplete
-│   ├── ImportView.swift       Import page: side-by-side BGG/CSV modes, CollectionPickerView
+│   ├── ImportView.swift       Import page: side-by-side BGG/CSV modes, token SecureField, Keychain storage
 │   ├── GameDetailView.swift   Detail — reads SwiftData cache, collection CRUD
 │   ├── SearchView.swift       Search — local-first filtering via @Query
-│   └── SettingsView.swift     Import links only
+│   └── SettingsView.swift     Import links only, Settings gear icon
 └── project.yml                XcodeGen config (iOS 26, Swift 6, bundle: app.lumedina.mbgc)
 ```
 
@@ -83,8 +85,11 @@ ios/MBGC/
 - NOT stored in Keychain, NOT synced to backend
 
 ### BGG API token
-- Optional build-time `BGGToken` from `Secrets.xcconfig` / `Info.plist`
-- No user-entered token UI or Keychain storage exists yet
+- User enters token via `SecureField` in `ImportView`
+- Stored in iOS Keychain under key `"bgg.apiToken"` with accessibility `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly` (device-local only)
+- `BGGClient` sends Bearer token to collection and thing endpoints
+- 401 response means token rejected by BGG
+- DEBUG builds skip cooldown — token testing unrestricted during development
 - Never store real tokens in repo files, `.env`, screenshots, or handoff docs
 
 ---
@@ -111,7 +116,7 @@ ios/MBGC/
 
 | File / Symbol | Why dead | Cleanup action |
 |---|---|---|
-| — | — | None currently tracked |
+| `Networking/APIClient.swift` | Local-first migration — no backend calls | Delete file and remove from project.yml |
 
 ---
 
