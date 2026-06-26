@@ -267,28 +267,38 @@ struct CollectionDetailView: View {
                             : "Tap + to add games from your Library."
                     )
                 )
-            } else if filteredGames.isEmpty {
-                ContentUnavailableView(
-                    "No Matches",
-                    systemImage: "line.3.horizontal.decrease.circle",
-                    description: Text("No games match your current filters.")
-                )
             } else {
-                List(filteredGames, id: \.bggId) { game in
-                    if isSelecting {
-                        Button { toggleSelection(game) } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedIds.contains(game.bggId) ? Color.accentColor : .secondary)
-                                    .font(.title3)
-                                gameRow(game)
-                            }
-                            .foregroundStyle(.primary)
-                        }
+                List {
+                    if !filters.isEmpty && !isSelecting {
+                        filterPillsBar
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            .listRowSeparator(.hidden)
+                    }
+                    if filteredGames.isEmpty {
+                        ContentUnavailableView(
+                            "No Matches",
+                            systemImage: "line.3.horizontal.decrease.circle",
+                            description: Text("No games match your current filters.")
+                        )
+                        .listRowSeparator(.hidden)
                     } else {
-                        NavigationLink(destination: GameDetailView(gameId: game.bggId)
-                            .toolbar(.visible, for: .navigationBar)) {
-                            gameRow(game)
+                        ForEach(filteredGames, id: \.bggId) { game in
+                            if isSelecting {
+                                Button { toggleSelection(game) } label: {
+                                    HStack(spacing: 14) {
+                                        Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                                            .foregroundStyle(selectedIds.contains(game.bggId) ? Color.accentColor : .secondary)
+                                            .font(.title3)
+                                        gameRow(game)
+                                    }
+                                    .foregroundStyle(.primary)
+                                }
+                            } else {
+                                NavigationLink(destination: GameDetailView(gameId: game.bggId)
+                                    .toolbar(.visible, for: .navigationBar)) {
+                                    gameRow(game)
+                                }
+                            }
                         }
                     }
                 }
@@ -403,6 +413,36 @@ struct CollectionDetailView: View {
             } else {
                 Text(game.name).bold().font(.subheadline)
             }
+        }
+    }
+
+    private var filterPillsBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(FilterField.allCases) { field in
+                    if let spec = filters.specs[field] {
+                        filterPill(field: field, spec: spec)
+                    }
+                }
+            }
+        }
+    }
+
+    private func filterPill(field: FilterField, spec: FilterSpec) -> some View {
+        let symbol = spec.mode == .minimum ? "≥" : spec.mode == .maximum ? "≤" : "="
+        let value = field.formatValue(spec.value) + (field.unit.map { " \($0)" } ?? "")
+        return Button { filters.specs[field] = nil } label: {
+            HStack(spacing: 4) {
+                Image(systemName: field.icon)
+                    .font(.caption2)
+                Text("\(symbol) \(value)")
+                    .font(.caption.monospacedDigit())
+            }
+            .foregroundStyle(spec.mode.color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(spec.mode.color.opacity(0.12))
+            .clipShape(Capsule())
         }
     }
 }

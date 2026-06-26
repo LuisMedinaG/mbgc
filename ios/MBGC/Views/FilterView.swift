@@ -170,6 +170,11 @@ struct FilterView: View {
             .navigationTitle("Filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear All") { filters.specs.removeAll() }
+                        .foregroundStyle(.red)
+                        .disabled(filters.isEmpty)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
