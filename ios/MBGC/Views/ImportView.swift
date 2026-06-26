@@ -16,9 +16,9 @@ private var bggToken: String? {
     return t.isEmpty ? nil : t  // nil → BGGClient skips Authorization header; public collections still work
 }
 #if DEBUG
-private let bggRegularImportLimit = 250
+private let bggRegularImportLimit = 500
 #else
-private let bggRegularImportLimit = 100
+private let bggRegularImportLimit = 150
 #endif
 private let bggImportCooldown: TimeInterval = 7 * 24 * 60 * 60
 

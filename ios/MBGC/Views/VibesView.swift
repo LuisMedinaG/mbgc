@@ -291,6 +291,8 @@ struct CollectionDetailView: View {
         }
     }
 
+    private var isDefaultSort: Bool { sortOrder == .name && sortAscending }
+
     private var sortDirectionLabel: String {
         switch sortOrder {
         case .name: return sortAscending ? "A → Z" : "Z → A"
@@ -407,8 +409,9 @@ struct CollectionDetailView: View {
                                 ForEach(GameSort.allCases) { s in Label(s.label, systemImage: s.icon).tag(s) }
                             }
                         } label: {
-                            Image(systemName: "arrow.up.arrow.down")
+                            Image(systemName: isDefaultSort ? "arrow.up.arrow.down" : sortOrder.icon)
                         }
+                        .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { isSelecting = true } label: {
