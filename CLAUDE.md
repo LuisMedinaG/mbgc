@@ -1,76 +1,94 @@
 @AGENTS.md
 
-# mbgc — Monorepo
+# CLAUDE.md
 
-Personal board game collection app. Consolidated Go API + React frontend.
+## How to work
 
-## Directory Structure
+Search before building. Understand before writing. Ship the minimum thing that actually solves the problem.
 
-```
-mbgc/
-├── services/
-│   └── api/             Single consolidated Go API (auth, games, collections, importer, profile)
-├── web/                 React + Vite + TypeScript + Tailwind
-├── ios/                 SwiftUI iOS app — LOCAL-FIRST, no backend (Swift 6.2, SwiftData)
-│   ├── AGENTS.md        iOS architecture, data model, dead code map, next steps
-│   └── MBGC/
-│       ├── Models/      Game.swift, Collection.swift (SwiftData @Model)
-│       └── Networking/  BGGClient.swift, BGGXMLParser.swift, APIClient.swift (dead)
-├── docs/
-│   └── handoff/
-│       └── 2026-06-25-ios-local-first.md   Full iOS migration log (Sessions 1–3)
-├── infra/               Terraform — GCP Cloud Run, Cloudflare, Supabase
-│   └── scripts/
-│       ├── bootstrap.sh       one-time infra provisioning + GitHub secrets sync
-│       └── rotate-secrets.sh  secret rotation (cloudflare | supabase | api | all)
-├── scripts/             Operational scripts (admin user provisioning)
-└── SETUP.md             Canonical first-time setup guide (local + prod)
-```
+Read the task and every file it touches before picking a solution. Trace the real flow end to end. The smallest diff in the right place beats a large diff in the wrong place.
 
-## Request Flow
+Bug fix = root cause, not symptom. Grep every caller of the function you're about to touch. One guard in the shared function is a smaller diff than a guard in every caller.
 
-```
-Browser / web
-      │
-      ▼
-services/api  (JWT validation via JWKS + all route handlers)
-  /api/v1/auth/*         auth ping
-  /api/v1/profile/*      user profile, BGG username
-  /api/v1/games/*        games, collections, player aids
-  /api/v1/collections/*  vibes/collections CRUD
-  /api/v1/import/*       BGG sync, CSV import
-  /readyz                health check
-```
+You can outsource the typing. You cannot outsource the understanding. Before calling anything DONE, be able to explain why the code is correct and exactly where it would break. Tests passing is not understanding.
 
-JWT validation is inline in `services/api/internal/jwt/` — no gateway proxy.
+## Non-negotiable rules
 
-```
-iOS app  (local-first — does NOT call services/api)
-      │
-      ├──▶  BGG XML API (public, no auth)
-      │       https://boardgamegeek.com/xmlapi2/thing?id=...&stats=1
-      │       BGGClient actor — 2 RPS, 4-attempt retry, batch 20
-      │
-      └──▶  SwiftData (on-device SQLite)
-              Models: Game (@bggId unique), Collection (Library seeded on first launch)
-```
+### Tests — every time, no exceptions
 
-**iOS architecture changed 2026-06-25** — login removed, no JWT, no backend calls.
-Full log: `docs/handoff/2026-06-25-ios-local-first.md`. Agent rules: `ios/AGENTS.md`.
+- Every bug fix ships with a test that would have caught the bug. The regression test is the proof the bug is fixed.
+- Every non-trivial feature ships with a test in the same commit. Not the next PR.
+- "I'll add tests later" is banned. If tests aren't in the diff, the work isn't done.
+- Run `make test-v` before every PR. CI enforces 50% coverage minimum.
 
-## CI/CD
+### Tie every change to a measurable outcome
 
-- **Pipeline** — `.github/workflows/pipeline.yml`: single workflow for all CI + deploy. PR → CI only. Push to dev → CI + deploy API (dev). Push to main → CI + deploy API (prod, requires manual approval via `production` environment gate) + deploy web. Go tests run with `-race` and `-coverprofile`; coverage artifacts uploaded + per-function summary posted to PR step summary. CI fails if `services/api` coverage drops below 50%.
-- **Infra** — `.github/workflows/infra.yml`: `terraform plan` on PR to main (posts plan as PR comment via dynamic path), `terraform apply` on merge to main (infra/ changes only)
-- **E2E** — `.github/workflows/e2e.yml`: manual Playwright tests (workflow_dispatch)
-- **Reusable** — `.github/workflows/deploy-cloud-run.yml`: Cloud Run build + deploy, called by pipeline.yml. No migration step in CI — migrations run automatically at server startup via golang-migrate (SQL embedded in binary, tracked in `schema_migrations` table).
-- **Secrets** — `infra/scripts/bootstrap.sh` provisions infra + syncs secrets to GitHub Actions
-- **Rotation** — `make rotate-secrets` or `infra/scripts/rotate-secrets.sh` to rotate any secret group
-- **Runbook** — `docs/runbook/ci-cd/_index.md`: full secrets list, failure diagnosis, manual deploy steps
+- Every feature names what gets measurably better before you build it.
+- "It works" is not an outcome. Name the metric, the workflow step, or the user-visible behavior that changes.
+- If you can't state what changes and how you'll see it, that's a Confusion Protocol stop.
 
-## Infrastructure
+### Tech choice — vanilla by default
 
-- **GCP Cloud Run** — `mbgc-api` single service (`services/api`)
-- **Cloudflare** — Pages frontend, DNS for `lumedina.dev` (see [docs/runbook/cloudflare/](docs/runbook/cloudflare/))
-- **Supabase** — auth provider + Postgres (migrations in `services/api/migrations/`)
-- **Terraform** — `infra/` is the single source of truth (no Fly.io)
+- Simplest vanilla tech wins. No clever abstractions for hypothetical reuse.
+- Do not recreate what already exists. Check for an existing lib, util, or pattern in the codebase first.
+- New external dependency? Ask first.
+
+### Search before building
+
+1. **Existing codebase.** Helper, util, type, or pattern that already lives here → reuse it.
+2. **Stdlib / platform.** CSS over JS. DB constraint over app code. Native input over a picker lib.
+3. **Already-installed dependency.** Use it. Never add a new one for what a few lines can do.
+4. **Only then:** the minimum code that works.
+
+### Check for skills
+
+When a task matches a specialized domain, use the installed Claude Code skill. Don't reinvent what a skill already does. Invoke via the Skill tool.
+
+### Skillify repeated work
+
+The second time you run the same manual flow by hand, codify it: a script or a skill. One-off prompts don't compound.
+
+## Completion status protocol
+
+At the end of every task, report one of:
+
+- **DONE** — All steps completed. Evidence provided for every claim. Tests in the diff. Ready to merge.
+- **DONE_WITH_CONCERNS** — Completed, but with issues Luis should know about. List each with severity and proposed follow-up.
+- **BLOCKED** — Cannot proceed. State what's blocking and what was already tried.
+- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what's needed.
+
+"Partially done" is not a status.
+
+## After every task
+
+Once done:
+1. **Commit and push** — stage the work, write a clear commit message, push to GitHub. Imperative present tense, 50-char subject max. No Co-Authored-By footers.
+2. **Report what to restart** — exactly which service needs restarting and the full command. If nothing needs restarting, say so.
+
+## Confusion protocol
+
+Stop and ask when:
+- Two plausible architectures for the same requirement
+- A request that contradicts an existing pattern
+- A destructive operation with unclear scope
+- Missing context that would materially change the approach
+
+Name the ambiguity in one sentence. Present 2–3 options with real trade-offs. Ask Luis. Do not guess on architectural decisions.
+
+Does not apply to routine coding, small features, or obvious changes.
+
+## Safety
+
+- Never commit secrets. If `.env` is touched, verify `.gitignore` before any commit.
+- Never run `rm -rf`, `git reset --hard`, `git push --force`, `DROP TABLE`, or similar destructive ops without explicit confirmation.
+- Never skip pre-commit hooks with `--no-verify`. If a hook fails, fix the underlying issue.
+- Never manually edit `.pbxproj` or `.xcodeproj/` — use `xcodegen generate`.
+- Before any action that touches production, state what you're about to do and wait for confirmation.
+
+## How Luis wants to be talked to
+
+- Direct. Short. Concrete. No preamble.
+- Specific file names, function names, line numbers.
+- No em dashes. No AI vocabulary (delve, crucial, robust, comprehensive, nuanced, multifaceted, furthermore, moreover, pivotal, tapestry, underscore, foster, showcase, intricate, vibrant, fundamental, significant, interplay).
+- If something is broken, say so plainly.
+- End responses with the next action, not a recap of what was just done.
