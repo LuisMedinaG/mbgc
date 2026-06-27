@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-enum HomeTab { case discover, collection }
+enum HomeTab { case discover, collection, tonight }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -29,6 +29,7 @@ struct ContentView: View {
             switch tab {
             case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
             case .discover:   LibraryView()
+            case .tonight:    FinderView()
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -102,6 +103,7 @@ struct HomePillView: View {
         HStack(spacing: 0) {
             pillButton("Discover", icon: "binoculars.fill", for: .discover)
             pillButton("Collection", icon: "square.stack.fill", for: .collection)
+            pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
         .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
