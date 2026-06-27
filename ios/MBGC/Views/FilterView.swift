@@ -19,73 +19,86 @@ enum FilterMode: String, CaseIterable, Identifiable {
 
 enum FilterField: String, CaseIterable, Identifiable {
     case rating = "Rating"
+    case userRating = "My Rating"
     case weight = "Complexity"
     case playtime = "Playtime"
     case players = "Players"
+    case bestFor = "Best For"
+    case bggRank = "BGG Rank"
     case yearPublished = "Year Published"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .rating: return "star"
-        case .weight: return "scalemass"
-        case .playtime: return "clock"
-        case .players: return "person.2"
+        case .rating:        return "star"
+        case .userRating:    return "star.fill"
+        case .weight:        return "scalemass"
+        case .playtime:      return "clock"
+        case .players:       return "person.2"
+        case .bestFor:       return "person.2.circle"
+        case .bggRank:       return "trophy"
         case .yearPublished: return "calendar"
         }
     }
 
     var color: Color {
         switch self {
-        case .rating: return .yellow
-        case .weight: return .purple
-        case .playtime: return .blue
-        case .players: return .green
+        case .rating:        return .yellow
+        case .userRating:    return .orange
+        case .weight:        return .purple
+        case .playtime:      return .blue
+        case .players:       return .green
+        case .bestFor:       return .teal
+        case .bggRank:       return .yellow
         case .yearPublished: return .orange
         }
     }
 
     var range: ClosedRange<Double> {
         switch self {
-        case .rating: return 1...10
-        case .weight: return 1...5
-        case .playtime: return 15...300
-        case .players: return 1...10
-        case .yearPublished: return 1970...2026
+        case .rating, .userRating: return 1...10
+        case .weight:              return 1...5
+        case .playtime:            return 15...300
+        case .players, .bestFor:   return 1...10
+        case .bggRank:             return 1...5000
+        case .yearPublished:       return 1970...2026
         }
     }
 
     var step: Double {
         switch self {
-        case .rating: return 0.5
-        case .weight: return 0.1
-        case .playtime: return 15
-        case .players, .yearPublished: return 1
+        case .rating, .userRating: return 0.5
+        case .weight:              return 0.1
+        case .playtime:            return 15
+        case .bggRank:             return 50
+        case .players, .bestFor, .yearPublished: return 1
         }
     }
 
     var unit: String? {
         switch self {
         case .playtime: return "min"
-        default: return nil
+        case .bestFor:  return "players"
+        default:        return nil
         }
     }
 
     var isInteger: Bool {
         switch self {
-        case .playtime, .players, .yearPublished: return true
+        case .playtime, .players, .bestFor, .bggRank, .yearPublished: return true
         default: return false
         }
     }
 
     var defaultValue: Double {
         switch self {
-        case .rating: return 7
-        case .weight: return 3
-        case .playtime: return 60
-        case .players: return 4
-        case .yearPublished: return 2015
+        case .rating, .userRating: return 7
+        case .weight:              return 3
+        case .playtime:            return 60
+        case .players, .bestFor:   return 4
+        case .bggRank:             return 1000
+        case .yearPublished:       return 2015
         }
     }
 
@@ -132,6 +145,9 @@ struct GameFilters: Equatable {
         case .rating:
             guard let v = game.rating else { return true }
             return check(v)
+        case .userRating:
+            guard let v = game.userRating else { return true }
+            return check(v)
         case .weight:
             guard let v = game.weight else { return true }
             return check(v)
@@ -147,6 +163,18 @@ struct GameFilters: Equatable {
             case .maximum: return mn <= spec.value
             case .exactly: return mn <= spec.value && spec.value <= mx
             }
+        case .bestFor:
+            guard let rp = game.recommendedPlayers, !rp.isEmpty else { return true }
+            let n = Int(spec.value)
+            switch spec.mode {
+            case .minimum: return rp.contains { $0 >= n }
+            case .maximum: return rp.contains { $0 <= n }
+            case .exactly: return rp.contains(n)
+            }
+        case .bggRank:
+            // Lower rank = better. "maximum 500" → top-500 games. Unranked games pass through.
+            guard let v = game.bggRank else { return true }
+            return check(Double(v))
         case .yearPublished:
             guard let v = game.yearPublished else { return true }
             return check(Double(v))

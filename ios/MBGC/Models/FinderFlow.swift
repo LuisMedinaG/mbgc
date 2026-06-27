@@ -120,6 +120,24 @@ enum FinderAxis: String, CaseIterable {
         }
     }
 
+    // MARK: - Score contribution
+    //
+    // Each axis knows its own ranking signal. Return 0 when the pick is nil (skipped) or
+    // this axis has no ranking signal (filter-only). To add a new signal: add a case here.
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        guard let pick, pick.id != "skip" else { return 0 }
+        switch self {
+        case .vibe, .duration:
+            return 0  // filter-only axes; picking them doesn't change individual game scores
+
+        case .players:
+            guard let n = Self.playerCount(from: pick.id),
+                  game.recommendedPlayers?.contains(n) == true else { return 0 }
+            return weights.recommendedPlayers
+        }
+    }
+
     // MARK: - Apply
 
     func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
@@ -194,12 +212,18 @@ final class FinderFlow {
     }
 
     var ranked: [Game] {
-        let n = chosenPlayerCount
+        let w = FinderConfig.rankingWeights
         return survivors.sorted { a, b in
-            let sa = FinderConfig.score(a, players: n)
-            let sb = FinderConfig.score(b, players: n)
-            return sa != sb ? sa > sb : a.name < b.name
+            score(a, weights: w) > score(b, weights: w) || (score(a, weights: w) == score(b, weights: w) && a.name < b.name)
         }
+    }
+
+    private func score(_ game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        let axisContributions = funnel.enumerated().reduce(0.0) { sum, item in
+            let pick = item.offset < picks.count ? picks[item.offset] : nil
+            return sum + item.element.scoreContribution(pick: pick, game: game, weights: weights)
+        }
+        return FinderConfig.score(game) + axisContributions
     }
 
     var hasCollections: Bool {

@@ -41,8 +41,9 @@ enum FinderConfig {
     /// Games ranked below this are treated as effectively unranked for the bggRank signal.
     static let rankCap: Double = 10_000
 
-    /// Score a single game. Higher = stronger recommendation. Call this; don't inline the logic.
-    static func score(_ game: Game, players: Int?) -> Double {
+    /// Static score for a game — signals that are always known, regardless of funnel answers.
+    /// Per-question signals (e.g. recommendedPlayers) live in FinderAxis.scoreContribution.
+    static func score(_ game: Game) -> Double {
         let w = rankingWeights
         var s = 0.0
 
@@ -51,9 +52,6 @@ enum FinderConfig {
         }
         if let gr = game.geekRating, gr > 0 {
             s += w.geekRating * (gr / 10)
-        }
-        if let n = players, game.recommendedPlayers?.contains(n) == true {
-            s += w.recommendedPlayers
         }
         if let rank = game.bggRank, rank > 0 {
             s += w.bggRank * (1.0 - min(Double(rank), rankCap) / rankCap)
