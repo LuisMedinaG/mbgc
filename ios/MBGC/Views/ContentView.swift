@@ -1,13 +1,13 @@
 import SwiftData
 import SwiftUI
 
-enum HomeTab { case discover, collection, tonight }
+enum HomeTab { case collection, tonight }
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appearanceMode") private var appearanceMode = "system"
     @State private var vibesViewModel = VibesViewModel()
-    @State private var tab: HomeTab = .discover
+    @State private var tab: HomeTab = .tonight
     @State private var collectionPath: [Collection] = []
     @State private var showSearch = false
     @State private var showSettings = false
@@ -28,7 +28,6 @@ struct ContentView: View {
         Group {
             switch tab {
             case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
-            case .discover:   LibraryView()
             case .tonight:    FinderView()
             }
         }
@@ -65,7 +64,7 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !isInDetailView {
+            if !isInDetailView && tab != .tonight {
                 Button { showSettings = true } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 20, weight: .medium))
@@ -101,7 +100,6 @@ struct HomePillView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            pillButton("Discover", icon: "binoculars.fill", for: .discover)
             pillButton("Collection", icon: "square.stack.fill", for: .collection)
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }

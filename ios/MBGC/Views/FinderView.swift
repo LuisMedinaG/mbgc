@@ -50,6 +50,7 @@ struct FinderView: View {
             .animation(.spring(response: 0.32, dampingFraction: 0.82), value: flow.stepIndex)
             .animation(.spring(response: 0.4),  value: flow.isDone)
             .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Int.self) { bggId in
                 GameDetailView(gameId: bggId)
             }
@@ -98,6 +99,7 @@ private struct FinderStepView: View {
             questionBlock
             optionGrid
         }
+        .padding(.bottom, 110)
     }
 
     private var header: some View {
@@ -122,11 +124,11 @@ private struct FinderStepView: View {
             Color.clear.frame(width: 44, height: 44)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
+        .padding(.top, 8)
     }
 
     private var questionBlock: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 4) {
             Text(axis.question)
                 .font(.largeTitle.bold())
                 .foregroundStyle(Color(.label))
@@ -137,8 +139,8 @@ private struct FinderStepView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 20)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
     }
 
     @ViewBuilder
@@ -150,7 +152,7 @@ private struct FinderStepView: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .contentMargins(.bottom, 80, for: .scrollContent)
+            .contentMargins(.bottom, 16, for: .scrollContent)
         } else {
             GeometryReader { geo in
                 let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
@@ -159,24 +161,32 @@ private struct FinderStepView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 16)
         }
     }
 
     private func optionButton(_ option: FinderOption) -> some View {
-        Button { onSelect(option) } label: {
+        let bg: Color = option.tint.flatMap { Color(hex: $0) } ?? Color(.secondarySystemBackground)
+        let fgPrimary:   Color = option.solidBg ? .white : Color(.label)
+        let fgSecondary: Color = option.solidBg ? .white.opacity(0.75) : .secondary
+
+        return Button { onSelect(option) } label: {
             VStack(spacing: 6) {
+                if let sym = option.symbol {
+                    Image(systemName: sym)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(fgPrimary)
+                }
                 Text(option.label)
                     .font(.title2.bold())
-                    .foregroundStyle(Color(.label))
+                    .foregroundStyle(fgPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
                 Text("\(option.count) \(option.count == 1 ? "game" : "games")")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(fgSecondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.secondarySystemBackground))
+            .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(FinderButtonStyle())
@@ -400,6 +410,20 @@ private struct FinderAllMatchesView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Helpers
+
+private extension Color {
+    init?(hex: String) {
+        let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard h.count == 6, let int = UInt64(h, radix: 16) else { return nil }
+        self.init(
+            red:   Double((int >> 16) & 0xFF) / 255,
+            green: Double((int >> 8)  & 0xFF) / 255,
+            blue:  Double(int         & 0xFF) / 255
+        )
     }
 }
 

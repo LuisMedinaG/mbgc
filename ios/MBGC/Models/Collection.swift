@@ -8,16 +8,43 @@ final class Collection {
     /// true = Library (default, cannot be deleted)
     var isDefault: Bool = false
     var createdAt: Date = Date()
+    var colorHex: String = ""   // "#RRGGBB"; empty = derive from name hash
+    var iconName: String = ""   // SF Symbol name; empty = derive from name hash
 
     /// Games in this collection — populated via the inverse Game.collections relationship.
     @Relationship(deleteRule: .nullify, inverse: \Game.collections)
     var games: [Game] = []
+
+    // ponytail: append-only — indices must stay stable; colorPalette[i] must always map to same color
+    static let colorPalette: [String] = [
+        "#FF6B6B", "#FF9F43", "#FECA57", "#48DBFB", "#1DD1A1",
+        "#6C5CE7", "#A29BFE", "#FD79A8", "#00CEC9", "#55EFC4",
+    ]
+    static let iconPalette: [String] = [
+        "star.fill", "flame.fill", "bolt.fill", "heart.fill", "leaf.fill",
+        "crown.fill", "gamecontroller.fill", "dice.fill", "person.3.fill", "trophy.fill",
+    ]
+
+    var effectiveColorHex: String {
+        colorHex.isEmpty
+            ? Collection.colorPalette[abs(name.hashValue) % Collection.colorPalette.count]
+            : colorHex
+    }
+    var effectiveIconName: String {
+        iconName.isEmpty
+            ? Collection.iconPalette[abs(name.hashValue) % Collection.iconPalette.count]
+            : iconName
+    }
 
     init(name: String, desc: String = "", isDefault: Bool = false) {
         self.name = name
         self.desc = desc
         self.isDefault = isDefault
         self.createdAt = isDefault ? Date.distantPast : Date()
+        if !isDefault {
+            colorHex = Collection.colorPalette[Int.random(in: 0..<Collection.colorPalette.count)]
+            iconName  = Collection.iconPalette[Int.random(in: 0..<Collection.iconPalette.count)]
+        }
     }
 }
 

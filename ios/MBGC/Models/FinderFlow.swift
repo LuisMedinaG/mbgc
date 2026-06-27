@@ -7,6 +7,9 @@ struct FinderOption: Identifiable, Equatable {
     let id: String
     let label: String
     let count: Int
+    var tint: String? = nil    // "#RRGGBB" background; nil = secondarySystemBackground
+    var symbol: String? = nil  // SF Symbol name; nil = no icon
+    var solidBg: Bool = false  // true = full-opacity bg with white text (vibe); false = pastel tint
 }
 
 // MARK: - Duration
@@ -62,7 +65,10 @@ enum FinderAxis: String, CaseIterable {
                 .compactMap { col in
                     let n = games.filter { $0.collections.contains(where: { $0.name == col.name }) }.count
                     guard n > 0 else { return nil }
-                    return FinderOption(id: "vibe:\(col.name)", label: col.name, count: n)
+                    return FinderOption(
+                        id: "vibe:\(col.name)", label: col.name, count: n,
+                        tint: col.effectiveColorHex, symbol: col.effectiveIconName, solidBg: true
+                    )
                 }
 
         case .players:
@@ -74,16 +80,25 @@ enum FinderAxis: String, CaseIterable {
                 guard lo <= hi else { continue }
                 for n in lo...hi { freq[n, default: 0] += 1 }
             }
-            return freq.sorted { $0.key < $1.key }.map { n, c in
+            // subtle blue gradient — fewer players = lighter, more = deeper
+            let playerTints = ["#DBEAFE", "#BFDBFE", "#93C5FD", "#60A5FA", "#3B82F6", "#2563EB", "#1D4ED8", "#1E40AF"]
+            return freq.sorted { $0.key < $1.key }.enumerated().map { idx, pair in
+                let (n, c) = pair
                 let label = n >= 8 ? "8+" : n == 1 ? "Solo" : "\(n) players"
-                return FinderOption(id: "players:\(n)", label: label, count: c)
+                return FinderOption(id: "players:\(n)", label: label, count: c,
+                                    tint: playerTints[min(idx, playerTints.count - 1)])
             }
 
         case .duration:
+            let durationTints: [DurationBucket: String] = [
+                .quick: "#DCFCE7", .short: "#FEF9C3", .medium: "#FED7AA",
+                .long:  "#FECACA", .unknown: "#E2E8F0",
+            ]
             return DurationBucket.allCases.compactMap { bucket in
                 let n = games.filter { bucket.matches($0.playtime) }.count
                 guard n > 0 else { return nil }
-                return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue, count: n)
+                return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
+                                    count: n, tint: durationTints[bucket])
             }
         }
     }
