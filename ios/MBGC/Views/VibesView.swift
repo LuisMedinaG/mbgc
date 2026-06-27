@@ -50,7 +50,6 @@ struct VibesView: View {
                                     Label("Delete", systemImage: "trash")
                                 }
                                 Button {
-                                    editName = col.name
                                     editingCollection = col
                                 } label: {
                                     Label("Rename", systemImage: "pencil")
