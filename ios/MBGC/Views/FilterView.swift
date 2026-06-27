@@ -376,7 +376,18 @@ struct FilterView: View {
                     .foregroundStyle(field.color)
                 Text(field.rawValue).font(.subheadline)
                 Spacer()
-                modeMenu(field, spec: spec)
+                Menu {
+                    Button("Off") { filters.specs[field] = nil; exactInputs[field] = nil }
+                    ForEach(FilterMode.allCases) { mode in
+                        Button(mode.rawValue) {
+                            let v = filters.specs[field]?.value ?? field.defaultValue
+                            filters.specs[field] = FilterSpec(mode: mode, value: v)
+                            exactInputs[field] = mode == .exactly ? field.formatValue(v) : nil
+                        }
+                    }
+                } label: {
+                    FilterMenuLabel(text: spec?.mode.rawValue ?? "Off")
+                }
             }
             if let spec {
                 if spec.mode == .exactly { exactlyInput(field) }
@@ -387,18 +398,20 @@ struct FilterView: View {
         .alignmentGuide(.listRowSeparatorLeading) { _ in 0 }
     }
 
-    private func modeMenu(_ field: FilterField, spec: FilterSpec?) -> some View {
-        Menu {
-            Button("Off") { filters.specs[field] = nil; exactInputs[field] = nil }
-            ForEach(FilterMode.allCases) { mode in
-                Button(mode.rawValue) {
-                    let v = filters.specs[field]?.value ?? field.defaultValue
-                    filters.specs[field] = FilterSpec(mode: mode, value: v)
-                    exactInputs[field] = mode == .exactly ? field.formatValue(v) : nil
-                }
+    private struct FilterMenuLabel: View {
+        let text: String
+        var body: some View {
+            HStack(spacing: 4) {
+                Text(text)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
-        } label: {
-            pillLabel(spec?.mode.rawValue ?? "Off", color: spec?.mode.color)
+            .font(.footnote.weight(.medium))
+            .fixedSize(horizontal: true, vertical: false)
         }
     }
 
@@ -449,8 +462,7 @@ struct FilterView: View {
                     Button("Off") { mechanicsExpanded = false; filters.mechanics = [] }
                     Button("Select") { mechanicsExpanded = true }
                 } label: {
-                    pillLabel(mechanicsExpanded ? (filters.mechanics.isEmpty ? "Select" : "\(filters.mechanics.count) on") : "Off",
-                              color: mechanicsExpanded ? .indigo : nil)
+                    FilterMenuLabel(text: mechanicsExpanded ? (filters.mechanics.isEmpty ? "Select" : "\(filters.mechanics.count) on") : "Off")
                 }
             }
             if mechanicsExpanded {
@@ -489,8 +501,7 @@ struct FilterView: View {
                     Button("Off") { languageExpanded = false; filters.languages = [] }
                     Button("Select") { languageExpanded = true }
                 } label: {
-                    pillLabel(languageExpanded ? (filters.languages.isEmpty ? "Select" : "\(filters.languages.count) on") : "Off",
-                              color: languageExpanded ? .teal : nil)
+                    FilterMenuLabel(text: languageExpanded ? (filters.languages.isEmpty ? "Select" : "\(filters.languages.count) on") : "Off")
                 }
             }
             if languageExpanded {
@@ -560,18 +571,32 @@ struct FilterView: View {
                         Button(m.rawValue) { titleExpanded = true; filters.titleMode = m }
                     }
                 } label: {
-                    pillLabel(titleExpanded ? filters.titleMode.rawValue : "Off",
-                              color: titleExpanded ? .pink : nil)
+                    FilterMenuLabel(text: titleExpanded ? filters.titleMode.rawValue : "Off")
                 }
             }
             if titleExpanded {
-                TextField("Type to filter…", text: $filters.titleQuery)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.body)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 11)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                HStack(spacing: 8) {
+                    TextField("Type to filter…", text: $filters.titleQuery)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.body)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                    Button {
+                        titleExpanded = false
+                        dismiss()
+                    } label: {
+                        Text("Confirm")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 11)
+                            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 10))
+                    }
+                    .disabled(filters.titleQuery.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .opacity(filters.titleQuery.trimmingCharacters(in: .whitespaces).isEmpty ? 0.5 : 1)
+                }
             }
         }
         .padding(.vertical, titleExpanded ? 4 : 0)
@@ -579,18 +604,4 @@ struct FilterView: View {
     }
 
     // MARK: - Shared
-
-    private func pillLabel(_ text: String, color: Color?) -> some View {
-        HStack(spacing: 4) {
-            Text(text)
-                .foregroundStyle(color ?? .secondary)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-            Image(systemName: "chevron.up.chevron.down")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .font(.footnote.weight(.medium))
-        .fixedSize(horizontal: true, vertical: false)
-    }
 }

@@ -5,7 +5,7 @@ struct GameDetailView: View {
     let gameId: Int
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = GameDetailViewModel()
-    @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
+    @State private var showAddToCollection = false
 
     private let langDep = ["", "No language", "Some text", "Moderate", "Extensive", "Unplayable"]
 
@@ -34,6 +34,35 @@ struct GameDetailView: View {
         .toolbar(.visible, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .onAppear { viewModel.load(gameId: gameId, modelContext: modelContext) }
+        .safeAreaInset(edge: .bottom) {
+            if viewModel.game != nil { addToBar }
+        }
+        .sheet(isPresented: $showAddToCollection) {
+            if let game = viewModel.game {
+                AddToCollectionSheet(game: game)
+                    .presentationDetents([.medium, .large])
+            }
+        }
+    }
+
+    private var addToBar: some View {
+        Button { showAddToCollection = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                Text("Add to…")
+                if let count = viewModel.game?.collections.count, count > 0 {
+                    Text("\(count)")
+                        .font(.caption.weight(.bold))
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(.white.opacity(0.25), in: Capsule())
+                }
+            }
+            .font(.headline)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 28).padding(.vertical, 14)
+            .background(Color.accentColor, in: Capsule())
+        }
+        .padding(.bottom, 8)
     }
 
     private func heroImage(_ game: Game) -> some View {
@@ -146,51 +175,16 @@ struct GameDetailView: View {
     private func collectionsSection(_ game: Game) -> some View {
         GroupBox("Collections") {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Spacer()
-                    if !viewModel.editingCollections {
-                        Button("Edit") { viewModel.startEditingCollections() }
-                            .font(.subheadline)
-                    }
-                }
-
-                if viewModel.editingCollections {
-                    ForEach(allCollections) { col in
-                        let isSelected = col.isDefault || viewModel.selectedCollectionIds.contains(col.persistentModelID)
-                        Button { viewModel.toggleCollection(col) } label: {
-                            HStack {
-                                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                Text(col.name)
-                            }
-                        }
-                        .disabled(col.isDefault)
-                        .foregroundStyle(.primary)
-                    }
-                    if allCollections.isEmpty {
-                        Text("No collections yet").font(.subheadline).foregroundStyle(.secondary)
-                    }
-                    HStack {
-                        Button("Save") {
-                            viewModel.saveCollections(allCollections: allCollections, modelContext: modelContext)
-                        }
-                        .disabled(viewModel.isSaving)
-                        Button("Cancel") { viewModel.editingCollections = false }
-                            .foregroundStyle(.secondary)
-                    }
+                if game.collections.isEmpty {
+                    Text("Not in any collection")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    if game.collections.isEmpty {
-                        Text("Not in any collection")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                    } else {
-                        FlowLayout(spacing: 6) {
-                            ForEach(game.collections.map(\.name), id: \.self) { name in
-                                tagChip(name, color: .purple)
-                            }
+                    FlowLayout(spacing: 6) {
+                        ForEach(game.collections.map(\.name), id: \.self) { name in
+                            tagChip(name, color: .purple)
                         }
                     }
-                }
-                if let error = viewModel.errorMessage {
-                    Text(error).font(.caption).foregroundStyle(.red)
                 }
             }
         }
@@ -256,5 +250,85 @@ struct FlowLayout: Layout {
             }
             size = CGSize(width: width, height: y + lineHeight)
         }
+    }
+}
+
+// MARK: — Add to Collection Sheet
+
+struct AddToCollectionSheet: View {
+    let game: Game
+
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Collection.createdAt) private var collections: [Collection]
+    @State private var saveError: String?
+    @State private var showNewCollection = false
+    @State private var newName = ""
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(collections) { col in
+                    let isIn = col.isDefault || game.collections.contains { $0.persistentModelID == col.persistentModelID }
+                    Button { toggle(col) } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+                                .foregroundStyle(col.isDefault ? .blue : .purple)
+                            Text(col.name).foregroundStyle(.primary)
+                            Spacer()
+                            Image(systemName: isIn ? "checkmark.circle.fill" : "plus.circle")
+                                .foregroundStyle(isIn ? Color.accentColor : .secondary)
+                                .font(.title3)
+                        }
+                    }
+                    .disabled(col.isDefault)
+                }
+                if collections.isEmpty {
+                    Text("No collections yet").foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Add to…")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { newName = ""; showNewCollection = true } label: {
+                        Image(systemName: "plus.circle")
+                    }
+                }
+            }
+            .alert("New Collection", isPresented: $showNewCollection) {
+                TextField("Name", text: $newName)
+                Button("Create") { createCollection() }
+                Button("Cancel", role: .cancel) {}
+            }
+            .alert("Couldn't save", isPresented: Binding(
+                get: { saveError != nil },
+                set: { if !$0 { saveError = nil } }
+            )) {
+                Button("OK") { saveError = nil }
+            } message: {
+                Text(saveError ?? "")
+            }
+        }
+    }
+
+    private func toggle(_ col: Collection) {
+        guard !col.isDefault else { return }
+        if let idx = col.games.firstIndex(where: { $0.bggId == game.bggId }) {
+            col.games.remove(at: idx)
+        } else {
+            LocalLibrary.add([game], to: col)
+        }
+        save("Couldn't update collection.")
+    }
+
+    private func createCollection() {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        modelContext.insert(Collection(name: trimmed))
+        save("Couldn't create collection.")
+    }
+
+    private func save(_ message: String) {
+        do { try modelContext.save() } catch { saveError = message }
     }
 }
