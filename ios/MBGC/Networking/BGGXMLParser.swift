@@ -1,7 +1,12 @@
 import Foundation
 
+struct CollectionResult {
+    let ids: [Int]
+    let userRatings: [Int: Double]
+}
+
 enum BGGXMLParser {
-    static func parseCollectionResponse(_ data: Data) throws -> [Int] {
+    static func parseCollectionResponse(_ data: Data) throws -> CollectionResult {
         let delegate = CollectionDelegate()
         let parser = XMLParser(data: data)
         parser.delegate = delegate
@@ -11,7 +16,7 @@ enum BGGXMLParser {
             }
             throw URLError(.cannotParseResponse)
         }
-        return delegate.ids
+        return CollectionResult(ids: delegate.ids, userRatings: delegate.userRatings)
     }
 
     static func parseThingResponse(_ data: Data) throws -> [BGGGame] {
@@ -29,18 +34,36 @@ enum BGGXMLParser {
 
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
+        var userRatings: [Int: Double] = [:]
         private var seen = Set<Int>()
+        private var currentId: Int = 0
+        private var inStats = false
 
         func parser(_ parser: XMLParser, didStartElement elementName: String,
                     namespaceURI: String?, qualifiedName qName: String?,
                     attributes attributeDict: [String: String] = [:]) {
-            guard elementName == "item",
-                  let id = Int(attributeDict["objectid"] ?? ""),
-                  id > 0,
-                  !seen.contains(id) else { return }
-            // ponytail: collection sync only needs BGG IDs; /thing already fetches metadata.
-            ids.append(id)
-            seen.insert(id)
+            switch elementName {
+            case "item":
+                let id = Int(attributeDict["objectid"] ?? "") ?? 0
+                guard id > 0, !seen.contains(id) else { currentId = 0; return }
+                ids.append(id)
+                seen.insert(id)
+                currentId = id
+            case "stats" where currentId > 0:
+                inStats = true
+            case "rating" where inStats:
+                if let val = attributeDict["value"], let r = Double(val) {
+                    userRatings[currentId] = r
+                }
+            default:
+                break
+            }
+        }
+
+        func parser(_ parser: XMLParser, didEndElement elementName: String,
+                    namespaceURI: String?, qualifiedName qName: String?) {
+            if elementName == "stats" { inStats = false }
+            if elementName == "item" { currentId = 0; inStats = false }
         }
     }
 
@@ -63,6 +86,8 @@ enum BGGXMLParser {
         private var mechanics: [String] = []
         private var types: [String] = []
         private var rating: Double = 0
+        private var geekRating: Double = 0
+        private var bggRank: Int = 0
         private var weight: Double = 0
         private var languageDependence: Int = 0
         private var recommendedPlayers: [Int] = []
@@ -121,6 +146,13 @@ enum BGGXMLParser {
                 inRatings = true
             case "average" where inRatings:
                 rating = Double(attributeDict["value"] ?? "") ?? 0
+            case "bayesaverage" where inRatings:
+                geekRating = Double(attributeDict["value"] ?? "") ?? 0
+            case "rank" where inRatings:
+                if attributeDict["type"] == "subtype", attributeDict["name"] == "boardgame",
+                   let v = attributeDict["value"], let r = Int(v) {
+                    bggRank = r
+                }
             case "averageweight" where inRatings:
                 weight = Double(attributeDict["value"] ?? "") ?? 0
 
@@ -212,6 +244,9 @@ enum BGGXMLParser {
                     types: types,
                     weight: weight,
                     rating: rating,
+                    geekRating: geekRating,
+                    bggRank: bggRank,
+                    userRating: 0,
                     languageDependence: languageDependence,
                     recommendedPlayers: recommendedPlayers
                 ))
@@ -235,6 +270,8 @@ enum BGGXMLParser {
             mechanics = []
             types = []
             rating = 0
+            geekRating = 0
+            bggRank = 0
             weight = 0
             languageDependence = 0
             recommendedPlayers = []

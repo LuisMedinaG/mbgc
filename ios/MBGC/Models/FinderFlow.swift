@@ -193,18 +193,12 @@ final class FinderFlow {
             .flatMap { FinderAxis.playerCount(from: $0.id) }
     }
 
-    // ponytail: ranking chain is data — future: persist a different order for configurability
     var ranked: [Game] {
         let n = chosenPlayerCount
         return survivors.sorted { a, b in
-            let ra = a.rating ?? 0, rb = b.rating ?? 0
-            if ra != rb { return ra > rb }
-            if let n {
-                let af = a.recommendedPlayers?.contains(n) == true
-                let bf = b.recommendedPlayers?.contains(n) == true
-                if af != bf { return af }
-            }
-            return a.name < b.name
+            let sa = FinderConfig.score(a, players: n)
+            let sb = FinderConfig.score(b, players: n)
+            return sa != sb ? sa > sb : a.name < b.name
         }
     }
 

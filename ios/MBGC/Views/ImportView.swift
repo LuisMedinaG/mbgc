@@ -147,7 +147,8 @@ struct ImportView: View {
 
         do {
             appendSyncLog("Fetching owned BGG IDs")
-            let bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
+            let collectionResult = try await BGGClient.shared.fetchCollection(username: username, token: token)
+            let bggIds = collectionResult.ids
             UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
             appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
 
@@ -172,7 +173,7 @@ struct ImportView: View {
             if !toFetch.isEmpty {
                 syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")…"
                 appendSyncLog("Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")")
-                let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token) { done, total in
+                let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token, userRatings: collectionResult.userRatings) { done, total in
                     Task { @MainActor in
                         self.syncProgress = "Fetching details (\(done) of \(total))…"
                         self.appendSyncLog("Fetched details for \(done) of \(total)")

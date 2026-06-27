@@ -54,12 +54,12 @@ actor BGGClient {
         session = URLSession(configuration: config)
     }
 
-    func fetchCollection(username: String, token: String? = nil) async throws -> [Int] {
+    func fetchCollection(username: String, token: String? = nil) async throws -> CollectionResult {
         var components = URLComponents(string: "https://boardgamegeek.com/xmlapi2/collection")
         components?.queryItems = [
             URLQueryItem(name: "username", value: username),
             URLQueryItem(name: "own", value: "1"),
-            URLQueryItem(name: "brief", value: "1")
+            URLQueryItem(name: "stats", value: "1")
         ]
         guard let url = components?.url else {
             throw BGGError.badURL
@@ -100,13 +100,14 @@ actor BGGClient {
                 throw BGGError.xmlParse(error)
             }
         }
-        return []
+        return CollectionResult(ids: [], userRatings: [:])
     }
 
     /// `onProgress(done, total)` is called on each completed batch.
     func fetchThings(
         ids: [Int],
         token: String? = nil,
+        userRatings: [Int: Double] = [:],
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> [BGGGame] {
         var allGames: [BGGGame] = []
@@ -118,7 +119,12 @@ actor BGGClient {
             allGames.append(contentsOf: games)
             onProgress?(allGames.count, total)
         }
-        return allGames
+        guard !userRatings.isEmpty else { return allGames }
+        return allGames.map { game in
+            var g = game
+            g.userRating = userRatings[game.bggId] ?? 0
+            return g
+        }
     }
 
     private func fetchBatch(_ ids: [Int], token: String?) async throws -> [BGGGame] {

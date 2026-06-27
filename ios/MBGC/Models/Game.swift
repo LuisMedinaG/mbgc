@@ -18,6 +18,9 @@ final class Game {
     var types: [String]?
     var weight: Double?
     var rating: Double?
+    var geekRating: Double?
+    var bggRank: Int?
+    var userRating: Double?
     var languageDependence: Int?
     var recommendedPlayers: [Int]?
 
@@ -47,6 +50,9 @@ final class Game {
         types = bggGame.types.isEmpty ? nil : bggGame.types
         weight = bggGame.weight > 0 ? bggGame.weight : nil
         rating = bggGame.rating > 0 ? bggGame.rating : nil
+        geekRating = bggGame.geekRating > 0 ? bggGame.geekRating : nil
+        bggRank = bggGame.bggRank > 0 ? bggGame.bggRank : nil
+        userRating = bggGame.userRating > 0 ? bggGame.userRating : nil
         languageDependence = bggGame.languageDependence > 0 ? bggGame.languageDependence : nil
         recommendedPlayers = bggGame.recommendedPlayers.isEmpty ? nil : bggGame.recommendedPlayers
     }

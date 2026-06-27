@@ -15,6 +15,9 @@ struct BGGGame: Sendable {
     let types: [String]
     let weight: Double
     let rating: Double
+    let geekRating: Double
+    let bggRank: Int
+    var userRating: Double
     let languageDependence: Int
     let recommendedPlayers: [Int]
 }

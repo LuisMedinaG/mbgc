@@ -123,36 +123,77 @@ struct CreateCollectionSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    @State private var desc = ""
+    @State private var selectedColor = "#2196F3"
+    @State private var selectedIcon = "list.bullet"
     @State private var errorMessage: String?
+
+    private let colors = [
+        "#3D4A52", "#8B4513", "#E040FB", "#9C27B0", "#5C35CC",
+        "#2196F3", "#42A5F5", "#26C6DA", "#26A69A", "#4CAF50",
+        "#66BB6A", "#FFA726", "#FF7043", "#F44336", "#EC407A",
+    ]
+    private let icons = [
+        "list.bullet",              "person.fill",        "crown.fill",   "bolt.fill",           "star.fill",
+        "face.smiling",             "face.dashed",        "flag.fill",    "sun.max.fill",        "moon.fill",
+        "leaf.fill",                "hand.thumbsup.fill", "hand.thumbsdown.fill", "heart.fill",  "flame.fill",
+        "theatermasks.fill",        "burst.fill",         "bookmark.fill","checkmark",           "xmark",
+        "gift.fill",                "hand.raised.fill",   "trophy.fill",  "dice.fill",           "gamecontroller.fill",
+    ]
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name)
-                    TextField("Description (optional)", text: $desc)
+            ScrollView {
+                VStack(spacing: 0) {
+                    // Icon + name preview
+                    VStack(spacing: 16) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(Color(hex: selectedColor) ?? .blue)
+                                .frame(width: 80, height: 80)
+                            Image(systemName: selectedIcon)
+                                .font(.system(size: 36, weight: .medium))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.top, 24)
+
+                        TextField("Name", text: $name)
+                            .font(.system(size: 34, weight: .regular))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(name.isEmpty ? Color(.placeholderText) : Color(.label))
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 24)
+                    }
+
+                    Divider()
+
+                    // Color grid
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+                        ForEach(colors, id: \.self) { hex in
+                            colorSwatch(hex: hex)
+                        }
+                    }
+                    .padding(16)
+
+                    Divider()
+
+                    // Icon grid
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+                        ForEach(icons, id: \.self) { icon in
+                            iconButton(icon: icon)
+                        }
+                    }
+                    .padding(16)
                 }
             }
-            .navigationTitle("New Collection")
+            .navigationTitle(trimmedName.isEmpty ? "New Collection" : trimmedName)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") {
-                        let sanitized = sanitizeName(trimmedName)
-                        let col = Collection(name: sanitized, desc: desc)
-                        modelContext.insert(col)
-                        do {
-                            try modelContext.save()
-                            dismiss()
-                        } catch {
-                            errorMessage = "Couldn't save collection."
-                        }
-                    }
-                    .disabled(trimmedName.isEmpty)
+                    Button("Create") { save() }
+                        .disabled(trimmedName.isEmpty)
                 }
             }
             .alert("Error", isPresented: Binding(
@@ -164,7 +205,63 @@ struct CreateCollectionSheet: View {
                 Text(errorMessage ?? "")
             }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
+    }
+
+    @ViewBuilder
+    private func colorSwatch(hex: String) -> some View {
+        let isSelected = hex == selectedColor
+        let color = Color(hex: hex) ?? .gray
+        Button { selectedColor = hex } label: {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(color)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(.white, lineWidth: 3)
+                        .opacity(isSelected ? 1 : 0)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(color, lineWidth: isSelected ? 3 : 0)
+                        .padding(-3)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func iconButton(icon: String) -> some View {
+        let isSelected = icon == selectedIcon
+        let accent = Color(hex: selectedColor) ?? .blue
+        Button { selectedIcon = icon } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(isSelected ? accent.opacity(0.15) : Color(.systemGray6))
+                    .aspectRatio(1, contentMode: .fit)
+                Image(systemName: icon)
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(isSelected ? accent : Color(.label))
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(accent, lineWidth: isSelected ? 2 : 0)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func save() {
+        let col = Collection(name: sanitizeName(trimmedName), desc: "")
+        col.colorHex = selectedColor
+        col.iconName = selectedIcon
+        modelContext.insert(col)
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            errorMessage = "Couldn't save collection."
+        }
     }
 
     private var trimmedName: String {

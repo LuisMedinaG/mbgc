@@ -11,7 +11,7 @@ import Testing
             yearPublished: year, image: "", thumbnail: "",
             minPlayers: minPlayers, maxPlayers: maxPlayers, playTime: playtime,
             categories: [], mechanics: [], types: [],
-            weight: weight, rating: rating, languageDependence: 0, recommendedPlayers: []
+            weight: weight, rating: rating, geekRating: 0, bggRank: 0, userRating: 0, languageDependence: 0, recommendedPlayers: []
         ))
     }
 
