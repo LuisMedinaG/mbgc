@@ -286,9 +286,9 @@ struct FinderResultView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.bottom, 100)
             }
             .padding(.horizontal, 20)
+            .padding(.bottom, 120)
         }
         .sheet(isPresented: $showingAll) {
             FinderAllMatchesView(games: flow.ranked)
@@ -309,7 +309,7 @@ private struct FinderHeroCard: View {
                 Color(.systemGray5)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 260)
+            .frame(height: 200)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 20))
 
@@ -423,20 +423,6 @@ private struct FinderAllMatchesView: View {
                 }
             }
         }
-    }
-}
-
-// MARK: - Helpers
-
-private extension Color {
-    init?(hex: String) {
-        let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard h.count == 6, let int = UInt64(h, radix: 16) else { return nil }
-        self.init(
-            red:   Double((int >> 16) & 0xFF) / 255,
-            green: Double((int >> 8)  & 0xFF) / 255,
-            blue:  Double(int         & 0xFF) / 255
-        )
     }
 }
 

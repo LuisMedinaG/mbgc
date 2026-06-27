@@ -117,18 +117,6 @@ struct VibesView: View {
     }
 }
 
-private extension Color {
-    init?(hex: String) {
-        let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard h.count == 6, let int = UInt64(h, radix: 16) else { return nil }
-        self.init(
-            red:   Double((int >> 16) & 0xFF) / 255,
-            green: Double((int >> 8)  & 0xFF) / 255,
-            blue:  Double(int         & 0xFF) / 255
-        )
-    }
-}
-
 // MARK: — Create sheet (own @Environment so modelContext is guaranteed)
 
 struct CreateCollectionSheet: View {

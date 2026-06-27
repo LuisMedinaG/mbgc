@@ -72,33 +72,28 @@ enum FinderAxis: String, CaseIterable {
                 }
 
         case .players:
-            // ponytail: cap at 8 so the grid stays manageable; "8+" covers all larger games correctly
+            let cap = FinderConfig.playerCap
             var freq: [Int: Int] = [:]
             for g in games {
                 let lo = g.minPlayers ?? 1
-                let hi = min(g.maxPlayers ?? lo, 8)
+                let hi = min(g.maxPlayers ?? lo, cap)
                 guard lo <= hi else { continue }
                 for n in lo...hi { freq[n, default: 0] += 1 }
             }
-            // subtle blue gradient — fewer players = lighter, more = deeper
-            let playerTints = ["#DBEAFE", "#BFDBFE", "#93C5FD", "#60A5FA", "#3B82F6", "#2563EB", "#1D4ED8", "#1E40AF"]
+            let tints = FinderConfig.playerTints
             return freq.sorted { $0.key < $1.key }.enumerated().map { idx, pair in
                 let (n, c) = pair
-                let label = n >= 8 ? "8+" : n == 1 ? "Solo" : "\(n) players"
+                let label = n >= cap ? "\(cap)+" : n == 1 ? "Solo" : "\(n) players"
                 return FinderOption(id: "players:\(n)", label: label, count: c,
-                                    tint: playerTints[min(idx, playerTints.count - 1)])
+                                    tint: tints[min(idx, tints.count - 1)])
             }
 
         case .duration:
-            let durationTints: [DurationBucket: String] = [
-                .quick: "#DCFCE7", .short: "#FEF9C3", .medium: "#FED7AA",
-                .long:  "#FECACA", .unknown: "#E2E8F0",
-            ]
             return DurationBucket.allCases.compactMap { bucket in
                 let n = games.filter { bucket.matches($0.playtime) }.count
                 guard n > 0 else { return nil }
                 return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
-                                    count: n, tint: durationTints[bucket])
+                                    count: n, tint: FinderConfig.durationTints[bucket])
             }
         }
     }
@@ -131,8 +126,7 @@ enum FinderAxis: String, CaseIterable {
 @MainActor
 @Observable
 final class FinderFlow {
-    // ponytail: fixed funnel — future settings screen swaps this array, no other changes needed
-    let funnel: [FinderAxis] = [.vibe, .players, .duration]
+    let funnel = FinderConfig.funnel
     private(set) var picks: [FinderOption] = []
 
     var ownedGames: [Game] = []
@@ -155,10 +149,10 @@ final class FinderFlow {
         currentAxis?.options(from: survivors, collections: allCollections) ?? []
     }
 
-    // Early stop: only after ≥1 pick; ≤3 survivors, funnel exhausted, or next axis can't split
+    // Ask every axis in the funnel; stop only when none are left or the next has no options.
     var isDone: Bool {
         guard !ownedGames.isEmpty, stepIndex > 0 else { return false }
-        return survivors.count <= 3 || currentAxis == nil || currentOptions.count <= 1
+        return currentAxis == nil || currentOptions.isEmpty
     }
 
     var chosenPlayerCount: Int? {

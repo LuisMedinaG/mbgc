@@ -126,26 +126,29 @@ struct GameFilters: Equatable {
             }
         }
 
+        // Unknown values aren't filtered out — a missing field means "not enough info",
+        // not "exclude". Keeps games visible when BGG lacks weight/rating/etc.
         switch field {
         case .rating:
-            guard let v = game.rating else { return false }
+            guard let v = game.rating else { return true }
             return check(v)
         case .weight:
-            guard let v = game.weight else { return false }
+            guard let v = game.weight else { return true }
             return check(v)
         case .playtime:
-            guard let v = game.playtime else { return false }
+            guard let v = game.playtime else { return true }
             return check(Double(v))
         case .players:
-            let mn = Double(game.minPlayers ?? 0)
-            let mx = Double(game.maxPlayers ?? 0)
+            guard game.minPlayers != nil || game.maxPlayers != nil else { return true }
+            let mn = Double(game.minPlayers ?? game.maxPlayers ?? 0)
+            let mx = Double(game.maxPlayers ?? game.minPlayers ?? 0)
             switch spec.mode {
             case .minimum: return mx >= spec.value
             case .maximum: return mn <= spec.value
             case .exactly: return mn <= spec.value && spec.value <= mx
             }
         case .yearPublished:
-            guard let v = game.yearPublished else { return false }
+            guard let v = game.yearPublished else { return true }
             return check(Double(v))
         }
     }
