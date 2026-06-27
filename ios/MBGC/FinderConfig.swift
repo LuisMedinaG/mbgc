@@ -6,7 +6,7 @@ enum FinderConfig {
     static let funnel: [FinderAxis] = [.vibe, .players, .duration]
 
     /// Largest distinct player count shown; counts at or above this fold into "N+".
-    static let playerCap = 8
+    static let playerCap = 5
 
     /// Player-count button tints, lightest (few players) → deepest (many).
     static let playerTints = [
