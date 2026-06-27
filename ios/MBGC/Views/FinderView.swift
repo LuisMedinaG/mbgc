@@ -100,6 +100,14 @@ private struct FinderStepView: View {
             optionGrid
         }
         .padding(.bottom, 110)
+        .gesture(
+            DragGesture(minimumDistance: 40)
+                .onEnded { value in
+                    guard value.translation.width > 60,
+                          abs(value.translation.height) < 100 else { return }
+                    onBack?()
+                }
+        )
     }
 
     private var header: some View {
@@ -121,7 +129,12 @@ private struct FinderStepView: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             Spacer()
-            Color.clear.frame(width: 44, height: 44)
+            Button("Skip") {
+                onSelect(FinderOption(id: "skip", label: "Skip", count: survivorCount))
+            }
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(.secondary)
+            .frame(width: 44, height: 44)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)

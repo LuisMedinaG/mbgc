@@ -104,12 +104,28 @@ struct VibesView: View {
     }
 
     private func collectionIcon(_ col: Collection) -> some View {
-        Image(systemName: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+        let bg: Color = col.isDefault
+            ? .blue
+            : Color(hex: col.effectiveColorHex) ?? .orange
+        let icon = col.isDefault ? "square.grid.2x2.fill" : col.effectiveIconName
+        return Image(systemName: icon)
             .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: 48, height: 48)
-            .background(col.isDefault ? Color.blue : Color.orange)
+            .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+private extension Color {
+    init?(hex: String) {
+        let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard h.count == 6, let int = UInt64(h, radix: 16) else { return nil }
+        self.init(
+            red:   Double((int >> 16) & 0xFF) / 255,
+            green: Double((int >> 8)  & 0xFF) / 255,
+            blue:  Double(int         & 0xFF) / 255
+        )
     }
 }
 

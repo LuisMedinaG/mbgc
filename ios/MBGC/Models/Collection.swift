@@ -17,8 +17,16 @@ final class Collection {
 
     // ponytail: append-only — indices must stay stable; colorPalette[i] must always map to same color
     static let colorPalette: [String] = [
-        "#FF6B6B", "#FF9F43", "#FECA57", "#48DBFB", "#1DD1A1",
-        "#6C5CE7", "#A29BFE", "#FD79A8", "#00CEC9", "#55EFC4",
+        "#C8622A", // terracotta
+        "#C8921C", // amber
+        "#4E8E44", // forest
+        "#B83860", // berry
+        "#3A6EA8", // ocean
+        "#A05C2C", // cedar
+        "#7A9438", // olive
+        "#6A449A", // plum
+        "#268A82", // teal
+        "#8A4840", // rust
     ]
     static let iconPalette: [String] = [
         "star.fill", "flame.fill", "bolt.fill", "heart.fill", "leaf.fill",

@@ -104,6 +104,7 @@ enum FinderAxis: String, CaseIterable {
     }
 
     func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        guard option.id != "skip" else { return games }
         switch self {
         case .vibe:
             let name = option.id.replacingOccurrences(of: "vibe:", with: "")
