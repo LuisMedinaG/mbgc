@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+/// SwiftData model for a board game imported from BGG.
+/// `bggId` is the unique key; duplicate imports update the existing record instead of creating a new one.
 @Model
 final class Game {
     @Attribute(.unique) var bggId: Int = 0
@@ -36,6 +38,7 @@ final class Game {
         apply(bggGame)
     }
 
+    // BGG encodes missing integers as 0 and missing strings as ""; convert to nil so optionals stay meaningful.
     private func apply(_ bggGame: BGGGame) {
         name = bggGame.name
         yearPublished = bggGame.yearPublished > 0 ? bggGame.yearPublished : nil

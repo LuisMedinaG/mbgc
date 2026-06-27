@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 
+/// SwiftData model for a named group of games (e.g. "Library", user-defined vibes).
+/// Library is the default collection — present on every device, cannot be deleted.
 @Model
 final class Collection {
     var name: String = ""
@@ -33,6 +35,7 @@ final class Collection {
         "crown.fill", "gamecontroller.fill", "dice.fill", "person.3.fill", "trophy.fill",
     ]
 
+    // Hash-based fallback keeps color/icon stable across launches even if none was explicitly chosen.
     var effectiveColorHex: String {
         colorHex.isEmpty
             ? Collection.colorPalette[abs(name.hashValue) % Collection.colorPalette.count]
@@ -48,7 +51,7 @@ final class Collection {
         self.name = name
         self.desc = desc
         self.isDefault = isDefault
-        self.createdAt = isDefault ? Date.distantPast : Date()
+        self.createdAt = isDefault ? Date.distantPast : Date() // distantPast sorts Library before all user collections
         if !isDefault {
             colorHex = Collection.colorPalette[Int.random(in: 0..<Collection.colorPalette.count)]
             iconName  = Collection.iconPalette[Int.random(in: 0..<Collection.iconPalette.count)]
@@ -56,8 +59,10 @@ final class Collection {
     }
 }
 
+/// Namespace for local SwiftData operations shared across import flows.
 @MainActor
 enum LocalLibrary {
+    /// Fetches the Library collection or creates it on first launch.
     static func ensureDefaultCollection(in modelContext: ModelContext) throws -> Collection {
         let all = try modelContext.fetch(FetchDescriptor<Collection>())
         if let library = all.first(where: { $0.isDefault }) {
@@ -83,7 +88,7 @@ enum LocalLibrary {
     }
 
     static func add(_ games: [Game], to collection: Collection) {
-        let existing = Set(collection.games.map(\.bggId))
+        let existing = Set(collection.games.map(\.bggId)) // skip games already in the collection
         collection.games.append(contentsOf: games.filter { !existing.contains($0.bggId) })
     }
 }

@@ -32,10 +32,11 @@ enum BGGXMLParser {
         return delegate.games
     }
 
+    // SAX delegate that streams the BGG collection XML — only extracts item IDs and user ratings.
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
         var userRatings: [Int: Double] = [:]
-        private var seen = Set<Int>()
+        private var seen = Set<Int>() // BGG can return duplicate <item> entries; deduplicate by objectid
         private var currentId: Int = 0
         private var inStats = false
 
@@ -67,6 +68,8 @@ enum BGGXMLParser {
         }
     }
 
+    // SAX delegate for the BGG thing endpoint. Explicit nesting flags (inItem, inStatistics, inRatings)
+    // prevent collisions — BGG XML reuses element names like <rating> at different depths.
     private final class ThingDelegate: NSObject, XMLParserDelegate {
         var games: [BGGGame] = []
 
@@ -282,6 +285,8 @@ enum BGGXMLParser {
             inRatings = false
         }
 
+        // Returns the language-dependence level with the most community votes (mode).
+        // Returns 0 if no votes were cast (poll absent or all zeros).
         private func computeLanguageDependence() -> Int {
             guard !langResults.isEmpty else { return 0 }
             var bestLevel = 0
@@ -295,6 +300,8 @@ enum BGGXMLParser {
             return bestVotes > 0 ? bestLevel : 0
         }
 
+        // A player count is "recommended" when (Best + Recommended) votes outnumber Not Recommended votes.
+        // This mirrors the threshold BGG uses to display the green/yellow badges on game pages.
         private func computeRecommendedPlayers() -> [Int] {
             var result: [Int] = []
             var seen = Set<Int>()
