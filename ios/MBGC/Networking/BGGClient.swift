@@ -102,7 +102,7 @@ actor BGGClient {
                 throw BGGError.xmlParse(error)
             }
         }
-        return CollectionResult(ids: [], userRatings: [:])
+        return CollectionResult(ids: [], userRatings: [:], wantToPlay: [:], numberOfPlays: [:])
     }
 
     /// `onProgress(done, total)` is called on each completed batch.
@@ -110,6 +110,8 @@ actor BGGClient {
         ids: [Int],
         token: String? = nil,
         userRatings: [Int: Double] = [:],
+        wantToPlay: [Int: Bool] = [:],
+        numberOfPlays: [Int: Int] = [:],
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> [BGGGame] {
         var allGames: [BGGGame] = []
@@ -121,10 +123,12 @@ actor BGGClient {
             allGames.append(contentsOf: games)
             onProgress?(allGames.count, total)
         }
-        guard !userRatings.isEmpty else { return allGames }
+        if userRatings.isEmpty && wantToPlay.isEmpty && numberOfPlays.isEmpty { return allGames }
         return allGames.map { game in
             var g = game
             g.userRating = userRatings[game.bggId] ?? 0
+            g.wantToPlay = wantToPlay[game.bggId] ?? false
+            g.numberOfPlays = numberOfPlays[game.bggId] ?? 0
             return g
         }
     }

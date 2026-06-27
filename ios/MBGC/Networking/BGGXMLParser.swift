@@ -3,6 +3,8 @@ import Foundation
 struct CollectionResult {
     let ids: [Int]
     let userRatings: [Int: Double]
+    let wantToPlay: [Int: Bool]
+    let numberOfPlays: [Int: Int]
 }
 
 enum BGGXMLParser {
@@ -16,7 +18,8 @@ enum BGGXMLParser {
             }
             throw URLError(.cannotParseResponse)
         }
-        return CollectionResult(ids: delegate.ids, userRatings: delegate.userRatings)
+        return CollectionResult(ids: delegate.ids, userRatings: delegate.userRatings,
+                               wantToPlay: delegate.wantToPlay, numberOfPlays: delegate.numberOfPlays)
     }
 
     static func parseThingResponse(_ data: Data) throws -> [BGGGame] {
@@ -32,13 +35,17 @@ enum BGGXMLParser {
         return delegate.games
     }
 
-    // SAX delegate that streams the BGG collection XML — only extracts item IDs and user ratings.
+    // SAX delegate that streams the BGG collection XML — extracts item IDs, user ratings, wanttoplay, and numplays.
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
         var userRatings: [Int: Double] = [:]
+        var wantToPlay: [Int: Bool] = [:]
+        var numberOfPlays: [Int: Int] = [:]
         private var seen = Set<Int>() // BGG can return duplicate <item> entries; deduplicate by objectid
         private var currentId: Int = 0
         private var inStats = false
+        private var inNumplays = false
+        private var numplaysBuffer = ""
 
         func parser(_ parser: XMLParser, didStartElement elementName: String,
                     namespaceURI: String?, qualifiedName qName: String?,
@@ -56,14 +63,29 @@ enum BGGXMLParser {
                 if let val = attributeDict["value"], let r = Double(val) {
                     userRatings[currentId] = r
                 }
+            case "status" where currentId > 0:
+                if attributeDict["wanttoplay"] == "1" { wantToPlay[currentId] = true }
+            case "numplays" where currentId > 0:
+                inNumplays = true
+                numplaysBuffer = ""
             default:
                 break
             }
         }
 
+        func parser(_ parser: XMLParser, foundCharacters string: String) {
+            if inNumplays { numplaysBuffer += string }
+        }
+
         func parser(_ parser: XMLParser, didEndElement elementName: String,
                     namespaceURI: String?, qualifiedName qName: String?) {
             if elementName == "stats" { inStats = false }
+            if elementName == "numplays" {
+                if let n = Int(numplaysBuffer.trimmingCharacters(in: .whitespaces)), n > 0 {
+                    numberOfPlays[currentId] = n
+                }
+                inNumplays = false
+            }
             if elementName == "item" { currentId = 0; inStats = false }
         }
     }
@@ -250,6 +272,8 @@ enum BGGXMLParser {
                     geekRating: geekRating,
                     bggRank: bggRank,
                     userRating: 0,
+                    wantToPlay: false,
+                    numberOfPlays: 0,
                     languageDependence: languageDependence,
                     recommendedPlayers: recommendedPlayers
                 ))

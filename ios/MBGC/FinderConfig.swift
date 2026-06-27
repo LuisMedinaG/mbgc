@@ -34,6 +34,8 @@ enum FinderConfig {
         var recommendedPlayers: Double = 1.0
         /// BGG board game rank (rank 1 = full credit; rank 10 000+ ≈ 0). Global prestige signal.
         var bggRank: Double = 0.5
+        /// Flat bonus for games marked "want to play" on BGG. Strong intent signal.
+        var wantToPlay: Double = 2.0
     }
 
     static let rankingWeights = RankingWeights()
@@ -55,6 +57,9 @@ enum FinderConfig {
         }
         if let rank = game.bggRank, rank > 0 {
             s += w.bggRank * (1.0 - min(Double(rank), rankCap) / rankCap)
+        }
+        if game.wantToPlay {
+            s += w.wantToPlay
         }
 
         return s

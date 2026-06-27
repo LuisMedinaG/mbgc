@@ -173,7 +173,7 @@ struct ImportView: View {
             if !toFetch.isEmpty {
                 syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")…"
                 appendSyncLog("Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")")
-                let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token, userRatings: collectionResult.userRatings) { done, total in
+                let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token, userRatings: collectionResult.userRatings, wantToPlay: collectionResult.wantToPlay, numberOfPlays: collectionResult.numberOfPlays) { done, total in
                     Task { @MainActor in
                         self.syncProgress = "Fetching details (\(done) of \(total))…"
                         self.appendSyncLog("Fetched details for \(done) of \(total)")

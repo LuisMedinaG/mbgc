@@ -23,6 +23,9 @@ final class Game {
     var geekRating: Double?
     var bggRank: Int?
     var userRating: Double?
+    var wantToPlay: Bool = false
+    var numberOfPlays: Int?
+    var lastLogPlayed: Date?  // ponytail: local-only, nil until play logging is built
     var languageDependence: Int?
     var recommendedPlayers: [Int]?
 
@@ -56,6 +59,8 @@ final class Game {
         geekRating = bggGame.geekRating > 0 ? bggGame.geekRating : nil
         bggRank = bggGame.bggRank > 0 ? bggGame.bggRank : nil
         userRating = bggGame.userRating > 0 ? bggGame.userRating : nil
+        wantToPlay = bggGame.wantToPlay
+        numberOfPlays = bggGame.numberOfPlays > 0 ? bggGame.numberOfPlays : nil
         languageDependence = bggGame.languageDependence > 0 ? bggGame.languageDependence : nil
         recommendedPlayers = bggGame.recommendedPlayers.isEmpty ? nil : bggGame.recommendedPlayers
     }

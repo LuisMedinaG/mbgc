@@ -18,6 +18,8 @@ struct BGGGame: Sendable {
     let geekRating: Double
     let bggRank: Int
     var userRating: Double
+    var wantToPlay: Bool
+    var numberOfPlays: Int
     let languageDependence: Int
     let recommendedPlayers: [Int]
 }

@@ -13,7 +13,8 @@ import Testing
             minPlayers: minPlayers, maxPlayers: maxPlayers, playTime: playtime,
             categories: [], mechanics: [], types: [],
             weight: weight, rating: rating, geekRating: 0, bggRank: bggRank,
-            userRating: userRating, languageDependence: 0, recommendedPlayers: recommendedPlayers
+            userRating: userRating, wantToPlay: false, numberOfPlays: 0,
+            languageDependence: 0, recommendedPlayers: recommendedPlayers
         ))
     }
 
