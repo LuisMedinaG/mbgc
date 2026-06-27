@@ -9,7 +9,6 @@ final class GameDetailViewModel {
     var isSaving = false
     var isDeleting = false
     var errorMessage: String?
-    var showDeleteConfirm = false
     var editingCollections = false
 
     func load(gameId: Int, modelContext: ModelContext) {

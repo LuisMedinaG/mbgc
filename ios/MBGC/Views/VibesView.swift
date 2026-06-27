@@ -17,6 +17,7 @@ struct VibesView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
     @State private var editingCollection: Collection?
+    @State private var collectionToDelete: Collection?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -45,7 +46,7 @@ struct VibesView: View {
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if !col.isDefault {
                                 Button(role: .destructive) {
-                                    viewModel.delete(col, modelContext: modelContext)
+                                    collectionToDelete = col
                                 } label: {
                                     Label("Delete", systemImage: "trash")
                                 }
@@ -76,6 +77,16 @@ struct VibesView: View {
                 Button("OK") { viewModel.errorMessage = nil }
             } message: {
                 Text(viewModel.errorMessage ?? "")
+            }
+            .alert("Delete \"\(collectionToDelete?.name ?? "")\"?", isPresented: Binding(
+                get: { collectionToDelete != nil },
+                set: { if !$0 { collectionToDelete = nil } }
+            )) {
+                Button("Delete", role: .destructive) {
+                    if let col = collectionToDelete { viewModel.delete(col, modelContext: modelContext) }
+                    collectionToDelete = nil
+                }
+                Button("Cancel", role: .cancel) { collectionToDelete = nil }
             }
         }
     }
@@ -378,6 +389,7 @@ struct CollectionDetailView: View {
     @State private var selectedIds: Set<Int> = []
     @State private var pendingAction: SelectionAction?
     @State private var showEditCollection = false
+    @State private var showDeleteCollectionConfirm = false
 
     private var sortedGames: [Game] {
         let asc = sortAscending
@@ -592,6 +604,10 @@ struct CollectionDetailView: View {
                 else { selectedIds.removeAll() }
             }
         }
+        .alert("Delete \"\(collection.name)\"?", isPresented: $showDeleteCollectionConfirm) {
+            Button("Delete", role: .destructive) { deleteCollection() }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
     private var collectionMenu: some View {
@@ -613,7 +629,7 @@ struct CollectionDetailView: View {
             }
             if !collection.isDefault {
                 Divider()
-                Button(role: .destructive) { deleteCollection() } label: {
+                Button(role: .destructive) { showDeleteCollectionConfirm = true } label: {
                     Label("Delete List", systemImage: "trash")
                 }
             }

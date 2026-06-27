@@ -82,6 +82,7 @@ struct ContentView: View {
         // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
         .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
         .preferredColorScheme(preferredScheme)
+        .id(appearanceMode)
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }

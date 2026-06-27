@@ -7,6 +7,8 @@ struct GameDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = GameDetailViewModel()
     @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
+    @State private var showDeleteAlert = false
+    @State private var showAddToCollection = false
 
     private let langDep = ["", "No language", "Some text", "Moderate", "Extensive", "Unplayable"]
 
@@ -19,11 +21,25 @@ struct GameDetailView: View {
                         statsRow(game)
                         descriptionSection(game)
                         tagsSection(game)
-                        collectionsSection(game)
                         linksSection(game)
-                        deleteSection(game)
                     }
                     .padding()
+                }
+                .safeAreaInset(edge: .bottom) {
+                    Button { showAddToCollection = true } label: {
+                        Text("Add to Collection")
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.accentColor)
+                            .foregroundStyle(.white)
+                            .clipShape(Capsule())
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 12)
+                }
+                .sheet(isPresented: $showAddToCollection) {
+                    AddToCollectionSheet(game: game, allCollections: allCollections)
                 }
             } else if let error = viewModel.errorMessage {
                 Text(error).foregroundStyle(.red)
@@ -34,6 +50,23 @@ struct GameDetailView: View {
         .navigationTitle(viewModel.game?.name ?? "Game")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive) { showDeleteAlert = true } label: {
+                        Label("Delete Game", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
+        .alert("Delete \"\(viewModel.game?.name ?? "")\"?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .onAppear { viewModel.load(gameId: gameId, modelContext: modelContext) }
     }
 
@@ -145,61 +178,6 @@ struct GameDetailView: View {
             .clipShape(Capsule())
     }
 
-    private func collectionsSection(_ game: Game) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Collections").font(.headline)
-                Spacer()
-                if !viewModel.editingCollections {
-                    Button("Edit") { viewModel.startEditingCollections() }
-                        .font(.subheadline)
-                }
-            }
-
-            if viewModel.editingCollections {
-                ForEach(allCollections) { col in
-                    let isSelected = col.isDefault || viewModel.selectedCollectionIds.contains(col.persistentModelID)
-                    Button { viewModel.toggleCollection(col) } label: {
-                        HStack {
-                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                            Text(col.name)
-                        }
-                    }
-                    .disabled(col.isDefault)
-                    .foregroundStyle(.primary)
-                }
-                if allCollections.isEmpty {
-                    Text("No collections yet").font(.subheadline).foregroundStyle(.secondary)
-                }
-                HStack {
-                    Button("Save") {
-                        viewModel.saveCollections(allCollections: allCollections, modelContext: modelContext)
-                    }
-                    .disabled(viewModel.isSaving)
-                    Button("Cancel") { viewModel.editingCollections = false }
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                if game.collections.isEmpty {
-                    Text("Not in any collection")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                } else {
-                    FlowLayout(spacing: 6) {
-                        ForEach(game.collections.map(\.name), id: \.self) { name in
-                            tagChip(name, color: .purple)
-                        }
-                    }
-                }
-            }
-            if let error = viewModel.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
     private func linksSection(_ game: Game) -> some View {
         VStack(spacing: 8) {
             if let rulesUrl = game.rulesUrl, !rulesUrl.isEmpty, let url = URL(string: rulesUrl) {
@@ -229,36 +207,59 @@ struct GameDetailView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func deleteSection(_ game: Game) -> some View {
-        VStack {
-            if viewModel.showDeleteConfirm {
-                HStack {
-                    Text("Delete \"\(game.name)\"?")
-                    Button("Yes") {
-                        if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(viewModel.isDeleting)
-                    Button("Cancel") { viewModel.showDeleteConfirm = false }
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Button("Delete game", role: .destructive) {
-                    viewModel.showDeleteConfirm = true
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
     private func playersStr(_ game: Game) -> String {
         if let min = game.minPlayers, let max = game.maxPlayers {
             return min == max ? "\(min)" : "\(min)-\(max)"
         }
         return "—"
+    }
+}
+
+struct AddToCollectionSheet: View {
+    let game: Game
+    let allCollections: [Collection]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedIds: Set<PersistentIdentifier>
+
+    init(game: Game, allCollections: [Collection]) {
+        self.game = game
+        self.allCollections = allCollections
+        _selectedIds = State(initialValue: Set(game.collections.map(\.persistentModelID)))
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(allCollections) { col in
+                let isSelected = col.isDefault || selectedIds.contains(col.persistentModelID)
+                Button {
+                    guard !col.isDefault else { return }
+                    if selectedIds.contains(col.persistentModelID) { selectedIds.remove(col.persistentModelID) }
+                    else { selectedIds.insert(col.persistentModelID) }
+                } label: {
+                    HStack {
+                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(col.isDefault ? Color.secondary : Color.accentColor)
+                        Text(col.name).foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
+                    }
+                }
+                .disabled(col.isDefault)
+            }
+            .listStyle(.plain)
+            .navigationTitle("Collections")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() {
+        game.collections = allCollections.filter { $0.isDefault || selectedIds.contains($0.persistentModelID) }
+        try? modelContext.save()
+        dismiss()
     }
 }
 
