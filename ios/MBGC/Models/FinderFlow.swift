@@ -214,7 +214,10 @@ final class FinderFlow {
     var ranked: [Game] {
         let w = FinderConfig.rankingWeights
         return survivors.sorted { a, b in
-            score(a, weights: w) > score(b, weights: w) || (score(a, weights: w) == score(b, weights: w) && a.name < b.name)
+            let scoreA = score(a, weights: w), scoreB = score(b, weights: w)
+            guard scoreA == scoreB else { return scoreA > scoreB }
+            let rankA = a.bggRank ?? Int.max, rankB = b.bggRank ?? Int.max
+            return rankA < rankB
         }
     }
 
