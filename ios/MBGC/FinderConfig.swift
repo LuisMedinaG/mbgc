@@ -34,8 +34,9 @@ enum FinderConfig {
         var recommendedPlayers: Double = 1.0
         /// BGG board game rank (rank 1 = full credit; rank 10 000+ ≈ 0). Global prestige signal.
         var bggRank: Double = 0.5
-        /// Flat bonus for games marked "want to play" on BGG. Strong intent signal.
-        var wantToPlay: Double = 2.0
+        /// Flat bonus for games marked "want to play" on BGG. Tiebreaker nudge, not an override —
+        /// kept below geekRating's reach so a great unflagged game still beats a mediocre flagged one.
+        var wantToPlay: Double = 1.0
     }
 
     static let rankingWeights = RankingWeights()
