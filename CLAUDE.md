@@ -1,5 +1,3 @@
-@AGENTS.md
-
 # CLAUDE.md
 
 ## How to work
@@ -92,3 +90,5 @@ Does not apply to routine coding, small features, or obvious changes.
 - No em dashes. No AI vocabulary (delve, crucial, robust, comprehensive, nuanced, multifaceted, furthermore, moreover, pivotal, tapestry, underscore, foster, showcase, intricate, vibrant, fundamental, significant, interplay).
 - If something is broken, say so plainly.
 - End responses with the next action, not a recap of what was just done.
+
+@AGENTS.md
