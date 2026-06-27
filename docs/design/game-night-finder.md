@@ -1,6 +1,6 @@
 # Game Night Finder — Design Doc
 
-_Status: proposed · 2026-06-26 · target: iOS (local-first)_
+_Status: v1 shipped · updated 2026-06-27 · target: iOS (local-first)_
 
 ## 1. The pitch
 
@@ -161,6 +161,51 @@ into the `FinderAxis` enum + `v1Funnel` array later with no new plumbing:
 - AI-generated vibes.
 - `userRating` capture (graceful degrade until then).
 - Web port.
+
+## 13. Known follow-up items (post-v1)
+
+### 13a. Geek Rating vs. Average Rating
+
+BGG exposes two ratings per game:
+
+| Field | BGG XML path | Meaning |
+| --- | --- | --- |
+| `averagerating` | `<statistics><ratings><average>` | Simple mean of all user votes |
+| `bayesaverage` | `<statistics><ratings><bayesaverage>` | "Geek Rating" — Bayesian average that shrinks low-vote-count games toward the global mean, preventing obscure games from sitting at 10.0 |
+
+**Current state:** `BGGXMLParser` extracts `average` into `Game.rating`.  
+**Change needed:** Swap to `bayesaverage` in `BGGXMLParser` (one-line change) + rename
+the field to `geekRating` in `Game` and `BGGGame` for clarity.  
+**Impact on finder ranking:** Geek Rating is a better proxy for "objectively good game"
+since it penalises games with few votes. Swap it in the ranking chain at the same time.
+
+### 13b. User Rating
+
+BGG's **collection** endpoint returns each user's personal rating for games in their
+collection (`<rating value="N">`), separate from the community rating.
+
+**Change needed:**
+1. Add `userRating: Double?` to `Game` (SwiftData model) — migration required.
+2. Add `userRating` to `BGGGame` struct.
+3. Call the BGG collection endpoint (or add it to the `thing` batch call) and populate
+   `userRating` during import.
+4. Move `userRating` to position 0 in `FinderFlow.ranked` comparator chain (already
+   designed for this — `nil` sorts last, so it degrades gracefully until populated).
+
+### 13c. Unify "Tonight" and "Discover" tabs
+
+Currently the app has three tabs: **Discover** (`LibraryView` — list + filter) and
+**Tonight** (`FinderView` — guided wizard). They serve the same user goal: finding a
+game to play. Having both causes confusion and burns tab space.
+
+**Proposed:** Replace the two tabs with a single **Tonight** tab that is `FinderView`.
+Move the library list (currently Discover) into:
+- The "See all" path inside the finder result, or
+- A floating "Browse Library" button on the finder landing screen.
+
+**Collection** tab stays unchanged — it's for managing vibes, not discovering games.
+
+This is a navigation restructure (ContentView + TabBar changes) with no logic impact.
 
 ## 11. Build phases
 

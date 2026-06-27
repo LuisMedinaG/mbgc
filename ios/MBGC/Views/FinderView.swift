@@ -5,6 +5,7 @@ import SwiftUI
 
 struct FinderView: View {
     @State private var flow = FinderFlow()
+    @State private var hapticTrigger = 0
     @Query private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
 
@@ -28,6 +29,7 @@ struct FinderView: View {
                         step: flow.stepIndex,
                         total: flow.funnel.count,
                         onSelect: { option in
+                            hapticTrigger += 1
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
                                 flow.select(option)
                             }
@@ -47,6 +49,7 @@ struct FinderView: View {
             }
             .animation(.spring(response: 0.32, dampingFraction: 0.82), value: flow.stepIndex)
             .animation(.spring(response: 0.4),  value: flow.isDone)
+            .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
             .navigationDestination(for: Int.self) { bggId in
                 GameDetailView(gameId: bggId)
             }
@@ -73,11 +76,27 @@ private struct FinderStepView: View {
     let onSelect: (FinderOption) -> Void
     let onBack: (() -> Void)?
 
+    // ponytail: thresholds match user spec — 2-col ≤4, 3-col 5-9, 4-col scrollable 10+
+    private var cols: Int {
+        switch options.count {
+        case ...4:  return 2
+        case 5...9: return 3
+        default:    return 4
+        }
+    }
+    private var isScrollable: Bool { options.count > 9 }
+    private var rows: Int { (options.count + cols - 1) / cols }
+    private let spacing: CGFloat = 10
+
+    private var gridCols: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: spacing), count: cols)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
             questionBlock
-            optionButtons
+            optionGrid
         }
     }
 
@@ -122,37 +141,49 @@ private struct FinderStepView: View {
         .padding(.bottom, 20)
     }
 
-    private var optionButtons: some View {
-        VStack(spacing: 10) {
-            ForEach(options) { option in
-                Button { onSelect(option) } label: {
-                    optionLabel(option)
+    @ViewBuilder
+    private var optionGrid: some View {
+        if isScrollable {
+            ScrollView {
+                LazyVGrid(columns: gridCols, spacing: spacing) {
+                    ForEach(options) { opt in optionButton(opt).frame(height: 90) }
                 }
-                .buttonStyle(FinderButtonStyle())
-                .sensoryFeedback(.impact(weight: .medium), trigger: option.id)
+                .padding(.horizontal, 16)
             }
+            .contentMargins(.bottom, 80, for: .scrollContent)
+        } else {
+            GeometryReader { geo in
+                let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
+                LazyVGrid(columns: gridCols, spacing: spacing) {
+                    ForEach(options) { opt in optionButton(opt).frame(height: max(rowH, 60)) }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 24)
-        .frame(maxHeight: .infinity)
     }
 
-    private func optionLabel(_ option: FinderOption) -> some View {
-        VStack(spacing: 6) {
-            Text(option.label)
-                .font(.title2.bold())
-                .foregroundStyle(Color(.label))
-            Text("\(option.count) \(option.count == 1 ? "game" : "games")")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+    private func optionButton(_ option: FinderOption) -> some View {
+        Button { onSelect(option) } label: {
+            VStack(spacing: 6) {
+                Text(option.label)
+                    .font(.title2.bold())
+                    .foregroundStyle(Color(.label))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                Text("\(option.count) \(option.count == 1 ? "game" : "games")")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .buttonStyle(FinderButtonStyle())
     }
 }
 
-// Gives each option button a slight press animation
+// Slight press scale — same pattern as the rest of the app
 private struct FinderButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -232,7 +263,7 @@ struct FinderResultView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                .padding(.bottom, 40)
+                .padding(.bottom, 100)
             }
             .padding(.horizontal, 20)
         }

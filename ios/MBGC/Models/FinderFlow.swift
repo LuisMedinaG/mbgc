@@ -66,15 +66,16 @@ enum FinderAxis: String, CaseIterable {
                 }
 
         case .players:
+            // ponytail: cap at 8 so the grid stays manageable; "8+" covers all larger games correctly
             var freq: [Int: Int] = [:]
             for g in games {
                 let lo = g.minPlayers ?? 1
-                let hi = min(g.maxPlayers ?? lo, 10)
+                let hi = min(g.maxPlayers ?? lo, 8)
                 guard lo <= hi else { continue }
                 for n in lo...hi { freq[n, default: 0] += 1 }
             }
             return freq.sorted { $0.key < $1.key }.map { n, c in
-                let label = n >= 10 ? "10+" : n == 1 ? "1 player" : "\(n) players"
+                let label = n >= 8 ? "8+" : n == 1 ? "Solo" : "\(n) players"
                 return FinderOption(id: "players:\(n)", label: label, count: c)
             }
 
@@ -138,9 +139,9 @@ final class FinderFlow {
         currentAxis?.options(from: survivors, collections: allCollections) ?? []
     }
 
-    // Early stop: ≤3 survivors, funnel exhausted, or next axis can't split the pool
+    // Early stop: only after ≥1 pick; ≤3 survivors, funnel exhausted, or next axis can't split
     var isDone: Bool {
-        guard !ownedGames.isEmpty else { return false }
+        guard !ownedGames.isEmpty, stepIndex > 0 else { return false }
         return survivors.count <= 3 || currentAxis == nil || currentOptions.count <= 1
     }
 
