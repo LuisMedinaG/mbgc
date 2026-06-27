@@ -167,6 +167,7 @@ private struct FinderStepView: View {
             }
             .contentMargins(.bottom, 16, for: .scrollContent)
         } else {
+            // GeometryReader fills the remaining VStack height so buttons expand to fill the screen.
             GeometryReader { geo in
                 let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
                 LazyVGrid(columns: gridCols, spacing: spacing) {
@@ -237,25 +238,33 @@ struct FinderResultView: View {
                 }
                 .padding(.top, 24)
 
-                if let hero = top.first {
-                    NavigationLink(value: hero.bggId) {
-                        FinderHeroCard(game: hero)
+                if top.isEmpty {
+                    ContentUnavailableView(
+                        "No Matches",
+                        systemImage: "questionmark.circle",
+                        description: Text("No games match those filters. Try different answers.")
+                    )
+                } else {
+                    if let hero = top.first {
+                        NavigationLink(value: hero.bggId) {
+                            FinderHeroCard(game: hero)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                }
 
-                let runners = Array(top.dropFirst())
-                if !runners.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Also great")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 12) {
-                            ForEach(runners) { game in
-                                NavigationLink(value: game.bggId) {
-                                    FinderRunnerCard(game: game)
+                    let runners = Array(top.dropFirst())
+                    if !runners.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Also great")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 12) {
+                                ForEach(runners) { game in
+                                    NavigationLink(value: game.bggId) {
+                                        FinderRunnerCard(game: game)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -302,23 +311,19 @@ private struct FinderHeroCard: View {
     let game: Game
 
     var body: some View {
+        // Frame and clip on the ZStack (not children) so LinearGradient can't escape the 200pt box.
         ZStack(alignment: .bottomLeading) {
             AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { img in
                 img.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Color(.systemGray5)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 200)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 20))
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.75)],
                 startPoint: .center,
                 endPoint: .bottom
             )
-            .clipShape(RoundedRectangle(cornerRadius: 20))
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(game.name)
@@ -344,6 +349,9 @@ private struct FinderHeroCard: View {
             }
             .padding(18)
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }
 

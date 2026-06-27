@@ -506,6 +506,9 @@ struct CollectionDetailView: View {
                 Button { showEditCollection = true } label: {
                     Label("Edit Collection", systemImage: "pencil")
                 }
+                Button { duplicateCollection() } label: {
+                    Label("Duplicate", systemImage: "plus.square.on.square")
+                }
             }
             ShareLink(item: shareText) {
                 Label("Share", systemImage: "square.and.arrow.up")
@@ -519,6 +522,15 @@ struct CollectionDetailView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
+    }
+
+    private func duplicateCollection() {
+        let copy = Collection(name: "\(collection.name) copy", desc: collection.desc)
+        copy.colorHex = collection.colorHex
+        copy.iconName = collection.iconName
+        modelContext.insert(copy)
+        LocalLibrary.add(collection.games, to: copy)
+        try? modelContext.save()
     }
 
     private var shareText: String {

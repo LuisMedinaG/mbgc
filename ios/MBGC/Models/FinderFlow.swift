@@ -57,56 +57,82 @@ enum FinderAxis: String, CaseIterable {
         }
     }
 
+    // MARK: - Options
+
     func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
         switch self {
-        case .vibe:
-            return collections
-                .filter { !$0.isDefault }
-                .compactMap { col in
-                    let n = games.filter { $0.collections.contains(where: { $0.name == col.name }) }.count
-                    guard n > 0 else { return nil }
-                    return FinderOption(
-                        id: "vibe:\(col.name)", label: col.name, count: n,
-                        tint: col.effectiveColorHex, symbol: col.effectiveIconName, solidBg: true
-                    )
-                }
-
-        case .players:
-            let cap = FinderConfig.playerCap
-            var freq: [Int: Int] = [:]
-            for g in games {
-                let lo = g.minPlayers ?? 1
-                let hi = min(g.maxPlayers ?? lo, cap)
-                guard lo <= hi else { continue }
-                for n in lo...hi { freq[n, default: 0] += 1 }
-            }
-            let tints = FinderConfig.playerTints
-            return freq.sorted { $0.key < $1.key }.enumerated().map { idx, pair in
-                let (n, c) = pair
-                let label = n >= cap ? "\(cap)+" : n == 1 ? "Solo" : "\(n) players"
-                return FinderOption(id: "players:\(n)", label: label, count: c,
-                                    tint: tints[min(idx, tints.count - 1)])
-            }
-
-        case .duration:
-            return DurationBucket.allCases.compactMap { bucket in
-                let n = games.filter { bucket.matches($0.playtime) }.count
-                guard n > 0 else { return nil }
-                return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
-                                    count: n, tint: FinderConfig.durationTints[bucket])
-            }
+        case .vibe:      return vibeOptions(games: games, collections: collections)
+        case .players:   return playerOptions(games: games)
+        case .duration:  return durationOptions(games: games)
         }
     }
+
+    private func vibeOptions(games: [Game], collections: [Collection]) -> [FinderOption] {
+        collections
+            .filter { !$0.isDefault }
+            .compactMap { col in
+                let n = games.filter { $0.collections.contains(where: { $0.name == col.name }) }.count
+                guard n > 0 else { return nil }
+                return FinderOption(
+                    id: "vibe:\(col.name)", label: col.name, count: n,
+                    tint: col.effectiveColorHex, symbol: col.effectiveIconName, solidBg: true
+                )
+            }
+    }
+
+    private func playerOptions(games: [Game]) -> [FinderOption] {
+        let cap = FinderConfig.playerCap
+        let tints = FinderConfig.playerTints
+
+        // Build a map of playerCount → number of games that support it.
+        var gamesPerCount: [Int: Int] = [:]
+        for game in games {
+            let lo = game.minPlayers ?? 1
+            let hi = min(game.maxPlayers ?? lo, cap)
+            guard lo <= hi else { continue }
+            for count in lo...hi {
+                gamesPerCount[count, default: 0] += 1
+            }
+        }
+
+        return gamesPerCount
+            .sorted { $0.key < $1.key }
+            .enumerated()
+            .map { index, entry in
+                let label = entry.key == 1     ? "Solo"
+                          : entry.key >= cap   ? "\(cap)+"
+                          :                     "\(entry.key) players"
+                return FinderOption(
+                    id: "players:\(entry.key)",
+                    label: label,
+                    count: entry.value,
+                    tint: tints[min(index, tints.count - 1)]
+                )
+            }
+    }
+
+    private func durationOptions(games: [Game]) -> [FinderOption] {
+        DurationBucket.allCases.compactMap { bucket in
+            let n = games.filter { bucket.matches($0.playtime) }.count
+            guard n > 0 else { return nil }
+            return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
+                                count: n, tint: FinderConfig.durationTints[bucket])
+        }
+    }
+
+    // MARK: - Apply
 
     func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
         guard option.id != "skip" else { return games }
         switch self {
         case .vibe:
-            let name = option.id.replacingOccurrences(of: "vibe:", with: "")
+            let name = String(option.id.dropFirst("vibe:".count))
             return games.filter { $0.collections.contains(where: { $0.name == name }) }
 
         case .players:
-            guard let n = Int(option.id.replacingOccurrences(of: "players:", with: "")) else { return games }
+            // "Supports N" — game is playable with N people when N is in its [min, max] range.
+            // Games where N is the BGG-recommended count are ranked higher (see FinderFlow.ranked).
+            guard let n = Self.playerCount(from: option.id) else { return games }
             return games.filter {
                 let lo = $0.minPlayers ?? 1
                 let hi = $0.maxPlayers ?? lo
@@ -114,10 +140,16 @@ enum FinderAxis: String, CaseIterable {
             }
 
         case .duration:
-            let raw = option.id.replacingOccurrences(of: "duration:", with: "")
+            let raw = String(option.id.dropFirst("duration:".count))
             guard let bucket = DurationBucket(rawValue: raw) else { return games }
             return games.filter { bucket.matches($0.playtime) }
         }
+    }
+
+    // Parses "players:N" option IDs. Single source so options(), apply(), and chosenPlayerCount agree.
+    static func playerCount(from optionId: String) -> Int? {
+        guard optionId.hasPrefix("players:") else { return nil }
+        return Int(optionId.dropFirst("players:".count))
     }
 }
 
@@ -149,7 +181,8 @@ final class FinderFlow {
         currentAxis?.options(from: survivors, collections: allCollections) ?? []
     }
 
-    // Ask every axis in the funnel; stop only when none are left or the next has no options.
+    // Runs every axis. Stops when the funnel is exhausted OR the next axis produces no options
+    // (e.g. all survivors share the same duration bucket — asking wouldn't split anything).
     var isDone: Bool {
         guard !ownedGames.isEmpty, stepIndex > 0 else { return false }
         return currentAxis == nil || currentOptions.isEmpty
@@ -157,7 +190,7 @@ final class FinderFlow {
 
     var chosenPlayerCount: Int? {
         picks.first { $0.id.hasPrefix("players:") }
-            .flatMap { Int($0.id.replacingOccurrences(of: "players:", with: "")) }
+            .flatMap { FinderAxis.playerCount(from: $0.id) }
     }
 
     // ponytail: ranking chain is data — future: persist a different order for configurability
