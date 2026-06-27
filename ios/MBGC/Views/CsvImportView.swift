@@ -44,7 +44,7 @@ struct CsvImportView: View {
         .navigationTitle("Import from CSV")
         .sheet(isPresented: $showDestinationPicker) {
             NavigationStack {
-                CollectionPickerView(games: importedGames) {
+                CollectionPickerView(games: importedGames) { _ in
                     showDestinationPicker = false
                 }
             }

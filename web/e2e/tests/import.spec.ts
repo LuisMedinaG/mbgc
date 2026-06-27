@@ -13,7 +13,7 @@ async function bootWithOverrides(
 }
 
 test.describe('Import — BGG sync', () => {
-  test('sync button is disabled when no BGG username is set', async ({ page }) => {
+  test('preview button is disabled when no BGG username is set', async ({ page }) => {
     await bootWithOverrides(page, {
       profile: { bggUsername: '' },
       games: { empty: true },
@@ -22,7 +22,7 @@ test.describe('Import — BGG sync', () => {
     await page.goto('/#/import')
     await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible({ timeout: 8000 })
     await expect(page.getByText(/set your bgg username/i)).toBeVisible()
-    await expect(page.getByRole('button', { name: /sync from bgg/i })).toBeDisabled()
+    await expect(page.getByRole('button', { name: /preview/i })).toBeDisabled()
   })
 
   test('successful sync shows imported/skipped/failed counts', async ({ page }) => {
@@ -30,17 +30,17 @@ test.describe('Import — BGG sync', () => {
       profile: { bggUsername: 'mytestuser', isAdmin: true },
       games: { empty: true },
       collections: { empty: true },
+      bggPreview: { total: 10, owned: 2, new: 8 },
       bggSync: { body: { imported: 5, skipped: 2, failed: 1 } },
     })
     await page.goto('/#/import')
     await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible({ timeout: 8000 })
-    await page.getByRole('button', { name: /sync from bgg/i }).click()
-    // The result panel must show all three counts — the bug was the type mismatch
-    // causing `undefined` to render. We assert on the labels, which only show on success.
+    await page.getByRole('button', { name: /preview/i }).click()
+    await page.getByRole('button', { name: /import \d+ game/i }).click()
+    // The result panel shows all three counts as colored bullets
     await expect(page.getByText('Imported', { exact: true })).toBeVisible({ timeout: 8000 })
     await expect(page.getByText('Skipped', { exact: true })).toBeVisible()
     await expect(page.getByText('Failed', { exact: true })).toBeVisible()
-    // And the values
     await expect(page.getByText('5', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('2', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('1', { exact: true }).first()).toBeVisible()
@@ -51,11 +51,13 @@ test.describe('Import — BGG sync', () => {
       profile: { bggUsername: 'mytestuser', isAdmin: true },
       games: { empty: true },
       collections: { empty: true },
+      bggPreview: { total: 10, owned: 2, new: 8 },
       bggSync: { status: 500, error: 'BGG sync is not configured' },
     })
     await page.goto('/#/import')
     await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible({ timeout: 8000 })
-    await page.getByRole('button', { name: /sync from bgg/i }).click()
+    await page.getByRole('button', { name: /preview/i }).click()
+    await page.getByRole('button', { name: /import \d+ game/i }).click()
     await expect(page.getByText(/BGG sync is not configured/)).toBeVisible({ timeout: 8000 })
     await expect(page.getByText('[object Object]')).not.toBeVisible()
   })
@@ -66,11 +68,13 @@ test.describe('Import — BGG sync', () => {
       profile: { bggUsername: 'mytestuser', isAdmin: true },
       games: { empty: true },
       collections: { empty: true },
+      bggPreview: { total: 10, owned: 2, new: 8 },
     })
     await page.goto('/#/import')
     await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible({ timeout: 8000 })
     await page.getByLabel(/full refresh/i).check()
-    await page.getByRole('button', { name: /sync from bgg/i }).click()
+    await page.getByRole('button', { name: /preview/i }).click()
+    await page.getByRole('button', { name: /import \d+ game/i }).click()
     const req = await syncPromise
     expect(req.url()).toContain('full_refresh=true')
   })

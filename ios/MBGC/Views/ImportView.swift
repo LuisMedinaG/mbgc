@@ -1,13 +1,25 @@
 import SwiftData
 import SwiftUI
 
-private let bggUsernameKey = "profile.bggUsername"
+private func sanitizeName(_ name: String) -> String {
+    let maxLength = 50
+    let sanitized = name
+        .filter { $0 != "[" && $0 != "]" }
+        .prefix(maxLength)
+    return String(sanitized)
+}
+
 private let bggLastSyncKey = "import.bgg.lastSyncDate"
+private let bggCachedIdsKey = "import.bgg.cachedIds"
 private var bggToken: String? {
     let t = Bundle.main.object(forInfoDictionaryKey: "BGGToken") as? String ?? ""
     return t.isEmpty ? nil : t  // nil → BGGClient skips Authorization header; public collections still work
 }
-private let bggRegularImportLimit = 100
+#if DEBUG
+private let bggRegularImportLimit = 500
+#else
+private let bggRegularImportLimit = 150
+#endif
 private let bggImportCooldown: TimeInterval = 7 * 24 * 60 * 60
 
 private struct BGGImportSummary {
@@ -17,6 +29,7 @@ private struct BGGImportSummary {
 }
 
 struct ImportView: View {
+    var dismissAll: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
 
     @State private var bggUsername = ""
@@ -52,7 +65,7 @@ struct ImportView: View {
                             } else {
                                 Image(systemName: "arrow.down.circle.fill")
                             }
-                            Text(isSyncing ? "Importing from BGG" : "Import from BGG")
+                            Text(isSyncing ? "Importing" : "Import")
                         }
                         .font(.headline)
                         .foregroundStyle(.white)
@@ -87,7 +100,7 @@ struct ImportView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
                                 Label(message, systemImage: "circle.fill")
-                                    .font(.caption).foregroundStyle(.secondary)
+                                    .font(.caption).foregroundStyle(statusColor(for: message))
                             }
                         }
                         .frame(maxWidth: .infinity)
@@ -101,14 +114,12 @@ struct ImportView: View {
         }
         .navigationTitle("Import from BGG")
         .navigationBarTitleDisplayMode(.large)
-        .onAppear {
-            bggUsername = UserDefaults.standard.string(forKey: bggUsernameKey) ?? ""
-        }
         .sheet(isPresented: $showDestinationPicker) {
             NavigationStack {
-                CollectionPickerView(games: selectedGames) {
+                CollectionPickerView(games: selectedGames) { confirmed in
                     showDestinationPicker = false
                     selectedGames = []
+                    if confirmed { dismissAll?() }
                 }
             }
             .presentationDetents([.medium, .large])
@@ -135,11 +146,10 @@ struct ImportView: View {
         defer { isSyncing = false; syncProgress = nil }
 
         do {
-            appendSyncLog("Saving BGG username")
-            UserDefaults.standard.set(username, forKey: bggUsernameKey)
-
             appendSyncLog("Fetching owned BGG IDs")
-            let bggIds = try await BGGClient.shared.fetchCollection(username: username, token: token)
+            let collectionResult = try await BGGClient.shared.fetchCollection(username: username, token: token)
+            let bggIds = collectionResult.ids
+            UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
             appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
 
             appendSyncLog("Checking local library")
@@ -150,44 +160,53 @@ struct ImportView: View {
             appendSyncLog("Skipping \(existing.count) already-local game\(existing.count == 1 ? "" : "s")")
             if overLimit > 0 { appendSyncLog("Limiting this sync to \(bggRegularImportLimit) new games") }
 
-            guard !toFetch.isEmpty else {
-                syncSummary = BGGImportSummary(imported: 0, skipped: existing.count, failed: [])
-                syncError = bggIds.isEmpty ? "No owned games found for this BGG username." : nil
-                appendSyncLog("Nothing new to import")
+            if bggIds.isEmpty {
+                syncSummary = BGGImportSummary(imported: 0, skipped: 0, failed: [])
+                syncError = "No owned games found for this BGG username."
+                appendSyncLog("Nothing to import")
                 return
             }
 
-            syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")…"
-            appendSyncLog("Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")")
-            let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token) { done, total in
-                Task { @MainActor in
-                    self.syncProgress = "Fetching details (\(done) of \(total))…"
-                    self.appendSyncLog("Fetched details for \(done) of \(total)")
-                }
-            }
-
-            let fetchedById = Dictionary(grouping: bggGames, by: \.bggId).compactMapValues(\.first)
+            // Fetch + insert only the genuinely-new games. Already-local games are reused.
             var newGames: [Game] = []
             var failedIds: [Int] = []
-            for id in toFetch {
-                if let bggGame = fetchedById[id] {
-                    let game = Game(bggGame: bggGame)
-                    modelContext.insert(game)
-                    newGames.append(game)
-                } else {
-                    failedIds.append(id)
+            if !toFetch.isEmpty {
+                syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")…"
+                appendSyncLog("Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")")
+                let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token, userRatings: collectionResult.userRatings) { done, total in
+                    Task { @MainActor in
+                        self.syncProgress = "Fetching details (\(done) of \(total))…"
+                        self.appendSyncLog("Fetched details for \(done) of \(total)")
+                    }
+                }
+
+                let fetchedById = Dictionary(grouping: bggGames, by: \.bggId).compactMapValues(\.first)
+                for id in toFetch {
+                    if let bggGame = fetchedById[id] {
+                        let game = Game(bggGame: bggGame)
+                        modelContext.insert(game)
+                        newGames.append(game)
+                    } else {
+                        failedIds.append(id)
+                    }
                 }
             }
 
             let library = try LocalLibrary.ensureDefaultCollection(in: modelContext)
             LocalLibrary.add(newGames, to: library)
-            appendSyncLog("Saving \(newGames.count) game\(newGames.count == 1 ? "" : "s") locally")
+            appendSyncLog("Saving \(newGames.count) new game\(newGames.count == 1 ? "" : "s") locally")
             try modelContext.save()
-            UserDefaults.standard.set(Date(), forKey: bggLastSyncKey)
-            selectedGames = newGames
+            if !newGames.isEmpty {
+                UserDefaults.standard.set(Date(), forKey: bggLastSyncKey)
+                UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
+            }
+
+            // Offer the WHOLE collection (new + already-local) to the destination picker.
+            // LocalLibrary.add dedups, so adding already-present games is a no-op.
+            selectedGames = LocalLibrary.games(matching: bggIds, in: modelContext)
             syncSummary = BGGImportSummary(imported: newGames.count, skipped: existing.count + overLimit, failed: failedIds)
-            showDestinationPicker = !newGames.isEmpty
-            appendSyncLog(newGames.isEmpty ? "Import finished" : "Choose a destination collection")
+            showDestinationPicker = !selectedGames.isEmpty
+            appendSyncLog(selectedGames.isEmpty ? "Import finished" : "Choose a destination collection")
         } catch {
             syncError = importMessage(for: error)
             appendSyncLog(syncError ?? "Import failed")
@@ -212,45 +231,88 @@ struct ImportView: View {
         guard nextSync > now else { return nil }
         return "BGG import is available again \(nextSync.formatted(date: .abbreviated, time: .shortened))."
     }
+
+    private func statusColor(for message: String) -> Color {
+        if message.contains("Fetched") || message.contains("Found") || message.contains("Saving") || message.contains("cached") {
+            return .green
+        } else if message.contains("Failed") || message.contains("Couldn't") || message.contains("error") {
+            return .red
+        } else if message.contains("Skipping") || message.contains("Limiting") {
+            return .yellow
+        }
+        return .secondary
+    }
 }
 
 // MARK: — Collection Picker (shared by ImportView + CsvImportView)
 
 struct CollectionPickerView: View {
     let games: [Game]
-    let onDone: () -> Void
+    let onDone: (Bool) -> Void
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
+    @State private var selectedIndex: Int = 0
     @State private var destinationError: String?
+    @State private var showNewCollection = false
+    @State private var newName = ""
 
     var body: some View {
-        List {
-            Section("Add \(games.count) game\(games.count == 1 ? "" : "s") to:") {
-                ForEach(collections) { col in
-                    Button {
-                        addToCollection(col)
-                    } label: {
-                        HStack {
-                            Image(systemName: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
-                                .foregroundStyle(col.isDefault ? .blue : .orange)
-                            Text(col.name)
-                            Spacer()
-                            Text("\(col.games.count)")
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                    }
-                    .buttonStyle(.plain)
+        VStack(spacing: 32) {
+            Spacer()
+
+            VStack(spacing: 6) {
+                Text("\(games.count) game\(games.count == 1 ? "" : "s") found")
+                    .font(.title2.bold())
+                Text("Owned games only · No expansions")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Picker("", selection: $selectedIndex) {
+                ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
+                    Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
+                        .tag(idx)
                 }
             }
+            .pickerStyle(.menu)
+            .padding(.horizontal, 20).padding(.vertical, 14)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.orange, lineWidth: 2))
+            .padding(.horizontal, 20)
+
+            Spacer()
+
+            Button { confirm() } label: {
+                Text("Import")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 40)
+                    .padding(.vertical, 18)
+                    .background(Capsule().fill(Color.orange))
+                    .shadow(color: Color.orange.opacity(0.4), radius: 12, y: 4)
+            }
+            .padding(.bottom, 12)
         }
         .navigationTitle("Add to collection")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") { onDone() }
+                Button("Cancel") { onDone(false) }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { newName = ""; showNewCollection = true } label: {
+                    Image(systemName: "plus.circle")
+                }
+            }
+        }
+        .onAppear { setDefaultSelection() }
+        .onChange(of: collections.count) { setDefaultSelection() }
+        .alert("New Collection", isPresented: $showNewCollection) {
+            TextField("Name", text: $newName)
+            Button("Create") { createAndSelect() }
+            Button("Cancel", role: .cancel) {}
         }
         .alert("Couldn't save", isPresented: Binding(
             get: { destinationError != nil },
@@ -262,11 +324,32 @@ struct CollectionPickerView: View {
         }
     }
 
-    private func addToCollection(_ col: Collection) {
+    private func setDefaultSelection() {
+        selectedIndex = collections.firstIndex(where: { $0.isDefault }) ?? 0
+    }
+
+    private func createAndSelect() {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let sanitized = sanitizeName(trimmed)
+        let col = Collection(name: sanitized)
+        modelContext.insert(col)
+        do {
+            try modelContext.save()
+            // Newly created collection will appear at end of @Query results
+            selectedIndex = max(0, collections.count - 1)
+        } catch {
+            destinationError = "Couldn't create collection."
+        }
+    }
+
+    private func confirm() {
+        guard selectedIndex < collections.count else { return }
+        let col = collections[selectedIndex]
         LocalLibrary.add(games, to: col)
         do {
             try modelContext.save()
-            onDone()
+            onDone(true)
         } catch {
             destinationError = "Couldn't save collection."
         }

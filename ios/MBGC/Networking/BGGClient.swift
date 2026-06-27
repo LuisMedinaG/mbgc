@@ -39,13 +39,14 @@ enum BGGError: Error, LocalizedError {
     }
 }
 
+/// Async BGG API client. `actor` isolation serializes all network state — no data races.
 actor BGGClient {
     static let shared = BGGClient()
 
     private let session: URLSession
-    private let batchSize = 20
+    private let batchSize = 20   // BGG thing endpoint caps at 20 IDs per request
     private let maxAttempts = 4
-    private let requestDelay: UInt64 = 5_000_000_000
+    private let requestDelay: UInt64 = 5_000_000_000 // 5s pre-delay; BGG throttles hard on burst requests
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -54,12 +55,12 @@ actor BGGClient {
         session = URLSession(configuration: config)
     }
 
-    func fetchCollection(username: String, token: String? = nil) async throws -> [Int] {
+    func fetchCollection(username: String, token: String? = nil) async throws -> CollectionResult {
         var components = URLComponents(string: "https://boardgamegeek.com/xmlapi2/collection")
         components?.queryItems = [
             URLQueryItem(name: "username", value: username),
             URLQueryItem(name: "own", value: "1"),
-            URLQueryItem(name: "brief", value: "1")
+            URLQueryItem(name: "stats", value: "1")
         ]
         guard let url = components?.url else {
             throw BGGError.badURL
@@ -84,6 +85,7 @@ actor BGGClient {
 
             let httpResponse = response as? HTTPURLResponse
             let status = httpResponse?.statusCode ?? 0
+            // 202 = BGG is still building the collection export; must poll. 429/5xx = retry with backoff.
             if status == 202 || status == 429 || status >= 500 {
                 if attempt == maxAttempts { throw BGGError.http(status: status) }
                 try await Task.sleep(nanoseconds: retryDelay(from: httpResponse, fallback: delay))
@@ -100,13 +102,14 @@ actor BGGClient {
                 throw BGGError.xmlParse(error)
             }
         }
-        return []
+        return CollectionResult(ids: [], userRatings: [:])
     }
 
     /// `onProgress(done, total)` is called on each completed batch.
     func fetchThings(
         ids: [Int],
         token: String? = nil,
+        userRatings: [Int: Double] = [:],
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> [BGGGame] {
         var allGames: [BGGGame] = []
@@ -118,7 +121,12 @@ actor BGGClient {
             allGames.append(contentsOf: games)
             onProgress?(allGames.count, total)
         }
-        return allGames
+        guard !userRatings.isEmpty else { return allGames }
+        return allGames.map { game in
+            var g = game
+            g.userRating = userRatings[game.bggId] ?? 0
+            return g
+        }
     }
 
     private func fetchBatch(_ ids: [Int], token: String?) async throws -> [BGGGame] {
@@ -176,6 +184,7 @@ actor BGGClient {
         throw BGGError.emptyResponse(ids: ids)
     }
 
+    // Honors BGG's Retry-After header (seconds). Falls back to exponential backoff if the header is absent.
     private func retryDelay(from response: HTTPURLResponse?, fallback: UInt64) -> UInt64 {
         guard let raw = response?.value(forHTTPHeaderField: "Retry-After"),
               let seconds = Double(raw), seconds >= 0 else { return fallback }

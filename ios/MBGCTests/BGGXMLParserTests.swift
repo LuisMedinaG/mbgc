@@ -11,9 +11,9 @@ import Testing
             </items>
             """.data(using: .utf8)!
 
-        let ids = try BGGXMLParser.parseCollectionResponse(xml)
+        let result = try BGGXMLParser.parseCollectionResponse(xml)
 
-        #expect(ids == [174430, 13])
+        #expect(result.ids == [174430, 13])
     }
 
     @Test func parsesBGGCollectionIDsOnlyOnce() throws {
@@ -25,8 +25,8 @@ import Testing
             </items>
             """.data(using: .utf8)!
 
-        let ids = try BGGXMLParser.parseCollectionResponse(xml)
+        let result = try BGGXMLParser.parseCollectionResponse(xml)
 
-        #expect(ids == [13])
+        #expect(result.ids == [13])
     }
 }

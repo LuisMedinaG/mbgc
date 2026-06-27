@@ -1,7 +1,12 @@
 import Foundation
 
+struct CollectionResult {
+    let ids: [Int]
+    let userRatings: [Int: Double]
+}
+
 enum BGGXMLParser {
-    static func parseCollectionResponse(_ data: Data) throws -> [Int] {
+    static func parseCollectionResponse(_ data: Data) throws -> CollectionResult {
         let delegate = CollectionDelegate()
         let parser = XMLParser(data: data)
         parser.delegate = delegate
@@ -11,7 +16,7 @@ enum BGGXMLParser {
             }
             throw URLError(.cannotParseResponse)
         }
-        return delegate.ids
+        return CollectionResult(ids: delegate.ids, userRatings: delegate.userRatings)
     }
 
     static func parseThingResponse(_ data: Data) throws -> [BGGGame] {
@@ -27,23 +32,44 @@ enum BGGXMLParser {
         return delegate.games
     }
 
+    // SAX delegate that streams the BGG collection XML — only extracts item IDs and user ratings.
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
-        private var seen = Set<Int>()
+        var userRatings: [Int: Double] = [:]
+        private var seen = Set<Int>() // BGG can return duplicate <item> entries; deduplicate by objectid
+        private var currentId: Int = 0
+        private var inStats = false
 
         func parser(_ parser: XMLParser, didStartElement elementName: String,
                     namespaceURI: String?, qualifiedName qName: String?,
                     attributes attributeDict: [String: String] = [:]) {
-            guard elementName == "item",
-                  let id = Int(attributeDict["objectid"] ?? ""),
-                  id > 0,
-                  !seen.contains(id) else { return }
-            // ponytail: collection sync only needs BGG IDs; /thing already fetches metadata.
-            ids.append(id)
-            seen.insert(id)
+            switch elementName {
+            case "item":
+                let id = Int(attributeDict["objectid"] ?? "") ?? 0
+                guard id > 0, !seen.contains(id) else { currentId = 0; return }
+                ids.append(id)
+                seen.insert(id)
+                currentId = id
+            case "stats" where currentId > 0:
+                inStats = true
+            case "rating" where inStats:
+                if let val = attributeDict["value"], let r = Double(val) {
+                    userRatings[currentId] = r
+                }
+            default:
+                break
+            }
+        }
+
+        func parser(_ parser: XMLParser, didEndElement elementName: String,
+                    namespaceURI: String?, qualifiedName qName: String?) {
+            if elementName == "stats" { inStats = false }
+            if elementName == "item" { currentId = 0; inStats = false }
         }
     }
 
+    // SAX delegate for the BGG thing endpoint. Explicit nesting flags (inItem, inStatistics, inRatings)
+    // prevent collisions — BGG XML reuses element names like <rating> at different depths.
     private final class ThingDelegate: NSObject, XMLParserDelegate {
         var games: [BGGGame] = []
 
@@ -63,6 +89,8 @@ enum BGGXMLParser {
         private var mechanics: [String] = []
         private var types: [String] = []
         private var rating: Double = 0
+        private var geekRating: Double = 0
+        private var bggRank: Int = 0
         private var weight: Double = 0
         private var languageDependence: Int = 0
         private var recommendedPlayers: [Int] = []
@@ -121,6 +149,13 @@ enum BGGXMLParser {
                 inRatings = true
             case "average" where inRatings:
                 rating = Double(attributeDict["value"] ?? "") ?? 0
+            case "bayesaverage" where inRatings:
+                geekRating = Double(attributeDict["value"] ?? "") ?? 0
+            case "rank" where inRatings:
+                if attributeDict["type"] == "subtype", attributeDict["name"] == "boardgame",
+                   let v = attributeDict["value"], let r = Int(v) {
+                    bggRank = r
+                }
             case "averageweight" where inRatings:
                 weight = Double(attributeDict["value"] ?? "") ?? 0
 
@@ -212,6 +247,9 @@ enum BGGXMLParser {
                     types: types,
                     weight: weight,
                     rating: rating,
+                    geekRating: geekRating,
+                    bggRank: bggRank,
+                    userRating: 0,
                     languageDependence: languageDependence,
                     recommendedPlayers: recommendedPlayers
                 ))
@@ -235,6 +273,8 @@ enum BGGXMLParser {
             mechanics = []
             types = []
             rating = 0
+            geekRating = 0
+            bggRank = 0
             weight = 0
             languageDependence = 0
             recommendedPlayers = []
@@ -245,6 +285,8 @@ enum BGGXMLParser {
             inRatings = false
         }
 
+        // Returns the language-dependence level with the most community votes (mode).
+        // Returns 0 if no votes were cast (poll absent or all zeros).
         private func computeLanguageDependence() -> Int {
             guard !langResults.isEmpty else { return 0 }
             var bestLevel = 0
@@ -258,6 +300,8 @@ enum BGGXMLParser {
             return bestVotes > 0 ? bestLevel : 0
         }
 
+        // A player count is "recommended" when (Best + Recommended) votes outnumber Not Recommended votes.
+        // This mirrors the threshold BGG uses to display the green/yellow badges on game pages.
         private func computeRecommendedPlayers() -> [Int] {
             var result: [Int] = []
             var seen = Set<Int>()
@@ -281,7 +325,13 @@ enum BGGXMLParser {
                 ("&apos;", "'"),
                 ("&#039;", "'"),
                 ("&#39;", "'"),
-                ("&nbsp;", " ")
+                ("&nbsp;", " "),
+                ("&rsquo;", "'"),
+                ("&lsquo;", "'"),
+                ("&rdquo;", "\u{201D}"),
+                ("&ldquo;", "\u{201C}"),
+                ("&mdash;", "—"),
+                ("&ndash;", "–")
             ]
             for (entity, replacement) in entities {
                 result = result.replacingOccurrences(of: entity, with: replacement)
