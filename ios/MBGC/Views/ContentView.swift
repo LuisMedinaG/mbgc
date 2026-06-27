@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var vibesViewModel = VibesViewModel()
     @State private var tab: HomeTab = .tonight
     @State private var collectionPath: [Collection] = []
+    @State private var finderPath: [Int] = []
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
@@ -22,13 +23,16 @@ struct ContentView: View {
     }
 
     // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
-    private var isInDetailView: Bool { !collectionPath.isEmpty && tab == .collection }
+    private var isInDetailView: Bool {
+        (!collectionPath.isEmpty && tab == .collection) ||
+        (!finderPath.isEmpty && tab == .tonight)
+    }
 
     var body: some View {
         Group {
             switch tab {
             case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
-            case .tonight:    FinderView()
+            case .tonight:    FinderView(path: $finderPath)
             }
         }
         .safeAreaInset(edge: .bottom) {

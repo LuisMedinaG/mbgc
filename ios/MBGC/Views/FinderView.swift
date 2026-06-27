@@ -4,13 +4,14 @@ import SwiftUI
 // MARK: - Container
 
 struct FinderView: View {
+    @Binding var path: [Int]
     @State private var flow = FinderFlow()
     @State private var hapticTrigger = 0
     @Query private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             ZStack {
                 Color(.systemBackground).ignoresSafeArea()
 

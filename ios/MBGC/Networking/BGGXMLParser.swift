@@ -110,11 +110,15 @@ enum BGGXMLParser {
         private var categories: [String] = []
         private var mechanics: [String] = []
         private var types: [String] = []
+        private var designers: [String] = []
+        private var artists: [String] = []
+        private var publishers: [String] = []
         private var rating: Double = 0
         private var geekRating: Double = 0
         private var bggRank: Int = 0
         private var weight: Double = 0
         private var languageDependence: Int = 0
+        private var minAge: Int = 0
         private var recommendedPlayers: [Int] = []
 
         private var inItem = false
@@ -154,14 +158,19 @@ enum BGGXMLParser {
                 maxPlayers = Int(attributeDict["value"] ?? "") ?? 0
             case "playingtime" where inItem:
                 playTime = Int(attributeDict["value"] ?? "") ?? 0
+            case "minage" where inItem:
+                minAge = Int(attributeDict["value"] ?? "") ?? 0
 
             case "link" where inItem:
                 let linkType = attributeDict["type"] ?? ""
                 let value = unescapeHTML(attributeDict["value"] ?? "")
                 switch linkType {
-                case "boardgamecategory": categories.append(value)
-                case "boardgamemechanic": mechanics.append(value)
+                case "boardgamecategory":  categories.append(value)
+                case "boardgamemechanic":  mechanics.append(value)
                 case "boardgamesubdomain": types.append(value)
+                case "boardgamedesigner":  designers.append(value)
+                case "boardgameartist":    artists.append(value)
+                case "boardgamepublisher": publishers.append(value)
                 default: break
                 }
 
@@ -275,7 +284,11 @@ enum BGGXMLParser {
                     wantToPlay: false,
                     numberOfPlays: 0,
                     languageDependence: languageDependence,
-                    recommendedPlayers: recommendedPlayers
+                    recommendedPlayers: recommendedPlayers,
+                    designers: designers,
+                    artists: artists,
+                    publishers: publishers,
+                    minAge: minAge
                 ))
                 inItem = false
 
@@ -296,11 +309,15 @@ enum BGGXMLParser {
             categories = []
             mechanics = []
             types = []
+            designers = []
+            artists = []
+            publishers = []
             rating = 0
             geekRating = 0
             bggRank = 0
             weight = 0
             languageDependence = 0
+            minAge = 0
             recommendedPlayers = []
             currentPollName = ""
             langResults = []

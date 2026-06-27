@@ -28,6 +28,10 @@ final class Game {
     var lastLogPlayed: Date?  // ponytail: local-only, nil until play logging is built
     var languageDependence: Int?
     var recommendedPlayers: [Int]?
+    var designers: [String]?
+    var artists: [String]?
+    var publishers: [String]?
+    var minAge: Int?
 
     /// Local SwiftData collections this game belongs to (e.g. Library, user vibes).
     var collections: [Collection] = []
@@ -63,5 +67,9 @@ final class Game {
         numberOfPlays = bggGame.numberOfPlays > 0 ? bggGame.numberOfPlays : nil
         languageDependence = bggGame.languageDependence > 0 ? bggGame.languageDependence : nil
         recommendedPlayers = bggGame.recommendedPlayers.isEmpty ? nil : bggGame.recommendedPlayers
+        designers = bggGame.designers.isEmpty ? nil : bggGame.designers
+        artists = bggGame.artists.isEmpty ? nil : bggGame.artists
+        publishers = bggGame.publishers.isEmpty ? nil : bggGame.publishers
+        minAge = bggGame.minAge > 0 ? bggGame.minAge : nil
     }
 }

@@ -588,7 +588,7 @@ struct CollectionDetailView: View {
             AddGamesSheet(collection: collection, allGames: allGames)
         }
         .sheet(isPresented: $showFilters) {
-            FilterView(filters: $filters)
+            FilterView(filters: $filters, games: collection.games)
         }
         .sheet(isPresented: $showEditCollection) {
             RenameCollectionSheet(collection: collection, initialName: collection.name)
@@ -694,12 +694,54 @@ struct CollectionDetailView: View {
     private var filterPillsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                if !filters.titleStartsWith.isEmpty {
+                    Button { filters.titleStartsWith = "" } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "textformat.abc").font(.caption2)
+                            Text(filters.titleStartsWith).font(.caption.monospacedDigit())
+                        }
+                        .foregroundStyle(Color.orange)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.orange.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+                if !filters.languageLevels.isEmpty {
+                    Button { filters.languageLevels.removeAll() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "text.bubble").font(.caption2)
+                            Text("\(filters.languageLevels.count)").font(.caption.monospacedDigit())
+                        }
+                        .foregroundStyle(Color.indigo)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.indigo.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                }
+                ForEach(SetFilterField.allCases) { field in
+                    if let selected = filters.setFilters[field] {
+                        Button { filters.setFilters[field] = nil } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: field.icon).font(.caption2)
+                                Text("\(selected.count)").font(.caption.monospacedDigit())
+                            }
+                            .foregroundStyle(field.color)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(field.color.opacity(0.12))
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
                 ForEach(FilterField.allCases) { field in
                     if let spec = filters.specs[field] {
                         filterPill(field: field, spec: spec)
                     }
                 }
             }
+            .padding(.horizontal, 4)
         }
     }
 

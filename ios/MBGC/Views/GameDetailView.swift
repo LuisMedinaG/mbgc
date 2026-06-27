@@ -9,35 +9,31 @@ struct GameDetailView: View {
     @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
     @State private var showDeleteAlert = false
     @State private var showAddToCollection = false
-
-    private let langDep = ["", "No language", "Some text", "Moderate", "Extensive", "Unplayable"]
+    @State private var isDescExpanded = false
 
     var body: some View {
         Group {
             if let game = viewModel.game {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(spacing: 0) {
                         heroImage(game)
+                            .ignoresSafeArea(edges: .top)
+                        titleSection(game)
                         statsRow(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                         descriptionSection(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                         tagsSection(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                         linksSection(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                     }
-                    .padding()
                 }
-                .safeAreaInset(edge: .bottom) {
-                    Button { showAddToCollection = true } label: {
-                        Text("Add to Collection")
-                            .font(.body.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.accentColor)
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
-                }
+                .safeAreaInset(edge: .bottom) { bottomBar(game) }
                 .sheet(isPresented: $showAddToCollection) {
                     AddToCollectionSheet(game: game, allCollections: allCollections)
                 }
@@ -47,20 +43,9 @@ struct GameDetailView: View {
                 ProgressView()
             }
         }
-        .navigationTitle(viewModel.game?.name ?? "Game")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button(role: .destructive) { showDeleteAlert = true } label: {
-                        Label("Delete Game", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                }
-            }
-        }
         .alert("Delete \"\(viewModel.game?.name ?? "")\"?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
@@ -71,56 +56,55 @@ struct GameDetailView: View {
     }
 
     private func heroImage(_ game: Game) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle().fill(Color.gray.opacity(0.3))
-            }
-            .frame(height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(game.name)
-                    .font(.title2).fontWeight(.bold).foregroundStyle(.white)
-                HStack(spacing: 8) {
-                    if let year = game.yearPublished, year > 0 {
-                        Text(String(year)).font(.caption).foregroundStyle(.white.opacity(0.85))
-                    }
-                    if let rating = game.rating, rating > 0 {
-                        Text("★ \(String(format: "%.1f", rating))").font(.caption).fontWeight(.bold).foregroundStyle(.white)
-                    }
-                    if let weight = game.weight, weight > 0 {
-                        Text(String(format: "%.1f", weight)).font(.caption).foregroundStyle(.white.opacity(0.85))
-                    }
-                    if let dep = game.languageDependence, langDep.indices.contains(dep) {
-                        Text(langDep[dep]).font(.caption).foregroundStyle(.white.opacity(0.85))
-                    }
-                }
-            }
-            .padding()
+        AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { image in
+            image.resizable().aspectRatio(contentMode: .fill)
+        } placeholder: {
+            Rectangle().fill(Color(.systemGray5))
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: 320)
+        .clipped()
+    }
+
+    private func titleSection(_ game: Game) -> some View {
+        VStack(spacing: 6) {
+            Text(game.name)
+                .font(.title2).fontWeight(.bold)
+                .multilineTextAlignment(.center)
+            // dot-separated: year · BGG rating · age+
+            let parts: [String] = [
+                game.yearPublished.map { $0 > 0 ? String($0) : nil } ?? nil,
+                game.rating.map { $0 > 0 ? "BGG \(String(format: "%.1f", $0))" : nil } ?? nil,
+                game.minAge.map { $0 > 0 ? "\($0)+" : nil } ?? nil
+            ].compactMap { $0 }
+            if !parts.isEmpty {
+                Text(parts.joined(separator: " · "))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
     }
 
     private func statsRow(_ game: Game) -> some View {
         HStack {
-            VStack {
+            VStack(spacing: 2) {
+                Text("PLAYERS").font(.caption2).foregroundStyle(.secondary)
                 Text(playersStr(game)).font(.title3).fontWeight(.bold)
                 Text("Players").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
-            VStack {
+            VStack(spacing: 2) {
+                Text("PLAYTIME").font(.caption2).foregroundStyle(.secondary)
                 Text("\(game.playtime ?? 0)").font(.title3).fontWeight(.bold)
                 Text("Minutes").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
-            VStack {
+            VStack(spacing: 2) {
+                Text("WEIGHT").font(.caption2).foregroundStyle(.secondary)
                 Text(game.weight.map { String(format: "%.1f", $0) } ?? "—").font(.title3).fontWeight(.bold)
                 Text("Complexity").font(.caption2).foregroundStyle(.secondary)
             }
@@ -128,15 +112,21 @@ struct GameDetailView: View {
         }
         .padding()
         .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func descriptionSection(_ game: Game) -> some View {
         Group {
             if let desc = game.gameDescription, !desc.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("About").font(.headline)
-                    Text(desc).font(.subheadline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(desc)
+                        .font(.subheadline)
+                        .lineLimit(isDescExpanded ? nil : 4)
+                    if !isDescExpanded {
+                        Button("More...") { isDescExpanded = true }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    }
                 }
             }
         }
@@ -151,17 +141,13 @@ struct GameDetailView: View {
                     if !categories.isEmpty {
                         Text("Categories").font(.headline)
                         FlowLayout(spacing: 6) {
-                            ForEach(categories, id: \.self) { tag in
-                                tagChip(tag, color: .blue)
-                            }
+                            ForEach(categories, id: \.self) { tagChip($0, color: .blue) }
                         }
                     }
                     if !mechanics.isEmpty {
                         Text("Mechanics").font(.headline)
                         FlowLayout(spacing: 6) {
-                            ForEach(mechanics, id: \.self) { tag in
-                                tagChip(tag, color: .green)
-                            }
+                            ForEach(mechanics, id: \.self) { tagChip($0, color: .green) }
                         }
                     }
                 }
@@ -204,12 +190,43 @@ struct GameDetailView: View {
         }
         .padding()
         .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func bottomBar(_ game: Game) -> some View {
+        HStack(spacing: 12) {
+            let count = game.collections.filter { !$0.isDefault }.count
+            Button { showAddToCollection = true } label: {
+                Text(count > 0 ? "Add to...  \(count)" : "Add to...")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.accentColor)
+                    .foregroundStyle(.white)
+                    .clipShape(Capsule())
+            }
+
+            Menu {
+                Button(role: .destructive) { showDeleteAlert = true } label: {
+                    Label("Delete Game", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(Color(.label))
+                    .frame(width: 52, height: 52)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(Circle())
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(.thinMaterial)
     }
 
     private func playersStr(_ game: Game) -> String {
         if let min = game.minPlayers, let max = game.maxPlayers {
-            return min == max ? "\(min)" : "\(min)-\(max)"
+            return min == max ? "\(min)" : "\(min)–\(max)"
         }
         return "—"
     }

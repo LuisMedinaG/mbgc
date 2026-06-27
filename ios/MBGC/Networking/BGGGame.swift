@@ -22,4 +22,8 @@ struct BGGGame: Sendable {
     var numberOfPlays: Int
     let languageDependence: Int
     let recommendedPlayers: [Int]
+    var designers: [String] = []
+    var artists: [String] = []
+    var publishers: [String] = []
+    let minAge: Int
 }

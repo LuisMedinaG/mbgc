@@ -109,6 +109,27 @@ struct ImportView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }
+
+                #if DEBUG
+                Divider()
+                Button {
+                    Task { await refreshAllGameDetails() }
+                } label: {
+                    HStack {
+                        if isSyncing { ProgressView().tint(.white) }
+                        else { Image(systemName: "arrow.clockwise.circle.fill") }
+                        Text(isSyncing ? "Refreshing…" : "Refresh All Details")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(isSyncing ? Color.gray : Color.orange))
+                }
+                .disabled(isSyncing)
+                Text("Debug: re-fetches full game data from BGG for every game in the library.")
+                    .font(.caption).foregroundStyle(.secondary)
+                #endif
             }
             .padding(20)
         }
@@ -212,6 +233,55 @@ struct ImportView: View {
             appendSyncLog(syncError ?? "Import failed")
         }
     }
+
+    #if DEBUG
+    private func refreshAllGameDetails() async {
+        guard !isSyncing else { return }
+        isSyncing = true
+        syncProgress = "Loading local games…"
+        syncError = nil; syncSummary = nil; syncLog = []
+        defer { isSyncing = false; syncProgress = nil }
+
+        do {
+            let allGames = try modelContext.fetch(FetchDescriptor<Game>())
+            guard !allGames.isEmpty else {
+                syncError = "No games in library to refresh."
+                appendSyncLog("Nothing to refresh")
+                return
+            }
+
+            // Preserve user-specific fields — these come from the collection endpoint, not thing endpoint.
+            let existingRatings = Dictionary(uniqueKeysWithValues: allGames.compactMap { g in g.userRating.map { (g.bggId, $0) } })
+            let existingWantToPlay = Dictionary(uniqueKeysWithValues: allGames.compactMap { g in g.wantToPlay ? Optional((g.bggId, true)) : nil })
+            let existingPlays = Dictionary(uniqueKeysWithValues: allGames.compactMap { g in g.numberOfPlays.map { (g.bggId, $0) } })
+
+            let allIds = allGames.map(\.bggId)
+            appendSyncLog("Refreshing \(allIds.count) game\(allIds.count == 1 ? "" : "s") from BGG")
+
+            let bggGames = try await BGGClient.shared.fetchThings(
+                ids: allIds,
+                token: bggToken,
+                userRatings: existingRatings,
+                wantToPlay: existingWantToPlay,
+                numberOfPlays: existingPlays
+            ) { done, total in
+                Task { @MainActor in self.syncProgress = "Refreshing (\(done) of \(total))…" }
+            }
+
+            let byId = Dictionary(grouping: bggGames, by: \.bggId).compactMapValues(\.first)
+            var updated = 0
+            for game in allGames {
+                if let fresh = byId[game.bggId] { game.update(from: fresh); updated += 1 }
+            }
+
+            try modelContext.save()
+            appendSyncLog("Refreshed \(updated) of \(allIds.count) game\(allIds.count == 1 ? "" : "s")")
+        } catch {
+            syncError = importMessage(for: error)
+            appendSyncLog(syncError ?? "Refresh failed")
+        }
+    }
+    #endif
 
     private func appendSyncLog(_ message: String) {
         guard syncLog.last != message else { return }

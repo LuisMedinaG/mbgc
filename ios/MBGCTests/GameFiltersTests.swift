@@ -14,7 +14,7 @@ import Testing
             categories: [], mechanics: [], types: [],
             weight: weight, rating: rating, geekRating: 0, bggRank: bggRank,
             userRating: userRating, wantToPlay: false, numberOfPlays: 0,
-            languageDependence: 0, recommendedPlayers: recommendedPlayers
+            languageDependence: 0, minAge: 0, recommendedPlayers: recommendedPlayers
         ))
     }
 
