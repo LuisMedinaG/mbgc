@@ -83,8 +83,8 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
         .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
-        // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
-        .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
+        // CreateTypeChooser / CreateCollectionSheet have their own @Environment(\.modelContext)
+        .sheet(isPresented: $showCreate)   { CreateTypeChooser().preferredColorScheme(preferredScheme) }
         .preferredColorScheme(preferredScheme)
         .id(appearanceMode)
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)

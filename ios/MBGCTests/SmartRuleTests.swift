@@ -90,6 +90,22 @@ import Testing
         #expect(out == [1, 3]) // A {1,2} △ B {2,3} = {1,3}
     }
 
+    @Test func baseStartsFromInitialList() throws {
+        let (ctx, a, b, all) = try fixture()
+        // base = A {1,2}, subtract B {2,3} → {1}
+        let s = smart(SmartRule(base: a.id, subtract: [b.id])); ctx.insert(s)
+        let out = Set(s.smartGames(collections: [a, b, s], allGames: all).map(\.bggId))
+        #expect(out == [1])
+    }
+
+    @Test func baseUnionsCombineLists() throws {
+        let (ctx, a, b, all) = try fixture()
+        // base = A {1,2}, combine B {2,3} → {1,2,3}
+        let s = smart(SmartRule(base: a.id, combine: [b.id])); ctx.insert(s)
+        let out = Set(s.smartGames(collections: [a, b, s], allGames: all).map(\.bggId))
+        #expect(out == [1, 2, 3])
+    }
+
     @Test func filtersNarrowTheSet() throws {
         let ctx = try makeContext()
         let g1 = game(1, rating: 9), g2 = game(2, rating: 5)

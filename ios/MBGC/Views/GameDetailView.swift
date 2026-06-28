@@ -53,9 +53,7 @@ struct GameDetailView: View {
                         Label("Delete Game", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(.white, Color.black.opacity(0.3))
+                    Image(systemName: "ellipsis")
                 }
             }
         }

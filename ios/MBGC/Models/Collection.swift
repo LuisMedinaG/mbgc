@@ -24,6 +24,11 @@ final class Collection {
     /// Persisted JSON data for the `SmartRule` defining this collection's membership.
     var ruleData: Data?
 
+    /// Ranked lists keep a manual game order the user drags to arrange.
+    var isRanked: Bool = false
+    /// bggIds in manual rank order (ranked lists only). Games not listed sort last.
+    var rankedOrder: [Int] = []
+
     /// Manually-curated games in this collection.
     /// For smart collections, this property remains empty and `smartGames()` should be used.
     @Relationship(deleteRule: .nullify, inverse: \Game.collections)
@@ -79,7 +84,8 @@ final class Collection {
 /// Rules that derive a smart list's membership. Persisted as JSON in `Collection.ruleData`.
 /// Lists are referenced by `Collection.id` so renames don't break a rule.
 struct SmartRule: Codable, Equatable {
-    var combine:   [UUID] = []   // union of these lists — the base set (empty = all games)
+    var base:      UUID?         // initial list to start from; nil = entire library
+    var combine:   [UUID] = []   // union these lists onto the base
     var intersect: [UUID] = []   // keep only games present in ALL of these
     var subtract:  [UUID] = []   // remove games present in ANY of these (A \ B)
     // ponytail: exclude = symmetric difference (games in exactly one side), distinct from
@@ -88,7 +94,12 @@ struct SmartRule: Codable, Equatable {
     var filters:   GameFilters = .init()
 
     var isEmpty: Bool {
-        combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
+        base == nil && combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
+    }
+
+    /// Count of every active selection — drives the "Set Filters" badge.
+    var activeCount: Int {
+        (base == nil ? 0 : 1) + combine.count + intersect.count + subtract.count + exclude.count + filters.activeCount
     }
 }
 
@@ -112,14 +123,18 @@ extension Collection {
             list.compactMap { byId[$0] }.map { Set($0.games.map(\.bggId)) }
         }
 
-        // Base: union of combine lists; empty combine = every game.
+        // Start from the chosen initial list; nil base + no combine = entire library.
         var base: Set<Int>
-        let combineSets = ids(rule.combine)
-        if combineSets.isEmpty {
-            base = Set(allGames.map(\.bggId))
+        if let baseId = rule.base, let c = byId[baseId] {
+            base = Set(c.games.map(\.bggId))
+        } else if !rule.combine.isEmpty {
+            base = []                                  // combine lists become the base
         } else {
-            base = combineSets.reduce(into: Set<Int>()) { $0.formUnion($1) }
+            base = Set(allGames.map(\.bggId))
         }
+
+        // Combine: union the combine lists onto the base.
+        for set in ids(rule.combine) { base.formUnion(set) }
 
         // Intersect: keep only games present in every intersect list.
         for set in ids(rule.intersect) { base.formIntersection(set) }
