@@ -266,11 +266,18 @@ struct AddToCollectionSheet: View {
                 } label: {
                     HStack {
                         Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(col.isDefault ? Color.secondary : Color.accentColor)
-                        Text(col.name).foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
+                            .foregroundStyle(col.isDefault ? Color.secondary.opacity(0.6) : Color.accentColor)
+                        Text(col.name)
+                            .foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
+                        if col.isDefault {
+                            Text("Always included")
+                                .font(.caption)
+                                .foregroundStyle(Color.secondary)
+                        }
                     }
                 }
                 .disabled(col.isDefault)
+                .accessibilityHint(col.isDefault ? "Library always contains every imported game" : "")
             }
             .listStyle(.plain)
             .navigationTitle("Collections")

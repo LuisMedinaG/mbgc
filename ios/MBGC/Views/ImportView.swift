@@ -113,7 +113,7 @@ struct ImportView: View {
                     HStack {
                         if isSyncing { ProgressView().tint(.white) }
                         else { Image(systemName: "arrow.clockwise.circle.fill") }
-                        Text(isSyncing ? "Refreshing…" : "Refresh All Details")
+                        Text(isSyncing ? "Refreshing..." : "Refresh All Details")
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -147,7 +147,7 @@ struct ImportView: View {
     }
 
     /// True when the 7-day cooldown still applies. In DEBUG the cooldown is
-    /// skipped — the user can re-sync freely.
+    /// skipped - the user can re-sync freely.
     private var isInCooldown: Bool {
         #if DEBUG
         return false
@@ -178,7 +178,7 @@ struct ImportView: View {
 
     private func importFromBGG() async {
         let username = bggUsername.trimmingCharacters(in: .whitespacesAndNewlines)
-        let token = bggToken  // nil when not configured — BGGClient will omit the auth header
+        let token = bggToken  // nil when not configured - BGGClient will omit the auth header
         guard !username.isEmpty else { return }
         #if !DEBUG
         if let message = cooldownMessage() {
@@ -187,7 +187,7 @@ struct ImportView: View {
         #endif
 
         isSyncing = true
-        syncProgress = "Fetching BGG collection…"
+        syncProgress = "Fetching BGG collection..."
         syncError = nil; syncSummary = nil; syncLog = []; selectedGames = []
         defer { isSyncing = false; syncProgress = nil }
 
@@ -217,11 +217,11 @@ struct ImportView: View {
             var newGames: [Game] = []
             var failedIds: [Int] = []
             if !toFetch.isEmpty {
-                syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")…"
+                syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")..."
                 appendSyncLog("Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")")
                 let bggGames = try await BGGClient.shared.fetchThings(ids: toFetch, token: token, userRatings: collectionResult.userRatings, wantToPlay: collectionResult.wantToPlay, numberOfPlays: collectionResult.numberOfPlays) { done, total in
                     Task { @MainActor in
-                        self.syncProgress = "Fetching details (\(done) of \(total))…"
+                        self.syncProgress = "Fetching details (\(done) of \(total))..."
                         self.appendSyncLog("Fetched details for \(done) of \(total)")
                     }
                 }
@@ -263,7 +263,7 @@ struct ImportView: View {
     private func refreshAllGameDetails() async {
         guard !isSyncing else { return }
         isSyncing = true
-        syncProgress = "Loading local games…"
+        syncProgress = "Loading local games..."
         syncError = nil; syncSummary = nil; syncLog = []
         defer { isSyncing = false; syncProgress = nil }
 
@@ -275,7 +275,7 @@ struct ImportView: View {
                 return
             }
 
-            // Preserve user-specific fields — these come from the collection endpoint, not thing endpoint.
+            // Preserve user-specific fields - these come from the collection endpoint, not thing endpoint.
             let existingRatings = Dictionary(uniqueKeysWithValues: allGames.compactMap { g in g.userRating.map { (g.bggId, $0) } })
             let existingWantToPlay = Dictionary(uniqueKeysWithValues: allGames.compactMap { g in g.wantToPlay ? Optional((g.bggId, true)) : nil })
             let existingPlays = Dictionary(uniqueKeysWithValues: allGames.compactMap { g in g.numberOfPlays.map { (g.bggId, $0) } })
@@ -290,7 +290,7 @@ struct ImportView: View {
                 wantToPlay: existingWantToPlay,
                 numberOfPlays: existingPlays
             ) { done, total in
-                Task { @MainActor in self.syncProgress = "Refreshing (\(done) of \(total))…" }
+                Task { @MainActor in self.syncProgress = "Refreshing (\(done) of \(total))..." }
             }
 
             let byId = Dictionary(grouping: bggGames, by: \.bggId).compactMapValues(\.first)
@@ -339,7 +339,7 @@ struct ImportView: View {
     }
 }
 
-// MARK: — Collection Picker (shared by ImportView + CsvImportView)
+// MARK: - Collection Picker (shared by ImportView + CsvImportView)
 
 struct CollectionPickerView: View {
     let games: [Game]
@@ -347,7 +347,7 @@ struct CollectionPickerView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
-    @State private var selectedIndex: Int = 0
+    @State private var selectedID: PersistentIdentifier?
     @State private var destinationError: String?
     @State private var showNewCollection = false
     @State private var newName = ""
@@ -364,10 +364,10 @@ struct CollectionPickerView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Picker("", selection: $selectedIndex) {
-                ForEach(Array(collections.enumerated()), id: \.offset) { idx, col in
+            Picker("", selection: $selectedID) {
+                ForEach(collections) { col in
                     Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
-                        .tag(idx)
+                        .tag(Optional(col.persistentModelID))
                 }
             }
             .pickerStyle(.menu)
@@ -420,7 +420,8 @@ struct CollectionPickerView: View {
     }
 
     private func setDefaultSelection() {
-        selectedIndex = collections.firstIndex(where: { $0.isDefault }) ?? 0
+        selectedID = collections.first(where: { $0.isDefault })?.persistentModelID
+            ?? collections.first?.persistentModelID
     }
 
     private func createAndSelect() {
@@ -430,16 +431,17 @@ struct CollectionPickerView: View {
         modelContext.insert(col)
         do {
             try modelContext.save()
-            // Newly created collection will appear at end of @Query results
-            selectedIndex = max(0, collections.count - 1)
+            // Newly created collection will appear at end of @Query results;
+            // select it once @Query picks it up.
+            selectedID = col.persistentModelID
         } catch {
             destinationError = "Couldn't create collection."
         }
     }
 
     private func confirm() {
-        guard selectedIndex < collections.count else { return }
-        let col = collections[selectedIndex]
+        guard let id = selectedID,
+              let col = collections.first(where: { $0.persistentModelID == id }) else { return }  
         LocalLibrary.add(games, to: col)
         do {
             try modelContext.save()

@@ -726,6 +726,18 @@ struct CollectionDetailView: View {
                 }
             } else {
                 if !effectiveGames.isEmpty {
+                    // Move "select" to the leading side to keep the trailing
+                    // bar at 3 items (filter, sort, menu). iPhone trailing
+                    // space runs out at 4+ items and SwiftUI auto-creates an
+                    // overflow "More" menu, hiding the action the user wants.
+                    if !collection.isSmart {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { isSelecting = true } label: {
+                                Image(systemName: "checkmark.circle")
+                            }
+                            .accessibilityLabel("Select games")
+                        }
+                    }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showFilters = true } label: {
                             Image(systemName: filters.isEmpty
@@ -733,6 +745,7 @@ struct CollectionDetailView: View {
                                 : "line.3.horizontal.decrease.circle.fill")
                         }
                         .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
+                        .accessibilityLabel("Filters")
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
@@ -758,13 +771,7 @@ struct CollectionDetailView: View {
                             }
                         }
                         .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
-                    }
-                    if !collection.isSmart {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button { isSelecting = true } label: {
-                                Image(systemName: "checkmark.circle")
-                            }
-                        }
+                        .accessibilityLabel("Sort by")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -774,49 +781,38 @@ struct CollectionDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isSelecting {
-                HStack {
-                    HStack(spacing: 0) {
-                        Button("Copy All") {
-                            selectedIds = Set(filteredGames.map(\.bggId))
-                            pendingAction = .copy
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-
-                        Rectangle()
-                            .fill(Color(.separator))
-                            .frame(width: 0.5, height: 20)
-
-                        Button("Move All") {
-                            selectedIds = Set(filteredGames.map(\.bggId))
-                            pendingAction = .move
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .disabled(collection.isDefault)
+                HStack(spacing: 12) {
+                    Button {
+                        selectedIds = Set(filteredGames.map(\.bggId))
+                        pendingAction = .copy
+                    } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                            .labelStyle(.titleAndIcon)
                     }
-                    .font(.body.weight(.medium))
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
+                    .buttonStyle(.bordered)
+                    .disabled(filteredGames.isEmpty)
 
-                    Spacer()
-
-                    Button { deleteSelected() } label: {
-                        Text("Delete All")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(selectedIds.isEmpty ? Color.secondary : Color.red)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
+                    Button {
+                        selectedIds = Set(filteredGames.map(\.bggId))
+                        pendingAction = .move
+                    } label: {
+                        Label("Move", systemImage: "arrow.right.square")
                     }
-                    .buttonStyle(.plain)
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
+                    .buttonStyle(.bordered)
+                    .disabled(filteredGames.isEmpty || collection.isDefault)
+
+                    Spacer(minLength: 8)
+
+                    Button(role: .destructive, action: deleteSelected) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                     .disabled(selectedIds.isEmpty)
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
             }
         }
         .sheet(isPresented: $showAddGames) {

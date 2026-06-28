@@ -101,14 +101,10 @@ private struct FinderStepView: View {
             optionGrid
         }
         .padding(.bottom, 110)
-        .gesture(
-            DragGesture(minimumDistance: 40)
-                .onEnded { value in
-                    guard value.translation.width > 60,
-                          abs(value.translation.height) < 100 else { return }
-                    onBack?()
-                }
-        )
+        // Note: a custom DragGesture was here for swipe-back, but it fought
+        // the NavigationStack's built-in right-edge swipe and could double-back
+        // or trigger while the user was scrolling the option grid. Removed —
+        // use the explicit Back button or the NavigationStack edge swipe.
     }
 
     private var header: some View {
