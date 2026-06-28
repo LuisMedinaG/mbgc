@@ -50,6 +50,28 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 }
 
+extension CachedAsyncImage where Placeholder == Color {
+    /// Convenience initializer for the most common case: square thumbnail
+    /// with a gray placeholder and rounded corners. Use the main init when
+    /// you need a custom placeholder (e.g. ProgressView or shimmer).
+    init(url: URL?, size: CGFloat = 60, cornerRadius: CGFloat = 8) {
+        self.init(
+            url: url,
+            content: { image in
+                image.resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            },
+            placeholder: {
+                Color(.systemGray5)
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            }
+        )
+    }
+}
+
 /// Dedicated URLSession for board game thumbnails. Owns its own URLCache so we
 /// don't mutate the global `URLCache.shared` (which would leak into every
 /// URLSession in the app, including future telemetry).
