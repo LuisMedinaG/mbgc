@@ -12,7 +12,7 @@ import Testing
         f.specs[.rating] = FilterSpec(mode: .minimum, value: 7)
         f.specs[.bggRank] = FilterSpec(mode: .maximum, value: 500)
         f.setFilters[.mechanics] = ["Worker Placement", "Deck Building"]
-        f.titleStartsWith = "C"
+        f.titleContains = "Catan"
         f.languageLevels = [1, 2]
 
         let data = try JSONEncoder().encode(f)

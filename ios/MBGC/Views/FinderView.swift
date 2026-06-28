@@ -312,16 +312,17 @@ private struct FinderHeroCard: View {
     let game: Game
 
     var body: some View {
-        // Frame and clip on the ZStack (not children) so LinearGradient can't escape the 200pt box.
         ZStack(alignment: .bottomLeading) {
             AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { img in
                 img.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
                 Color(.systemGray5)
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 260)
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.75)],
+                colors: [.clear, .black.opacity(0.7)],
                 startPoint: .center,
                 endPoint: .bottom
             )
@@ -330,11 +331,12 @@ private struct FinderHeroCard: View {
                 Text(game.name)
                     .font(.title2.bold())
                     .foregroundStyle(.white)
+
                 HStack(spacing: 14) {
                     if let r = game.rating, r > 0 {
                         Label(String(format: "%.1f", r), systemImage: "star.fill")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.white.opacity(0.85))
                     }
                     if let lo = game.minPlayers, let hi = game.maxPlayers {
                         Label(lo == hi ? "\(lo)" : "\(lo)–\(hi)", systemImage: "person.2.fill")
@@ -348,10 +350,8 @@ private struct FinderHeroCard: View {
                     }
                 }
             }
-            .padding(18)
+            .padding(16)
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 200)
         .clipShape(RoundedRectangle(cornerRadius: 20))
     }
 }

@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
+    @State private var createKind: CollectionKind?
 
     private var preferredScheme: ColorScheme? {
         switch appearanceMode {
@@ -83,8 +84,25 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
         .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
-        // CreateTypeChooser / CreateCollectionSheet have their own @Environment(\.modelContext)
-        .sheet(isPresented: $showCreate)   { CreateTypeChooser().preferredColorScheme(preferredScheme) }
+        // CreateCollectionSheet has its own @Environment(\.modelContext)
+        .sheet(item: $createKind) { CreateCollectionSheet(kind: $0).preferredColorScheme(preferredScheme) }
+        .overlay {
+            if showCreate {
+                Color.black.opacity(0.2)
+                    .ignoresSafeArea()
+                    .onTapGesture { withAnimation(.spring(duration: 0.25)) { showCreate = false } }
+                VStack {
+                    Spacer()
+                    CreateTypeChooser { kind in
+                        withAnimation(.spring(duration: 0.25)) { showCreate = false }
+                        createKind = kind
+                    }
+                    .padding(.bottom, 100)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(duration: 0.25), value: showCreate)
         .preferredColorScheme(preferredScheme)
         .id(appearanceMode)
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)

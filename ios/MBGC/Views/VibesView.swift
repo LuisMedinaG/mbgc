@@ -309,31 +309,21 @@ enum CollectionKind: String, CaseIterable, Identifiable {
     }
 }
 
-/// Presented by the "+" button — pick a list type, then create it.
+/// Inline floating card presented by the "+" button — pick a list type.
 struct CreateTypeChooser: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var chosen: CollectionKind?
+    let onSelect: (CollectionKind) -> Void
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(CollectionKind.allCases) { kind in
-                    Button { chosen = kind } label: { row(kind) }
-                        .buttonStyle(.plain)
-                }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("New List")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+        VStack(spacing: 0) {
+            ForEach(CollectionKind.allCases) { kind in
+                Button { onSelect(kind) } label: { row(kind) }
+                    .buttonStyle(.plain)
             }
         }
-        .presentationDetents([.medium])
-        // Any dismissal of the create form returns to the collection list.
-        .sheet(item: $chosen, onDismiss: { dismiss() }) { kind in
-            CreateCollectionSheet(kind: kind)
-        }
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.12), radius: 20, x: 0, y: 4)
+        .padding(.horizontal, 20)
     }
 
     private func row(_ kind: CollectionKind) -> some View {
@@ -350,6 +340,8 @@ struct CreateTypeChooser: View {
             }
             Spacer()
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .contentShape(Rectangle())
     }
 }
@@ -517,10 +509,13 @@ struct SmartListEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var activeBucket: Bucket?
     @State private var showBasePicker = false
+    @State private var baseSelected: Bool
+    @State private var showTitlePicker = false
+    @State private var activeChecklist: SetFilterField?
 
     private var baseName: String {
-        guard let id = rule.base else { return "Entire library" }
-        return lists.first { $0.id == id }?.name ?? "Entire library"
+        guard let id = rule.base else { return "Library" }
+        return lists.first { $0.id == id }?.name ?? "Library"
     }
 
     init(rule: SmartRule, lists: [Collection], allGames: [Game], onSave: @escaping (SmartRule) -> Void) {
@@ -528,6 +523,7 @@ struct SmartListEditor: View {
         self.lists = lists
         self.allGames = allGames
         self.onSave = onSave
+        _baseSelected = State(initialValue: rule.base != nil || !rule.combine.isEmpty || !rule.intersect.isEmpty || !rule.subtract.isEmpty || !rule.exclude.isEmpty)
     }
 
     enum Bucket: String, CaseIterable, Identifiable {
@@ -572,14 +568,15 @@ struct SmartListEditor: View {
         NavigationStack {
             List {
                 Section("Lists") {
-                    Button { showBasePicker = true } label: { baseRow }
-                        .buttonStyle(.plain)
-                    ForEach(Bucket.allCases) { bucket in
-                        Button { activeBucket = bucket } label: { bucketRow(bucket) }
-                            .buttonStyle(.plain)
+                    baseRow
+                    if baseSelected {
+                        ForEach(Bucket.allCases) { bucket in
+                            Button { activeBucket = bucket } label: { bucketRow(bucket) }
+                                .buttonStyle(.plain)
+                        }
                     }
                 }
-                FilterRows(filters: $rule.filters, games: allGames)
+                FilterRows(filters: $rule.filters, games: allGames, showTitlePicker: $showTitlePicker, activeChecklist: $activeChecklist)
             }
             .navigationTitle("Smart Filter")
             .navigationBarTitleDisplayMode(.inline)
@@ -592,15 +589,28 @@ struct SmartListEditor: View {
             .sheet(item: $activeBucket) { bucket in
                 ListPickerSheet(
                     title: bucket.rawValue,
-                    lists: lists,
+                    lists: lists.filter { $0.id != rule.base },
                     selected: Binding(
                         get: { Set(ids(bucket)) },
                         set: { setIds(Array($0), bucket) }
                     )
                 )
             }
-            .sheet(isPresented: $showBasePicker) {
+            .sheet(isPresented: $showBasePicker, onDismiss: { baseSelected = true }) {
                 BasePickerSheet(lists: lists, selected: $rule.base)
+            }
+            .sheet(item: $activeChecklist) { field in
+                ChecklistPickerSheet(
+                    title: field.rawValue,
+                    options: field.values(from: allGames),
+                    selected: Binding(
+                        get: { rule.filters.setFilters[field] ?? [] },
+                        set: { rule.filters.setFilters[field] = $0.isEmpty ? nil : $0 }
+                    )
+                )
+            }
+            .sheet(isPresented: $showTitlePicker) {
+                TitleFilterSheet(text: $rule.filters.titleContains)
             }
         }
     }
@@ -613,10 +623,34 @@ struct SmartListEditor: View {
                 Text("Start from this collection").font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(baseName)
-                .foregroundStyle(rule.base == nil ? .secondary : Color.accentColor)
-                .font(.subheadline.weight(.medium))
-            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+            baseMenu
+        }
+    }
+
+    private var baseMenu: some View {
+        Menu {
+            Button {
+                baseSelected = false
+                rule.base = nil
+                rule.combine = []; rule.intersect = []; rule.subtract = []; rule.exclude = []
+            } label: {
+                if baseSelected { Text("Off") } else { Label("Off", systemImage: "checkmark") }
+            }
+            Button {
+                showBasePicker = true
+            } label: {
+                if baseSelected { Label("Choose…", systemImage: "checkmark") } else { Text("Choose…") }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(baseSelected ? baseName : "Off")
+                    .foregroundStyle(baseSelected ? Color.accentColor : .secondary)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+            }
+            .font(.subheadline.weight(.medium))
+            .padding(.vertical, 4)
+            .padding(.leading, 8)
+            .contentShape(Rectangle())
         }
     }
 
@@ -685,16 +719,16 @@ struct BasePickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                baseOption(name: "Entire library", icon: "square.grid.2x2.fill", tint: .blue, isSelected: selected == nil) {
-                    selected = nil; dismiss()
+                baseOption(name: "Library", icon: "square.grid.2x2.fill", tint: .blue, isSelected: selected == nil) {
+                    selected = nil
                 }
-                ForEach(lists) { list in
+                ForEach(lists.filter { !$0.isDefault }) { list in
                     baseOption(
                         name: list.name,
-                        icon: list.isDefault ? "square.grid.2x2.fill" : list.effectiveIconName,
+                        icon: list.effectiveIconName,
                         tint: Color(hex: list.effectiveColorHex) ?? .orange,
                         isSelected: selected == list.id
-                    ) { selected = list.id; dismiss() }
+                    ) { selected = list.id }
                 }
             }
             .listStyle(.plain)
@@ -715,9 +749,9 @@ struct BasePickerSheet: View {
                 Image(systemName: icon).foregroundStyle(tint).frame(width: 24)
                 Text(name).foregroundStyle(.primary)
                 Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark").foregroundStyle(Color.accentColor).font(.body.weight(.semibold))
-                }
+                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                    .font(.title3)
             }
             .contentShape(Rectangle())
         }
@@ -834,7 +868,7 @@ struct CollectionDetailView: View {
                     systemImage: "gamecontroller",
                     description: Text(
                         collection.isSmart
-                            ? "No games match this smart list's rules. Tap ··· to edit the filter."
+                            ? "No games match this smart list's rules. Tap the filter button to edit the rule."
                             : collection.isDefault
                                 ? "Import from BGG or CSV to add games to your Library."
                                 : "Tap ··· to add games from your Library."
@@ -869,7 +903,10 @@ struct CollectionDetailView: View {
                             } else {
                                 NavigationLink(destination: GameDetailView(gameId: game.bggId)
                                     .toolbar(.visible, for: .navigationBar)) {
-                                    gameRow(game)
+                                    HStack(spacing: 12) {
+                                        if collection.isRanked { rankBadge(game) }
+                                        gameRow(game)
+                                    }
                                 }
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     // Smart lists derive membership — no hand delete/move from source.
@@ -921,21 +958,27 @@ struct CollectionDetailView: View {
                     Button("Done") { exitSelection() }
                 }
             } else {
-                if !effectiveGames.isEmpty {
+                // Smart filter always visible so empty smart lists can still be configured.
+                if collection.isSmart {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { showFilters = true } label: {
-                            Image(systemName: filters.isEmpty
-                                ? "line.3.horizontal.decrease.circle"
-                                : "line.3.horizontal.decrease.circle.fill")
+                        Button { showEditRule = true } label: {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
                         }
-                        .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
                     }
-                    // Ranked lists are manually ordered → reorder via EditButton, no attribute sort.
-                    if collection.isRanked {
-                        if filters.isEmpty {
-                            ToolbarItem(placement: .topBarTrailing) { EditButton() }
+                }
+                if !effectiveGames.isEmpty {
+                    if !collection.isSmart && !collection.isRanked {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button { showFilters = true } label: {
+                                Image(systemName: filters.isEmpty
+                                    ? "line.3.horizontal.decrease.circle"
+                                    : "line.3.horizontal.decrease.circle.fill")
+                            }
+                            .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
                         }
-                    } else {
+                    }
+                    // Ranked lists are manually ordered (long-press a row to drag) — no attribute sort.
+                    if !collection.isRanked {
                         ToolbarItem(placement: .topBarTrailing) {
                             Menu {
                                 Button { sortAscending.toggle() } label: {
@@ -998,7 +1041,6 @@ struct CollectionDetailView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
-                        .disabled(collection.isDefault)
                     }
                     .font(.body.weight(.medium))
                     .background(.regularMaterial)
@@ -1061,16 +1103,12 @@ struct CollectionDetailView: View {
     private var collectionMenu: some View {
         Menu {
             if !collection.isDefault {
-                if collection.isSmart {
-                    Button { showEditRule = true } label: {
-                        Label("Edit Filter", systemImage: "line.3.horizontal.decrease.circle")
-                    }
-                } else {
+                if !collection.isSmart {
                     Button { showAddGames = true } label: {
                         Label("Add Games", systemImage: "plus")
                     }
+                    Divider()
                 }
-                Divider()
                 Button { showEditCollection = true } label: {
                     Label("Edit Collection", systemImage: "pencil")
                 }
@@ -1143,6 +1181,17 @@ struct CollectionDetailView: View {
         selectedIds.removeAll()
     }
 
+    /// Pink position badge for ranked lists (1, 2, 3 …).
+    @ViewBuilder
+    private func rankBadge(_ game: Game) -> some View {
+        let rank = (filteredGames.firstIndex { $0.bggId == game.bggId } ?? 0) + 1
+        Text("\(rank)")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.pink)
+            .frame(width: 30, height: 30)
+            .background(Color.pink.opacity(0.15), in: Circle())
+    }
+
     private func gameRow(_ game: Game) -> some View {
         HStack(spacing: 14) {
             AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
@@ -1164,11 +1213,11 @@ struct CollectionDetailView: View {
     private var filterPillsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                if !filters.titleStartsWith.isEmpty {
-                    Button { filters.titleStartsWith = "" } label: {
+                if !filters.titleContains.isEmpty {
+                    Button { filters.titleContains = "" } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "textformat.abc").font(.caption2)
-                            Text(filters.titleStartsWith).font(.caption.monospacedDigit())
+                            Text(filters.titleContains).font(.caption)
                         }
                         .foregroundStyle(Color.orange)
                         .padding(.horizontal, 10)
