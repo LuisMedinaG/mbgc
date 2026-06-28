@@ -93,9 +93,11 @@ func (m *mockProfileService) GetTier(ctx context.Context, userID string) (string
 
 func okStore() *mockImporterStore {
 	return &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return nil },
-		logSyncFn:        func(ctx context.Context, userID string, imported int, fullRefresh bool) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
+			return nil
+		},
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return nil },
+		logSyncFn:    func(ctx context.Context, userID string, imported int, fullRefresh bool) error { return nil },
 	}
 }
 
@@ -153,8 +155,10 @@ func TestSync_Success(t *testing.T) {
 func TestSync_FullRefreshNonAdmin(t *testing.T) {
 	var got bool
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
+			return nil
+		},
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn: func(ctx context.Context, userID string, imported int, fr bool) error {
 			got = fr
 			return nil
@@ -174,8 +178,10 @@ func TestSync_FullRefreshNonAdmin(t *testing.T) {
 func TestSync_FullRefreshAdmin(t *testing.T) {
 	var got bool
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
+			return nil
+		},
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return nil },
 		logSyncFn: func(ctx context.Context, userID string, imported int, fr bool) error {
 			got = fr
 			return nil
@@ -587,9 +593,11 @@ func TestSync_EmitsSyncErrorOnCheckRateLimitServerFailure(t *testing.T) {
 func TestSync_EmitsSyncErrorOnStoreFailure(t *testing.T) {
 	buf := testutil.CaptureSlog(t)
 	store := &mockImporterStore{
-		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error { return nil },
-		recordSyncFn:     func(ctx context.Context, userID string, tier string) error { return apierr.ErrInternal },
-		logSyncFn:        func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
+		checkRateLimitFn: func(ctx context.Context, userID string, isAdmin bool, tier string, limits SyncLimits) error {
+			return nil
+		},
+		recordSyncFn: func(ctx context.Context, userID string, tier string) error { return apierr.ErrInternal },
+		logSyncFn:    func(ctx context.Context, userID string, imported int, fr bool) error { return nil },
 	}
 	h := mkHandler(store, &mockBGGClient{available: true}, &mockGameService{})
 	w := httptest.NewRecorder()

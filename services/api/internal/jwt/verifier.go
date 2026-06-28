@@ -47,13 +47,13 @@ func (c *claims) isAdmin() bool {
 // Verifier handles the validation of Supabase-issued JSON Web Tokens (JWTs).
 // It supports a dual-path verification strategy:
 //
-// 1. Primary Path (JWKS): Validates ES256 or RS256 signatures using public keys
-//    automatically fetched and refreshed from Supabase's JWKS endpoint. This is
-//    the modern, recommended approach.
+//  1. Primary Path (JWKS): Validates ES256 or RS256 signatures using public keys
+//     automatically fetched and refreshed from Supabase's JWKS endpoint. This is
+//     the modern, recommended approach.
 //
-// 2. Legacy Path (HS256): Validates signatures using a shared secret
-//    (SUPABASE_JWT_SECRET). This is only enabled if the secret is provided
-//    and is intended for backward compatibility with older tokens.
+//  2. Legacy Path (HS256): Validates signatures using a shared secret
+//     (SUPABASE_JWT_SECRET). This is only enabled if the secret is provided
+//     and is intended for backward compatibility with older tokens.
 type Verifier struct {
 	keyfunc jwtlib.Keyfunc
 	issuer  string
