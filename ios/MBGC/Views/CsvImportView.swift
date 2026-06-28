@@ -301,13 +301,27 @@ private func csvFields(_ line: String) -> [String] {
     var fields: [String] = []
     var current = ""
     var inQuotes = false
-    for ch in line {
-        switch ch {
-        case "\"": inQuotes.toggle()
-        case "," where !inQuotes:
+    var skipNext = false
+
+    let chars = Array(line)
+    for i in 0..<chars.count {
+        if skipNext {
+            skipNext = false
+            continue
+        }
+        let ch = chars[i]
+        if ch == "\"" {
+            if inQuotes && i + 1 < chars.count && chars[i + 1] == "\"" {
+                current.append("\"")
+                skipNext = true
+            } else {
+                inQuotes.toggle()
+            }
+        } else if ch == "," && !inQuotes {
             fields.append(current)
             current = ""
-        default: current.append(ch)
+        } else {
+            current.append(ch)
         }
     }
     fields.append(current)

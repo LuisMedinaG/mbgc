@@ -35,6 +35,53 @@ enum BGGXMLParser {
         return delegate.games
     }
 
+    private static let entities: [(String, String)] = [
+        ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&apos;", "'"),
+        ("&#039;", "'"), ("&#39;", "'"), ("&nbsp;", " "), ("&rsquo;", "'"), ("&lsquo;", "'"),
+        ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"), ("&mdash;", "—"), ("&ndash;", "–"),
+        ("&bull;", "•"), ("&hellip;", "…")
+    ]
+
+    private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#(x?[0-9a-fA-F]+);", options: [])
+
+    fileprivate static func unescapeHTML(_ s: String) -> String {
+        guard s.contains("&") else { return s }
+        var result = s
+        for (entity, replacement) in entities {
+            result = result.replacingOccurrences(of: entity, with: replacement)
+        }
+
+        // Handle numeric entities like &#1234; or &#xABCD;
+        if result.contains("&#") {
+            result = unescapeNumericEntities(result)
+        }
+
+        return result
+    }
+
+    private static func unescapeNumericEntities(_ s: String) -> String {
+        guard let regex = numericEntityRegex else { return s }
+        var result = s
+        let nsString = result as NSString
+        let matches = regex.matches(in: result, options: [], range: NSRange(location: 0, length: nsString.length))
+
+        for match in matches.reversed() {
+            let entityRange = match.range(at: 1)
+            let entityStr = nsString.substring(with: entityRange)
+            let codePoint: UInt32?
+            if entityStr.hasPrefix("x") {
+                codePoint = UInt32(entityStr.dropFirst(), radix: 16)
+            } else {
+                codePoint = UInt32(entityStr, radix: 10)
+            }
+
+            if let cp = codePoint, let scalar = UnicodeScalar(cp) {
+                result = (result as NSString).replacingCharacters(in: match.range, with: String(scalar))
+            }
+        }
+        return result
+    }
+
     // SAX delegate that streams the BGG collection XML — extracts item IDs, user ratings, wanttoplay, and numplays.
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
@@ -147,7 +194,7 @@ enum BGGXMLParser {
 
             case "name" where inItem:
                 if attributeDict["type"] == "primary" {
-                    name = unescapeHTML(attributeDict["value"] ?? "")
+                    name = BGGXMLParser.unescapeHTML(attributeDict["value"] ?? "")
                 }
 
             case "yearpublished" where inItem:
@@ -163,7 +210,7 @@ enum BGGXMLParser {
 
             case "link" where inItem:
                 let linkType = attributeDict["type"] ?? ""
-                let value = unescapeHTML(attributeDict["value"] ?? "")
+                let value = BGGXMLParser.unescapeHTML(attributeDict["value"] ?? "")
                 switch linkType {
                 case "boardgamecategory":  categories.append(value)
                 case "boardgamemechanic":  mechanics.append(value)
@@ -239,7 +286,7 @@ enum BGGXMLParser {
             case "image" where inItem:
                 image = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             case "description" where inItem:
-                desc = unescapeHTML(textBuffer.trimmingCharacters(in: .whitespacesAndNewlines))
+                desc = BGGXMLParser.unescapeHTML(textBuffer.trimmingCharacters(in: .whitespacesAndNewlines))
 
             case "statistics":
                 inStatistics = false
@@ -355,29 +402,5 @@ enum BGGXMLParser {
             return result
         }
 
-        private func unescapeHTML(_ s: String) -> String {
-            guard s.contains("&") else { return s }
-            var result = s
-            let entities: [(String, String)] = [
-                ("&amp;", "&"),
-                ("&lt;", "<"),
-                ("&gt;", ">"),
-                ("&quot;", "\""),
-                ("&apos;", "'"),
-                ("&#039;", "'"),
-                ("&#39;", "'"),
-                ("&nbsp;", " "),
-                ("&rsquo;", "'"),
-                ("&lsquo;", "'"),
-                ("&rdquo;", "\u{201D}"),
-                ("&ldquo;", "\u{201C}"),
-                ("&mdash;", "—"),
-                ("&ndash;", "–")
-            ]
-            for (entity, replacement) in entities {
-                result = result.replacingOccurrences(of: entity, with: replacement)
-            }
-            return result
-        }
     }
 }

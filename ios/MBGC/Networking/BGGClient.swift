@@ -46,7 +46,8 @@ actor BGGClient {
     private let session: URLSession
     private let batchSize = 20   // BGG thing endpoint caps at 20 IDs per request
     private let maxAttempts = 4
-    private let requestDelay: UInt64 = 5_000_000_000 // 5s pre-delay; BGG throttles hard on burst requests
+    private let requestDelay: UInt64 = 5_000_000_000 // 5s between requests; BGG throttles hard on burst requests
+    private var lastRequestTime: Date?
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -68,7 +69,7 @@ actor BGGClient {
 
         var delay = requestDelay
         for attempt in 1...maxAttempts {
-            try await Task.sleep(nanoseconds: requestDelay)
+            await waitForRateLimit()
 
             let request = request(for: url, token: token)
 
@@ -142,7 +143,7 @@ actor BGGClient {
 
         var delay: UInt64 = 500_000_000
         for attempt in 1...maxAttempts {
-            try await Task.sleep(nanoseconds: requestDelay)
+            await waitForRateLimit()
 
             let request = request(for: url, token: token)
 
@@ -202,5 +203,21 @@ actor BGGClient {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         return request
+    }
+
+    private func waitForRateLimit() async {
+        if let lastRequestTime {
+            let elapsed = Date().timeIntervalSince(lastRequestTime)
+            let waitSeconds = Double(requestDelay) / 1_000_000_000.0 - elapsed
+            if waitSeconds > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(waitSeconds * 1_000_000_000))
+                } catch {
+                    // Task was cancelled, don't update lastRequestTime and just return
+                    return
+                }
+            }
+        }
+        lastRequestTime = Date()
     }
 }
