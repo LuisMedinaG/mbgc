@@ -43,20 +43,43 @@ enum BGGXMLParser {
     ]
 
     private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#(x?[0-9a-fA-F]+);", options: [])
+    private static let htmlTagRegex = try? NSRegularExpression(pattern: "<[^>]+>", options: [])
+    private static let multiWhitespaceRegex = try? NSRegularExpression(pattern: "[ \\t]+", options: [])
+    private static let multiNewlineRegex = try? NSRegularExpression(pattern: "\\n{3,}", options: [])
 
+    /// Strip BGG's HTML markup from descriptions so they render as plain text.
+    /// - Unescapes named and numeric HTML entities (&amp; &lt; &#10; etc.)
+    /// - Removes remaining tags (<br/>, <a href=...>, <i>, <b>, <img ...>, <err>, etc.)
+    /// - Collapses runs of spaces and excessive newlines
+    /// - Decodes &quot; etc. so quotes render correctly in SwiftUI Text
     fileprivate static func unescapeHTML(_ s: String) -> String {
-        guard s.contains("&") else { return s }
         var result = s
-        for (entity, replacement) in entities {
-            result = result.replacingOccurrences(of: entity, with: replacement)
+        if result.contains("&") {
+            for (entity, replacement) in entities {
+                result = result.replacingOccurrences(of: entity, with: replacement)
+            }
+            if result.contains("&#") {
+                result = unescapeNumericEntities(result)
+            }
         }
 
-        // Handle numeric entities like &#1234; or &#xABCD;
-        if result.contains("&#") {
-            result = unescapeNumericEntities(result)
+        // BGG stores descriptions as HTML — strip remaining tags so they render as plain text.
+        if result.contains("<"), let tagRegex = htmlTagRegex {
+            let nsRange = NSRange(location: 0, length: (result as NSString).length)
+            result = tagRegex.stringByReplacingMatches(in: result, options: [], range: nsRange, withTemplate: "")
         }
 
-        return result
+        // Collapse runs of spaces/tabs and excessive newlines for clean SwiftUI Text rendering.
+        if let wsRegex = multiWhitespaceRegex {
+            let nsRange = NSRange(location: 0, length: (result as NSString).length)
+            result = wsRegex.stringByReplacingMatches(in: result, options: [], range: nsRange, withTemplate: " ")
+        }
+        if let nlRegex = multiNewlineRegex {
+            let nsRange = NSRange(location: 0, length: (result as NSString).length)
+            result = nlRegex.stringByReplacingMatches(in: result, options: [], range: nsRange, withTemplate: "\n\n")
+        }
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func unescapeNumericEntities(_ s: String) -> String {
@@ -238,11 +261,16 @@ enum BGGXMLParser {
                 weight = Double(attributeDict["value"] ?? "") ?? 0
 
             case "poll" where inItem:
+                // Always reset first — if name is missing or unknown, an empty
+                // currentPollName makes the inner result/results cases no-op,
+                // preventing state bleed from a previous <poll>.
                 currentPollName = attributeDict["name"] ?? ""
                 if currentPollName == "language_dependence" {
                     langResults = []
                 } else if currentPollName == "suggested_numplayers" {
                     playerGroups = []
+                } else {
+                    currentPollName = ""
                 }
 
             case "results" where !currentPollName.isEmpty:
@@ -310,33 +338,37 @@ enum BGGXMLParser {
                 currentPollName = ""
 
             case "item":
-                games.append(BGGGame(
-                    bggId: currentItemId,
-                    name: name.isEmpty ? "(unnamed BGG \(currentItemId))" : name,
-                    description: desc,
-                    yearPublished: yearPublished,
-                    image: image,
-                    thumbnail: thumbnail,
-                    minPlayers: minPlayers,
-                    maxPlayers: maxPlayers,
-                    playTime: playTime,
-                    categories: categories,
-                    mechanics: mechanics,
-                    types: types,
-                    weight: weight,
-                    rating: rating,
-                    geekRating: geekRating,
-                    bggRank: bggRank,
-                    userRating: 0,
-                    wantToPlay: false,
-                    numberOfPlays: 0,
-                    languageDependence: languageDependence,
-                    recommendedPlayers: recommendedPlayers,
-                    designers: designers,
-                    artists: artists,
-                    publishers: publishers,
-                    minAge: minAge
-                ))
+                // Skip items with malformed/missing id — a zero bggId would
+                // collide with the @Attribute(.unique) Game row in SwiftData.
+                if currentItemId > 0 {
+                    games.append(BGGGame(
+                        bggId: currentItemId,
+                        name: name.isEmpty ? "(unnamed BGG \(currentItemId))" : name,
+                        description: desc,
+                        yearPublished: yearPublished,
+                        image: image,
+                        thumbnail: thumbnail,
+                        minPlayers: minPlayers,
+                        maxPlayers: maxPlayers,
+                        playTime: playTime,
+                        categories: categories,
+                        mechanics: mechanics,
+                        types: types,
+                        weight: weight,
+                        rating: rating,
+                        geekRating: geekRating,
+                        bggRank: bggRank,
+                        userRating: 0,
+                        wantToPlay: false,
+                        numberOfPlays: 0,
+                        languageDependence: languageDependence,
+                        recommendedPlayers: recommendedPlayers,
+                        designers: designers,
+                        artists: artists,
+                        publishers: publishers,
+                        minAge: minAge
+                    ))
+                }
                 inItem = false
 
             default:

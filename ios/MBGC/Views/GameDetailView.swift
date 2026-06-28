@@ -103,23 +103,23 @@ struct GameDetailView: View {
     private func statsRow(_ game: Game) -> some View {
         HStack {
             VStack(spacing: 2) {
-                Text("PLAYERS").font(.caption2).foregroundStyle(.secondary)
-                Text(playersStr(game)).font(.title3).fontWeight(.bold)
                 Text("Players").font(.caption2).foregroundStyle(.secondary)
+                Text(playersStr(game)).font(.title3).fontWeight(.bold)
+                Text("count").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
             VStack(spacing: 2) {
-                Text("PLAYTIME").font(.caption2).foregroundStyle(.secondary)
-                Text("\(game.playtime ?? 0)").font(.title3).fontWeight(.bold)
-                Text("Minutes").font(.caption2).foregroundStyle(.secondary)
+                Text("Playtime").font(.caption2).foregroundStyle(.secondary)
+                Text(playtimeStr(game)).font(.title3).fontWeight(.bold)
+                Text("minutes").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
             VStack(spacing: 2) {
-                Text("WEIGHT").font(.caption2).foregroundStyle(.secondary)
+                Text("Weight").font(.caption2).foregroundStyle(.secondary)
                 Text(game.weight.map { String(format: "%.1f", $0) } ?? "—").font(.title3).fontWeight(.bold)
-                Text("Complexity").font(.caption2).foregroundStyle(.secondary)
+                Text("complexity").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
@@ -226,6 +226,11 @@ struct GameDetailView: View {
             return min == max ? "\(min)" : "\(min)–\(max)"
         }
         return "—"
+    }
+
+    /// "—" when BGG didn't publish a playtime — never "0" (would imply an instant game).
+    private func playtimeStr(_ game: Game) -> String {
+        game.playtime.map { "\($0)" } ?? "—"
     }
 }
 

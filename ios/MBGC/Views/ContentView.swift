@@ -86,7 +86,9 @@ struct ContentView: View {
         // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
         .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
         .preferredColorScheme(preferredScheme)
-        .id(appearanceMode)
+        // Note: avoid .id(appearanceMode) — it would force SwiftUI to rebuild
+        // the entire view tree on theme change, wiping navigation stacks and
+        // sheet state. preferredColorScheme alone is enough.
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
@@ -123,9 +125,10 @@ struct HomePillView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .foregroundStyle(tab == target ? Color(.systemBackground) : .secondary)
-            .background(tab == target ? Color(.label) : Color.clear)
+            .foregroundStyle(tab == target ? Color.white : .secondary)
+            .background(tab == target ? Color.accentColor : Color.clear)
             .clipShape(Capsule())
         }
+        .accessibilityLabel(label)
     }
 }
