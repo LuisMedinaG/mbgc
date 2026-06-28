@@ -35,6 +35,9 @@ func (m *mockProfileStore) GetBGGUsername(ctx context.Context, userID string) (s
 	}
 	return "", nil
 }
+func (m *mockProfileStore) GetTier(ctx context.Context, userID string) (string, error) {
+	return "basic", nil
+}
 
 // --- GetProfile ---
 

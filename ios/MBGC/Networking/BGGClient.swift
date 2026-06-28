@@ -39,7 +39,16 @@ enum BGGError: Error, LocalizedError {
     }
 }
 
-/// Async BGG API client. `actor` isolation serializes all network state — no data races.
+/// Async BGG API client.
+///
+/// This actor provides a centralized and thread-safe interface for interacting with the BoardGameGeek XML API2.
+///
+/// Key Architectural Features:
+/// - **Actor Isolation**: Uses Swift actors to serialize all network state and configuration, ensuring no data races.
+/// - **Pacing & Rate Limiting**: Implements a strict 5-second delay between requests to BGG to avoid aggressive
+///   rate-limiting from their servers.
+/// - **Resilience**: Includes exponential backoff and retries (up to 4 attempts) for transient failures (202, 429, 5xx).
+/// - **Batching**: Handles BGG's batch limit (20 items per request) automatically in `fetchThings`.
 actor BGGClient {
     static let shared = BGGClient()
 
@@ -56,6 +65,11 @@ actor BGGClient {
         session = URLSession(configuration: config)
     }
 
+    /// Fetches the public collection for a given BGG username.
+    ///
+    /// This method is the entry point for importing a user's library.
+    /// Note: BGG often returns a 202 status when a collection is being prepared;
+    /// the client automatically retries in these cases.
     func fetchCollection(username: String, token: String? = nil) async throws -> CollectionResult {
         var components = URLComponents(string: "https://boardgamegeek.com/xmlapi2/collection")
         components?.queryItems = [
@@ -106,7 +120,12 @@ actor BGGClient {
         return CollectionResult(ids: [], userRatings: [:], wantToPlay: [:], numberOfPlays: [:])
     }
 
-    /// `onProgress(done, total)` is called on each completed batch.
+    /// Fetches detailed game data ("things") for a list of BGG IDs.
+    ///
+    /// This method handles batching IDs into groups of 20 and provides progress updates.
+    ///
+    /// - Parameters:
+    ///   - onProgress: A callback invoked after each batch completes, providing (currentCount, totalCount).
     func fetchThings(
         ids: [Int],
         token: String? = nil,

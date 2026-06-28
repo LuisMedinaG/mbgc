@@ -1,6 +1,9 @@
 import Foundation
 import SwiftData
 
+/// A view model that handles local CRUD operations for game collections.
+///
+/// Note: The term "Vibes" is a legacy name for Collections in the codebase.
 @MainActor
 @Observable
 final class VibesViewModel {

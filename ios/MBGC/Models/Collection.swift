@@ -13,14 +13,19 @@ final class Collection {
     var colorHex: String = ""   // "#RRGGBB"; empty = derive from name hash
     var iconName: String = ""   // SF Symbol name; empty = derive from name hash
 
-    /// Stable handle so smart-list rules can reference other lists across renames.
+    /// Stable identifier used for referencing this collection in smart-list rules.
+    /// This ensures rules remain valid even if the collection is renamed.
     var id: UUID = UUID()
-    /// true = membership is derived from `rule`, not hand-curated. `games` stays empty.
+
+    /// Indicates if this is a "smart" collection whose membership is dynamically
+    /// computed based on rules rather than manual assignment.
     var isSmart: Bool = false
-    /// JSON-encoded SmartRule; nil for normal lists.
+
+    /// Persisted JSON data for the `SmartRule` defining this collection's membership.
     var ruleData: Data?
 
-    /// Games in this collection — populated via the inverse Game.collections relationship.
+    /// Manually-curated games in this collection.
+    /// For smart collections, this property remains empty and `smartGames()` should be used.
     @Relationship(deleteRule: .nullify, inverse: \Game.collections)
     var games: [Game] = []
 
@@ -42,12 +47,15 @@ final class Collection {
         "crown.fill", "gamecontroller.fill", "dice.fill", "person.3.fill", "trophy.fill",
     ]
 
-    // Hash-based fallback keeps color/icon stable across launches even if none was explicitly chosen.
+    /// The color hex to use for UI display. If `colorHex` is empty, it returns
+    /// a stable fallback derived from the collection's name.
     var effectiveColorHex: String {
         colorHex.isEmpty
             ? Collection.colorPalette[abs(name.hashValue) % Collection.colorPalette.count]
             : colorHex
     }
+    /// The SF Symbol name to use for UI display. If `iconName` is empty, it returns
+    /// a stable fallback derived from the collection's name.
     var effectiveIconName: String {
         iconName.isEmpty
             ? Collection.iconPalette[abs(name.hashValue) % Collection.iconPalette.count]

@@ -9,7 +9,9 @@ import (
 	"github.com/LuisMedinaG/mbgc/services/api/internal/apierr"
 )
 
-// WriteJSON serializes v as JSON with the given HTTP status code.
+// WriteJSON serializes the provided value 'v' as JSON and writes it to the response
+// with the specified HTTP status code. It also sets the Content-Type header to
+// application/json; charset=utf-8.
 func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -18,8 +20,15 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// WriteError maps a sentinel error to the correct HTTP status and error envelope.
-// Unknown errors become 500 and are logged server-side — internal details are never leaked.
+// WriteError maps a sentinel error from the apierr package to its corresponding
+// HTTP status code and returns a standardized JSON error envelope.
+//
+// Key behaviors:
+//   - Sentinel errors (like apierr.ErrNotFound) map to specific status codes (404).
+//   - Unknown errors default to 500 Internal Server Error.
+//   - Internal implementation details are NEVER leaked to the client; only safe
+//     messages and machine-readable codes are returned.
+//   - All errors are logged server-side for debugging.
 func WriteError(w http.ResponseWriter, err error) {
 	var status int
 	var code, msg string
