@@ -1,14 +1,6 @@
 import SwiftData
 import SwiftUI
 
-private func sanitizeName(_ name: String) -> String {
-    let maxLength = 50
-    let sanitized = name
-        .filter { $0 != "[" && $0 != "]" }
-        .prefix(maxLength)
-    return String(sanitized)
-}
-
 private let bggLastSyncKey = "import.bgg.lastSyncDate"
 private let bggCachedIdsKey = "import.bgg.cachedIds"
 private var bggToken: String? {
@@ -65,7 +57,7 @@ struct ImportView: View {
                             } else {
                                 Image(systemName: "arrow.down.circle.fill")
                             }
-                            Text(isSyncing ? "Importing" : "Import")
+                            Text(buttonLabel)
                         }
                         .font(.headline)
                         .foregroundStyle(.white)
@@ -73,13 +65,16 @@ struct ImportView: View {
                         .padding(.vertical, 16)
                         .background(
                             RoundedRectangle(cornerRadius: 14)
-                                .fill(!canImportBGG || isSyncing ? Color.gray : Color.blue)
+                                .fill(buttonBackground)
                         )
                     }
-                    .disabled(!canImportBGG || isSyncing)
+                    .disabled(!canImportBGG || isSyncing || isInCooldown)
 
                     if !canImportBGG {
                         Text("Enter your BGG username to sync your collection")
+                            .font(.caption).foregroundStyle(.secondary)
+                    } else if let next = nextAvailableDate {
+                        Text("Next sync available \(next.formatted(date: .abbreviated, time: .shortened)).")
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
                         Text("Sync up to \(bggRegularImportLimit) new owned games. Available once every 7 days.")
@@ -149,6 +144,36 @@ struct ImportView: View {
 
     private var canImportBGG: Bool {
         !bggUsername.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// True when the 7-day cooldown still applies. In DEBUG the cooldown is
+    /// skipped — the user can re-sync freely.
+    private var isInCooldown: Bool {
+        #if DEBUG
+        return false
+        #else
+        return nextAvailableDate != nil
+        #endif
+    }
+
+    /// Next sync time, or nil if cooldown has elapsed / never synced.
+    private var nextAvailableDate: Date? {
+        guard let lastSync = UserDefaults.standard.object(forKey: bggLastSyncKey) as? Date else { return nil }
+        let next = lastSync.addingTimeInterval(bggImportCooldown)
+        return next > Date() ? next : nil
+    }
+
+    private var buttonLabel: String {
+        if isSyncing { return "Importing" }
+        if isInCooldown, let next = nextAvailableDate {
+            let days = max(1, Calendar.current.dateComponents([.day], from: Date(), to: next).day ?? 1)
+            return days == 1 ? "Available tomorrow" : "Available in \(days) days"
+        }
+        return "Import"
+    }
+
+    private var buttonBackground: Color {
+        (!canImportBGG || isSyncing || isInCooldown) ? Color.gray : Color.accentColor
     }
 
     private func importFromBGG() async {
@@ -401,8 +426,7 @@ struct CollectionPickerView: View {
     private func createAndSelect() {
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let sanitized = sanitizeName(trimmed)
-        let col = Collection(name: sanitized)
+        let col = Collection(name: CollectionName.sanitize(trimmed))
         modelContext.insert(col)
         do {
             try modelContext.save()

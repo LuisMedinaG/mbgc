@@ -3,14 +3,6 @@ import SwiftUI
 
 // MARK: — Collections list
 
-private func sanitizeName(_ name: String) -> String {
-    let maxLength = 50
-    let sanitized = name
-        .filter { $0 != "[" && $0 != "]" }
-        .prefix(maxLength)
-    return String(sanitized)
-}
-
 struct VibesView: View {
     let viewModel: VibesViewModel
     @Binding var path: [Collection]
@@ -239,10 +231,6 @@ struct CollectionPickerBody: View {
     }
 }
 
-private func trimmed(_ s: String) -> String {
-    s.trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
 // MARK: — Create sheet (own @Environment so modelContext is guaranteed)
 
 struct CreateCollectionSheet: View {
@@ -264,7 +252,7 @@ struct CreateCollectionSheet: View {
                 smartStrip
                 CollectionPickerBody(name: $name, selectedColor: $selectedColor, selectedIcon: $selectedIcon)
             }
-                .navigationTitle(trimmed(name).isEmpty ? "New Collection" : trimmed(name))
+                .navigationTitle(CollectionName.trimmed(name).isEmpty ? "New Collection" : CollectionName.trimmed(name))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -272,7 +260,7 @@ struct CreateCollectionSheet: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Create") { save() }
-                            .disabled(trimmed(name).isEmpty)
+                            .disabled(CollectionName.trimmed(name).isEmpty)
                     }
                 }
                 .collectionSaveAlert($errorMessage)
@@ -308,7 +296,7 @@ struct CreateCollectionSheet: View {
     }
 
     private func save() {
-        let col = Collection(name: sanitizeName(trimmed(name)), desc: "")
+        let col = Collection(name: CollectionName.prepareForSave(name), desc: "")
         col.colorHex = selectedColor
         col.iconName = selectedIcon
         if isSmart {
@@ -346,7 +334,7 @@ struct RenameCollectionSheet: View {
     var body: some View {
         NavigationStack {
             CollectionPickerBody(name: $name, selectedColor: $selectedColor, selectedIcon: $selectedIcon)
-                .navigationTitle(trimmed(name).isEmpty ? "Edit Collection" : trimmed(name))
+                .navigationTitle(CollectionName.trimmed(name).isEmpty ? "Edit Collection" : CollectionName.trimmed(name))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -354,7 +342,7 @@ struct RenameCollectionSheet: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") { save() }
-                            .disabled(trimmed(name).isEmpty)
+                            .disabled(CollectionName.trimmed(name).isEmpty)
                     }
                 }
                 .collectionSaveAlert($errorMessage)
@@ -364,7 +352,7 @@ struct RenameCollectionSheet: View {
 
     private func save() {
         guard !collection.isDefault else { return }
-        collection.name = sanitizeName(trimmed(name))
+        collection.name = CollectionName.prepareForSave(name)
         collection.colorHex = selectedColor
         collection.iconName = selectedIcon
         do {
