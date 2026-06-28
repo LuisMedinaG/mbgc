@@ -406,7 +406,6 @@ struct SmartListEditor: View {
     let onSave: (SmartRule) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var activeBucket: Bucket?
-    @State private var showFilters = false
 
     init(rule: SmartRule, lists: [Collection], allGames: [Game], onSave: @escaping (SmartRule) -> Void) {
         _rule = State(initialValue: rule)
@@ -462,21 +461,7 @@ struct SmartListEditor: View {
                             .buttonStyle(.plain)
                     }
                 }
-                Section("Attributes") {
-                    Button { showFilters = true } label: {
-                        HStack {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .frame(width: 24).foregroundStyle(Color.orange)
-                            Text("Filters").font(.body).foregroundStyle(.primary)
-                            Spacer()
-                            Text(rule.filters.isEmpty ? "Off" : "\(rule.filters.activeCount) active")
-                                .foregroundStyle(rule.filters.isEmpty ? .secondary : Color.orange)
-                                .font(.subheadline.weight(.medium))
-                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
+                FilterRows(filters: $rule.filters, games: allGames)
             }
             .navigationTitle("Smart Filter")
             .navigationBarTitleDisplayMode(.inline)
@@ -495,11 +480,6 @@ struct SmartListEditor: View {
                         set: { setIds(Array($0), bucket) }
                     )
                 )
-            }
-            // ponytail: FilterView checklist options use the full library, not the
-            // resolved base set. Pass the resolved set if option lists feel noisy.
-            .sheet(isPresented: $showFilters) {
-                FilterView(filters: $rule.filters, games: allGames)
             }
         }
     }

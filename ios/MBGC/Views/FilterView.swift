@@ -285,70 +285,56 @@ struct GameFilters: Equatable, Codable {
     }
 }
 
-// MARK: - FilterView
+// MARK: - FilterRows (embeddable sections — used by FilterView and SmartListEditor)
 
-struct FilterView: View {
+/// Renders the enabled + other filter sections inline inside any List.
+/// Owns its own transient state (exactInputs, checklist sheet, title picker, lang expansion).
+/// When `filters` is cleared externally the local state resets via onChange.
+struct FilterRows: View {
     @Binding var filters: GameFilters
     let games: [Game]
-    @Environment(\.dismiss) private var dismiss
     @State private var exactInputs: [FilterField: String] = [:]
     @State private var activeChecklist: SetFilterField?
     @State private var showTitlePicker = false
     @State private var languageExpanded = false
 
-    private var activeSets: [SetFilterField]   { SetFilterField.allCases.filter { filters.setFilters[$0] != nil } }
-    private var inactiveSets: [SetFilterField]  { SetFilterField.allCases.filter { filters.setFilters[$0] == nil } }
-    private var activeNumeric: [FilterField]    { FilterField.allCases.filter { filters.specs[$0] != nil } }
-    private var inactiveNumeric: [FilterField]  { FilterField.allCases.filter { filters.specs[$0] == nil } }
+    private var activeSets: [SetFilterField]  { SetFilterField.allCases.filter { filters.setFilters[$0] != nil } }
+    private var inactiveSets: [SetFilterField] { SetFilterField.allCases.filter { filters.setFilters[$0] == nil } }
+    private var activeNumeric: [FilterField]   { FilterField.allCases.filter { filters.specs[$0] != nil } }
+    private var inactiveNumeric: [FilterField] { FilterField.allCases.filter { filters.specs[$0] == nil } }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if !filters.isEmpty {
-                    Section("Enabled filters") {
-                        if !filters.titleStartsWith.isEmpty { titleRow }
-                        if !filters.languageLevels.isEmpty { languageDependenceRow }
-                        ForEach(activeSets) { checklistRow($0) }
-                        ForEach(activeNumeric) { filterRow($0) }
-                    }
-                }
-
-                Section(filters.isEmpty ? "Select filters" : "Other filters") {
-                    if filters.titleStartsWith.isEmpty { titleRow }
-                    if filters.languageLevels.isEmpty { languageDependenceRow }
-                    ForEach(inactiveSets) { checklistRow($0) }
-                    ForEach(inactiveNumeric) { filterRow($0) }
+        Group {
+            if !filters.isEmpty {
+                Section("Enabled filters") {
+                    if !filters.titleStartsWith.isEmpty { titleRow }
+                    if !filters.languageLevels.isEmpty { languageDependenceRow }
+                    ForEach(activeSets) { checklistRow($0) }
+                    ForEach(activeNumeric) { filterRow($0) }
                 }
             }
-            .navigationTitle("Filters")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear All") {
-                        filters = GameFilters()
-                        exactInputs.removeAll()
-                        languageExpanded = false
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(filters.isEmpty)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.fontWeight(.semibold)
-                }
+            Section(filters.isEmpty ? "Select filters" : "Other filters") {
+                if filters.titleStartsWith.isEmpty { titleRow }
+                if filters.languageLevels.isEmpty { languageDependenceRow }
+                ForEach(inactiveSets) { checklistRow($0) }
+                ForEach(inactiveNumeric) { filterRow($0) }
             }
-            .sheet(item: $activeChecklist) { field in
-                ChecklistPickerSheet(
-                    title: field.rawValue,
-                    options: field.values(from: games),
-                    selected: Binding(
-                        get: { filters.setFilters[field] ?? [] },
-                        set: { filters.setFilters[field] = $0.isEmpty ? nil : $0 }
-                    )
+        }
+        .sheet(item: $activeChecklist) { field in
+            ChecklistPickerSheet(
+                title: field.rawValue,
+                options: field.values(from: games),
+                selected: Binding(
+                    get: { filters.setFilters[field] ?? [] },
+                    set: { filters.setFilters[field] = $0.isEmpty ? nil : $0 }
                 )
-            }
-            .sheet(isPresented: $showTitlePicker) {
-                TitleFilterSheet(selected: $filters.titleStartsWith)
-            }
+            )
+        }
+        .sheet(isPresented: $showTitlePicker) {
+            TitleFilterSheet(selected: $filters.titleStartsWith)
+        }
+        .onChange(of: filters.isEmpty) { _, isEmpty in
+            if isEmpty { exactInputs.removeAll(); languageExpanded = false }
         }
     }
 
@@ -370,7 +356,7 @@ struct FilterView: View {
         .onTapGesture { showTitlePicker = true }
     }
 
-    // MARK: - Language Dependence row (inline expansion)
+    // MARK: - Language Dependence row
 
     private var languageDependenceRow: some View {
         let showOptions = languageExpanded || !filters.languageLevels.isEmpty
@@ -392,7 +378,6 @@ struct FilterView: View {
                 }
                 .buttonStyle(.plain)
             }
-
             if showOptions {
                 VStack(spacing: 6) {
                     ForEach(langLevels) { lvl in langLevelCard(lvl) }
@@ -528,6 +513,34 @@ struct FilterView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
+    }
+}
+
+// MARK: - FilterView (modal wrapper around FilterRows)
+
+struct FilterView: View {
+    @Binding var filters: GameFilters
+    let games: [Game]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                FilterRows(filters: $filters, games: games)
+            }
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear All") { filters = GameFilters() }
+                        .foregroundStyle(.red)
+                        .disabled(filters.isEmpty)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+        }
     }
 }
 
