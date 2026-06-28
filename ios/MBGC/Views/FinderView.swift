@@ -118,6 +118,7 @@ private struct FinderStepView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Back")
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }

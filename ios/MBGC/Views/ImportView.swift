@@ -400,6 +400,7 @@ struct CollectionPickerView: View {
                 Button { newName = ""; showNewCollection = true } label: {
                     Image(systemName: "plus.circle")
                 }
+                .accessibilityLabel("New collection")
             }
         }
         .onAppear { setDefaultSelection() }

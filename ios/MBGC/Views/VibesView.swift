@@ -883,6 +883,7 @@ struct CollectionDetailView: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
+        .accessibilityLabel("Collection actions")
     }
 
     private func duplicateCollection() {
