@@ -10,42 +10,56 @@ struct SearchView: View {
     private var results: [Game] {
         let q = query.trimmingCharacters(in: .whitespaces)
         guard !q.isEmpty else { return [] }
-        return allGames.filter { $0.name.localizedCaseInsensitiveContains(q) }
+        return allGames.filter { matches($0, query: q) }
+    }
+
+    /// Matches name OR any of: categories, mechanics, designers, artists, publishers.
+    /// BGG metadata is local-first (post-import), so this searches the full library.
+    private func matches(_ game: Game, query: String) -> Bool {
+        if game.name.localizedCaseInsensitiveContains(query) { return true }
+        for list in [game.categories, game.mechanics, game.designers, game.artists, game.publishers] {
+            if let list, list.contains(where: { $0.localizedCaseInsensitiveContains(query) }) {
+                return true
+            }
+        }
+        return false
     }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Search")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
-
-                if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    ContentUnavailableView("Search your library",
-                        systemImage: "magnifyingglass",
-                        description: Text("Type a game name to find it."))
-                } else if results.isEmpty {
-                    ContentUnavailableView("No games found",
-                        systemImage: "magnifyingglass",
-                        description: Text("Try a different name or keyword."))
-                } else {
-                    List(results) { game in
-                        Button { navigationPath.append(game.bggId) } label: {
-                            gameRow(game)
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    .listStyle(.plain)
+            content
+                .navigationTitle("Search")
+                .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Game, mechanic, designer…")
+                .navigationDestination(for: Int.self) { gameId in
+                    GameDetailView(gameId: gameId)
                 }
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                            .fontWeight(.semibold)
+                    }
+                }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if query.trimmingCharacters(in: .whitespaces).isEmpty {
+            ContentUnavailableView("Search your library",
+                systemImage: "magnifyingglass",
+                description: Text("Find a game by name, mechanic, designer, or category."))
+        } else if results.isEmpty {
+            ContentUnavailableView("No games found",
+                systemImage: "magnifyingglass",
+                description: Text("Try a different name or keyword."))
+        } else {
+            List(results) { game in
+                Button { navigationPath.append(game.bggId) } label: {
+                    gameRow(game)
+                }
+                .foregroundStyle(.primary)
             }
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(for: Int.self) { gameId in
-                GameDetailView(gameId: gameId)
-                    .toolbar(.visible, for: .navigationBar)
-            }
-            .safeAreaInset(edge: .bottom) { bottomBar }
+            .listStyle(.plain)
         }
     }
 
@@ -59,36 +73,5 @@ struct SearchView: View {
                 Text(game.name)
             }
         }
-    }
-
-    private var bottomBar: some View {
-        HStack(spacing: 10) {
-            Button { dismiss() } label: {
-                Image(systemName: "rectangle.stack")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 44, height: 44)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(Circle())
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.body)
-                TextField("Board games, expansions…", text: $query)
-                if !query.isEmpty {
-                    Button { query = "" } label: {
-                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(Capsule())
-            .frame(height: 44)
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
     }
 }
