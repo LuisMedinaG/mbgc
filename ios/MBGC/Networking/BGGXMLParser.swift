@@ -355,27 +355,48 @@ enum BGGXMLParser {
             return result
         }
 
-        private func unescapeHTML(_ s: String) -> String {
+        private static func unescapeHTML(_ s: String) -> String {
             guard s.contains("&") else { return s }
             var result = s
             let entities: [(String, String)] = [
-                ("&amp;", "&"),
-                ("&lt;", "<"),
-                ("&gt;", ">"),
-                ("&quot;", "\""),
-                ("&apos;", "'"),
-                ("&#039;", "'"),
-                ("&#39;", "'"),
-                ("&nbsp;", " "),
-                ("&rsquo;", "'"),
-                ("&lsquo;", "'"),
-                ("&rdquo;", "\u{201D}"),
-                ("&ldquo;", "\u{201C}"),
-                ("&mdash;", "—"),
-                ("&ndash;", "–")
+                ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&apos;", "'"),
+                ("&#039;", "'"), ("&#39;", "'"), ("&nbsp;", " "), ("&rsquo;", "'"), ("&lsquo;", "'"),
+                ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"), ("&mdash;", "—"), ("&ndash;", "–"),
+                ("&bull;", "•"), ("&hellip;", "…")
             ]
             for (entity, replacement) in entities {
                 result = result.replacingOccurrences(of: entity, with: replacement)
+            }
+
+            // Handle numeric entities like &#1234; or &#xABCD;
+            if result.contains("&#") {
+                result = unescapeNumericEntities(result)
+            }
+
+            return result
+        }
+
+        private static func unescapeNumericEntities(_ s: String) -> String {
+            var result = s
+            let pattern = "&#(x?[0-9a-fA-F]+);"
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return s }
+
+            let nsString = result as NSString
+            let matches = regex.matches(in: result, options: [], range: NSRange(location: 0, length: nsString.length))
+
+            for match in matches.reversed() {
+                let entityRange = match.range(at: 1)
+                let entityStr = nsString.substring(with: entityRange)
+                let codePoint: UInt32?
+                if entityStr.hasPrefix("x") {
+                    codePoint = UInt32(entityStr.dropFirst(), radix: 16)
+                } else {
+                    codePoint = UInt32(entityStr, radix: 10)
+                }
+
+                if let cp = codePoint, let scalar = UnicodeScalar(cp) {
+                    result = (result as NSString).replacingCharacters(in: match.range, with: String(scalar))
+                }
             }
             return result
         }
