@@ -51,13 +51,7 @@ struct SearchView: View {
 
     private func gameRow(_ game: Game) -> some View {
         HStack(spacing: 12) {
-            AsyncImage(url: URL(string: game.thumbnail ?? "")) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
 
             if let year = game.yearPublished, year > 0 {
                 Text("\(game.name) ") + Text("(\(year))").foregroundColor(.secondary)

@@ -314,11 +314,11 @@ private struct FinderHeroCard: View {
     var body: some View {
         // Frame and clip on the ZStack (not children) so LinearGradient can't escape the 200pt box.
         ZStack(alignment: .bottomLeading) {
-            AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
+            CachedAsyncImage(
+                url: URL(string: game.image ?? game.thumbnail ?? ""),
+                content: { img in img.resizable().aspectRatio(contentMode: .fill) },
+                placeholder: { Color(.systemGray5) }
+            )
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.75)],
@@ -363,11 +363,11 @@ private struct FinderRunnerCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: game.thumbnail ?? game.image ?? "")) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
+            CachedAsyncImage(
+                url: URL(string: game.thumbnail ?? game.image ?? ""),
+                content: { img in img.resizable().aspectRatio(contentMode: .fill) },
+                placeholder: { Color(.systemGray5) }
+            )
             .frame(maxWidth: .infinity)
             .frame(height: 110)
             .clipped()
@@ -402,13 +402,7 @@ private struct FinderAllMatchesView: View {
             List(games) { game in
                 NavigationLink(value: game.bggId) {
                     HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color(.systemGray5)
-                        }
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 8)
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(game.name).font(.body.weight(.semibold))

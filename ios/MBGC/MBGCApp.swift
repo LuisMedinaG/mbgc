@@ -3,13 +3,11 @@ import SwiftUI
 
 @main
 struct MBGCApp: App {
-    init() {
-        // ponytail: default URLCache.shared is ~512KB memory/10MB disk on iOS —
-        // too small to keep game thumbnails across scrolls. AsyncImage uses
-        // URLSession.shared, which respects this cache. Bump it instead of
-        // writing a custom image loader.
-        URLCache.shared = URLCache(memoryCapacity: 50 * 1024 * 1024, diskCapacity: 200 * 1024 * 1024)
-    }
+    // ponytail: image caching is handled by `ImageCache.shared` (see
+    // `Views/CachedAsyncImage.swift`). We previously bumped the global
+    // `URLCache.shared` from here, but that affected every URLSession in
+    // the app — including future telemetry / crash reporter. Keep this
+    // init empty until we add a real lifecycle hook.
 
     var body: some Scene {
         WindowGroup {

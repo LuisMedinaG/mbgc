@@ -943,13 +943,7 @@ struct CollectionDetailView: View {
 
     private func gameRow(_ game: Game) -> some View {
         HStack(spacing: 14) {
-            AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
 
             if let year = game.yearPublished, year > 0 {
                 Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
@@ -1100,11 +1094,7 @@ struct AddGamesSheet: View {
                     HStack(spacing: 14) {
                         Image(systemName: selected.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(selected.contains(game.bggId) ? Color.orange : .secondary)
-                        AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: { Color(.systemGray5) }
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 6)
                         VStack(alignment: .leading, spacing: 0) {
                             if let year = game.yearPublished, year > 0 {
                                 Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
