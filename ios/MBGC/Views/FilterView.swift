@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Filter model
 
-enum FilterMode: String, CaseIterable, Identifiable {
+enum FilterMode: String, CaseIterable, Identifiable, Codable {
     case minimum = "Minimum"
     case maximum = "Maximum"
     case exactly = "Exactly"
@@ -17,7 +17,7 @@ enum FilterMode: String, CaseIterable, Identifiable {
     }
 }
 
-enum FilterField: String, CaseIterable, Identifiable {
+enum FilterField: String, CaseIterable, Identifiable, Codable {
     case rating        = "Rating"
     case userRating    = "My Rating"
     case weight        = "Complexity"
@@ -116,7 +116,7 @@ enum FilterField: String, CaseIterable, Identifiable {
 
 // MARK: - Checklist (set-based) filter fields
 
-enum SetFilterField: String, CaseIterable, Identifiable, Hashable {
+enum SetFilterField: String, CaseIterable, Identifiable, Hashable, Codable {
     case designers  = "Designers"
     case artists    = "Artists"
     case publishers = "Publisher"
@@ -189,14 +189,14 @@ let langLevels: [LangLevel] = [
 
 // MARK: - Filter spec
 
-struct FilterSpec: Equatable {
+struct FilterSpec: Equatable, Codable {
     var mode: FilterMode
     var value: Double
 }
 
 // MARK: - GameFilters
 
-struct GameFilters: Equatable {
+struct GameFilters: Equatable, Codable {
     var specs: [FilterField: FilterSpec] = [:]
     var setFilters: [SetFilterField: Set<String>] = [:]
     var titleStartsWith: String = ""

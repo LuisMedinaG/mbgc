@@ -13,6 +13,13 @@ final class Collection {
     var colorHex: String = ""   // "#RRGGBB"; empty = derive from name hash
     var iconName: String = ""   // SF Symbol name; empty = derive from name hash
 
+    /// Stable handle so smart-list rules can reference other lists across renames.
+    var id: UUID = UUID()
+    /// true = membership is derived from `rule`, not hand-curated. `games` stays empty.
+    var isSmart: Bool = false
+    /// JSON-encoded SmartRule; nil for normal lists.
+    var ruleData: Data?
+
     /// Games in this collection — populated via the inverse Game.collections relationship.
     @Relationship(deleteRule: .nullify, inverse: \Game.collections)
     var games: [Game] = []
@@ -56,6 +63,67 @@ final class Collection {
             colorHex = Collection.colorPalette[Int.random(in: 0..<Collection.colorPalette.count)]
             iconName  = Collection.iconPalette[Int.random(in: 0..<Collection.iconPalette.count)]
         }
+    }
+}
+
+// MARK: - Smart lists
+
+/// Rules that derive a smart list's membership. Persisted as JSON in `Collection.ruleData`.
+/// Lists are referenced by `Collection.id` so renames don't break a rule.
+struct SmartRule: Codable, Equatable {
+    var combine:   [UUID] = []   // union of these lists — the base set (empty = all games)
+    var intersect: [UUID] = []   // keep only games present in ALL of these
+    var subtract:  [UUID] = []   // remove games present in ANY of these (A \ B)
+    // ponytail: exclude = symmetric difference (games in exactly one side), distinct from
+    // subtract to match the 4 screenshot rows. Drop it + its UI row to collapse to 3 ops.
+    var exclude:   [UUID] = []
+    var filters:   GameFilters = .init()
+
+    var isEmpty: Bool {
+        combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
+    }
+}
+
+extension Collection {
+    var decodedRule: SmartRule? {
+        guard let ruleData else { return nil }
+        return try? JSONDecoder().decode(SmartRule.self, from: ruleData)
+    }
+
+    func setRule(_ rule: SmartRule) {
+        ruleData = try? JSONEncoder().encode(rule)
+    }
+
+    /// Computes a smart list's membership on demand. Pure — no DB writes.
+    /// Resolves only direct membership: a referenced smart list contributes its
+    /// stored `games` (empty), not its computed set (no transitive resolution).
+    func smartGames(collections: [Collection], allGames: [Game]) -> [Game] {
+        guard isSmart, let rule = decodedRule else { return [] }
+        let byId = Dictionary(collections.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        func ids(_ list: [UUID]) -> [Set<Int>] {
+            list.compactMap { byId[$0] }.map { Set($0.games.map(\.bggId)) }
+        }
+
+        // Base: union of combine lists; empty combine = every game.
+        var base: Set<Int>
+        let combineSets = ids(rule.combine)
+        if combineSets.isEmpty {
+            base = Set(allGames.map(\.bggId))
+        } else {
+            base = combineSets.reduce(into: Set<Int>()) { $0.formUnion($1) }
+        }
+
+        // Intersect: keep only games present in every intersect list.
+        for set in ids(rule.intersect) { base.formIntersection(set) }
+
+        // Subtract: remove games present in any subtract list.
+        for set in ids(rule.subtract) { base.subtract(set) }
+
+        // Exclude: symmetric difference against each exclude list.
+        for set in ids(rule.exclude) { base.formSymmetricDifference(set) }
+
+        let members = allGames.filter { base.contains($0.bggId) }
+        return rule.filters.apply(members)
     }
 }
 

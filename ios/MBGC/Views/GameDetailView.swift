@@ -46,6 +46,19 @@ struct GameDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive) { showDeleteAlert = true } label: {
+                        Label("Delete Game", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white, Color.black.opacity(0.3))
+                }
+            }
+        }
         .alert("Delete \"\(viewModel.game?.name ?? "")\"?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
                 if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
@@ -194,34 +207,18 @@ struct GameDetailView: View {
     }
 
     private func bottomBar(_ game: Game) -> some View {
-        HStack(spacing: 12) {
-            let count = game.collections.filter { !$0.isDefault }.count
-            Button { showAddToCollection = true } label: {
-                Text(count > 0 ? "Add to...  \(count)" : "Add to...")
-                    .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.accentColor)
-                    .foregroundStyle(.white)
-                    .clipShape(Capsule())
-            }
-
-            Menu {
-                Button(role: .destructive) { showDeleteAlert = true } label: {
-                    Label("Delete Game", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(Color(.label))
-                    .frame(width: 52, height: 52)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(Circle())
-            }
+        let count = game.collections.filter { !$0.isDefault }.count
+        return Button { showAddToCollection = true } label: {
+            Text(count > 0 ? "Add to...  \(count)" : "Add to...")
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: 200)
+                .padding(.vertical, 14)
+                .background(Color.accentColor)
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .background(.thinMaterial)
     }
 
     private func playersStr(_ game: Game) -> String {
