@@ -7,6 +7,11 @@ struct CollectionResult {
     let numberOfPlays: [Int: Int]
 }
 
+/// A high-performance XML parser for BoardGameGeek XML API2 responses.
+///
+/// This parser uses `XMLParser` (SAX-style) for memory efficiency. It utilizes specialized
+/// delegates to handle different API endpoints (collection vs thing) while maintaining
+/// a robust state machine to navigate BGG's nested XML structure.
 enum BGGXMLParser {
     static func parseCollectionResponse(_ data: Data) throws -> CollectionResult {
         let delegate = CollectionDelegate()
@@ -82,7 +87,15 @@ enum BGGXMLParser {
         return result
     }
 
-    // SAX delegate that streams the BGG collection XML — extracts item IDs, user ratings, wanttoplay, and numplays.
+    /// SAX delegate for parsing the `/collection` endpoint.
+    ///
+    /// It extracts:
+    /// - Game IDs (`objectid`)
+    /// - User personal ratings
+    /// - "Want to play" status
+    /// - Number of recorded plays
+    ///
+    /// It handles deduplication of items as BGG sometimes returns duplicate entries in this endpoint.
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
         var userRatings: [Int: Double] = [:]
@@ -137,8 +150,15 @@ enum BGGXMLParser {
         }
     }
 
-    // SAX delegate for the BGG thing endpoint. Explicit nesting flags (inItem, inStatistics, inRatings)
-    // prevent collisions — BGG XML reuses element names like <rating> at different depths.
+    /// SAX delegate for parsing the `/thing` endpoint.
+    ///
+    /// This is the primary parser for detailed game metadata.
+    ///
+    /// **State Management**:
+    /// BGG XML is deeply nested and reuses element names (e.g., `<rating>` appears for both
+    /// the community average and the user's personal rating). This delegate uses explicit
+    /// state flags (`inItem`, `inStatistics`, `inRatings`) to track context and ensure
+    /// values are mapped to the correct properties.
     private final class ThingDelegate: NSObject, XMLParserDelegate {
         var games: [BGGGame] = []
 
@@ -373,8 +393,9 @@ enum BGGXMLParser {
             inRatings = false
         }
 
-        // Returns the language-dependence level with the most community votes (mode).
-        // Returns 0 if no votes were cast (poll absent or all zeros).
+        /// Computes the language-dependence level based on community poll results.
+        ///
+        /// - Returns: The level (1-5) with the most community votes (mode), or 0 if no votes were cast.
         private func computeLanguageDependence() -> Int {
             guard !langResults.isEmpty else { return 0 }
             var bestLevel = 0
@@ -388,8 +409,11 @@ enum BGGXMLParser {
             return bestVotes > 0 ? bestLevel : 0
         }
 
-        // A player count is "recommended" when (Best + Recommended) votes outnumber Not Recommended votes.
-        // This mirrors the threshold BGG uses to display the green/yellow badges on game pages.
+        /// Computes which player counts are "recommended" by the community.
+        ///
+        /// A player count is considered recommended if the sum of "Best" and "Recommended"
+        /// votes exceeds "Not Recommended" votes. This logic matches the badge logic
+        /// seen on BoardGameGeek.com.
         private func computeRecommendedPlayers() -> [Int] {
             var result: [Int] = []
             var seen = Set<Int>()

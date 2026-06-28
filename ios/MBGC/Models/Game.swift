@@ -5,6 +5,7 @@ import SwiftData
 /// `bggId` is the unique key; duplicate imports update the existing record instead of creating a new one.
 @Model
 final class Game {
+    /// Unique identifier from BoardGameGeek. Used as the primary key for deduplication.
     @Attribute(.unique) var bggId: Int = 0
     var name: String = ""
     var yearPublished: Int?
@@ -13,21 +14,44 @@ final class Game {
     var minPlayers: Int?
     var maxPlayers: Int?
     var playtime: Int?
+
+    /// User-provided URL for game rules (local-only field).
     var rulesUrl: String?
     var gameDescription: String?
     var categories: [String]?
     var mechanics: [String]?
     var types: [String]?
+
+    /// Average complexity rating from BGG (1.0 - 5.0).
     var weight: Double?
+
+    /// Community average rating from BGG.
     var rating: Double?
+
+    /// BGG's Bayesian average rating used for rankings.
     var geekRating: Double?
+
+    /// Global rank on BoardGameGeek.
     var bggRank: Int?
+
+    /// The user's personal rating for this game.
     var userRating: Double?
+
+    /// Whether the user has flagged this game for their "Want to Play" list.
     var wantToPlay: Bool = false
+
+    /// Number of times the user has recorded playing this game.
     var numberOfPlays: Int?
+
+    /// Local-only timestamp of the last recorded play.
     var lastLogPlayed: Date?  // ponytail: local-only, nil until play logging is built
+
+    /// Community-voted language dependence level (1-5).
     var languageDependence: Int?
+
+    /// List of player counts recommended by the BGG community.
     var recommendedPlayers: [Int]?
+
     var designers: [String]?
     var artists: [String]?
     var publishers: [String]?

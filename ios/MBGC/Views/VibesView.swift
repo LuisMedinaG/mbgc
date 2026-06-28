@@ -3,6 +3,7 @@ import SwiftUI
 
 // MARK: — Collections list
 
+/// Sanitizes a collection name by trimming length and removing illegal characters.
 private func sanitizeName(_ name: String) -> String {
     let maxLength = 50
     let sanitized = name
@@ -11,7 +12,10 @@ private func sanitizeName(_ name: String) -> String {
     return String(sanitized)
 }
 
+/// The primary view for displaying and managing a user's game collections.
+/// In the UI, this is often labeled as "Collection".
 struct VibesView: View {
+    /// Legacy name for the view model handling collection CRUD.
     let viewModel: VibesViewModel
     @Binding var path: [Collection]
     @Environment(\.modelContext) private var modelContext
@@ -133,6 +137,7 @@ struct VibesView: View {
 
 // MARK: — Shared color/icon picker (used by Create + Rename)
 
+/// A shared UI component for picking a collection's name, color, and icon.
 struct CollectionPickerBody: View {
     @Binding var name: String
     @Binding var selectedColor: String
@@ -391,7 +396,9 @@ private extension View {
 
 // MARK: — Smart list rule editor
 
-/// Edits a SmartRule: 4 set-op buckets over existing lists + the existing attribute filters.
+/// A specialized editor for defining `SmartRule` logic.
+/// It allows users to combine, intersect, subtract, or exclude games from other
+/// collections and apply attribute-based filters.
 struct SmartListEditor: View {
     @State private var rule: SmartRule
     let lists: [Collection]
@@ -590,7 +597,10 @@ enum GameSort: String, CaseIterable, Identifiable {
     var isCustomImage: Bool { self == .bggRating }
 }
 
+/// Displays the games within a specific collection, supporting sorting, filtering,
+/// and batch management actions.
 struct CollectionDetailView: View {
+    /// The collection being viewed.
     let collection: Collection
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Game.name) private var allGames: [Game]
