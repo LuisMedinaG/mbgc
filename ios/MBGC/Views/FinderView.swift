@@ -397,7 +397,7 @@ struct FinderResultView: View {
 
     private var alternativesSection: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
-            SectionTitle("Alternatives")
+            SectionTitle(text: "Alternatives")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Spacing.md) {
                     ForEach(alternatives) { game in
@@ -417,7 +417,7 @@ struct FinderResultView: View {
     @ViewBuilder
     private func fullRankingSection(scrollProxy: ScrollViewProxy) -> some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
-            SectionTitle("Full Ranking")
+            SectionTitle(text: "Full Ranking")
 
             if showAll {
                 Button { toggleAll(proxy: scrollProxy) } label: {

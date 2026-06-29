@@ -189,6 +189,14 @@ struct ChromeButton: View {
 struct SectionTitle: View {
     let text: String
 
+    init(_ text: String) {
+        self.text = text
+    }
+
+    init(text: String) {
+        self.text = text
+    }
+
     var body: some View {
         Text(text)
             .font(Typography.sectionTitle)
@@ -205,6 +213,16 @@ struct SectionTitle: View {
 struct ScreenTitle: View {
     let text: String
     var subtitle: String? = nil
+
+    init(_ text: String, subtitle: String? = nil) {
+        self.text = text
+        self.subtitle = subtitle
+    }
+
+    init(text: String, subtitle: String? = nil) {
+        self.text = text
+        self.subtitle = subtitle
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
