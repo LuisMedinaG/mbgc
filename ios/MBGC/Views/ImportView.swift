@@ -23,6 +23,7 @@ private struct BGGImportSummary {
 struct ImportView: View {
     var dismissAll: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
 
     @State private var bggUsername = ""
     @State private var showDestinationPicker = false
@@ -34,102 +35,111 @@ struct ImportView: View {
     @State private var syncLog: [String] = []
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("BGG Username")
-                        .font(.headline)
-                    TextField("Your BoardGameGeek username", text: $bggUsername)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+        VStack(spacing: 0) {
+            HStack {
+                Spacer()
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(10)
+                        .background(Color(.systemGray5))
+                        .clipShape(Circle())
                 }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
 
-                VStack(spacing: 12) {
-                    Button {
-                        Task { await importFromBGG() }
-                    } label: {
-                        HStack {
-                            if isSyncing {
-                                ProgressView().tint(.white)
-                            } else {
-                                Image(systemName: "arrow.down.circle.fill")
-                            }
-                            Text(buttonLabel)
-                        }
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(buttonBackground)
-                        )
-                    }
-                    .disabled(!canImportBGG || isSyncing || isInCooldown)
+            Spacer()
 
-                    if !canImportBGG {
-                        Text("Enter your BGG username to sync your collection")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else if let next = nextAvailableDate {
-                        Text("Next sync available \(next.formatted(date: .abbreviated, time: .shortened)).")
-                            .font(.caption).foregroundStyle(.secondary)
-                    } else {
-                        Text("Sync up to \(bggRegularImportLimit) new owned games. Available once every 7 days.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
+            VStack(alignment: .leading, spacing: 12) {
+                Image("powered-by-bgg")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 24)
 
-                    if let syncProgress {
-                        Text(syncProgress).font(.caption).foregroundStyle(.secondary)
-                    }
-                    if let syncError {
-                        Text(syncError).font(.caption).foregroundStyle(.red)
-                    }
-                    if let syncSummary {
-                        Text("Imported \(syncSummary.imported) · Skipped \(syncSummary.skipped) · Failed \(syncSummary.failed.count)")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    if !syncLog.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
-                                Label(message, systemImage: "circle.fill")
-                                    .font(.caption).foregroundStyle(statusColor(for: message))
-                            }
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
+                Text("BoardGameGeek\nImport")
+                    .font(.largeTitle.bold())
+                    .fixedSize(horizontal: false, vertical: true)
 
-                #if DEBUG
+                Text("It might take a while if your collection is big.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                TextField("Username", text: $bggUsername)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .font(.body)
+                    .padding(.top, 8)
+
                 Divider()
+
+                if let syncProgress {
+                    Text(syncProgress).font(.caption).foregroundStyle(.secondary)
+                }
+                if let syncError {
+                    Text(syncError).font(.caption).foregroundStyle(.red)
+                }
+                if let syncSummary {
+                    Text("Imported \(syncSummary.imported) · Skipped \(syncSummary.skipped) · Failed \(syncSummary.failed.count)")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !syncLog.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
+                            Label(message, systemImage: "circle.fill")
+                                .font(.caption).foregroundStyle(statusColor(for: message))
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 28)
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                #if DEBUG
                 Button {
                     Task { await refreshAllGameDetails() }
                 } label: {
+                    HStack(spacing: 6) {
+                        if isSyncing { ProgressView().tint(.primary).scaleEffect(0.8) }
+                        else { Image(systemName: "arrow.clockwise") }
+                        Text("Refresh All")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(isSyncing)
+                #endif
+
+                Button {
+                    Task { await importFromBGG() }
+                } label: {
                     HStack {
                         if isSyncing { ProgressView().tint(.white) }
-                        else { Image(systemName: "arrow.clockwise.circle.fill") }
-                        Text(isSyncing ? "Refreshing..." : "Refresh All Details")
+                        Text(buttonLabel)
                     }
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(isSyncing ? Color.gray : Color.orange))
+                    .padding(.vertical, 17)
+                    .background(Capsule().fill(buttonBackground))
                 }
-                .disabled(isSyncing)
-                Text("Debug: re-fetches full game data from BGG for every game in the library.")
-                    .font(.caption).foregroundStyle(.secondary)
-                #endif
+                .disabled(!canImportBGG || isSyncing || isInCooldown)
             }
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 32)
         }
-        .navigationTitle("Import from BGG")
-        .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showDestinationPicker) {
             NavigationStack {
                 CollectionPickerView(games: selectedGames) { confirmed in

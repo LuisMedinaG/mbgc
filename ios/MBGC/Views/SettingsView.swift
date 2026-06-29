@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Binding var isPresented: Bool
     @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @State private var showImportBGG = false
 
     var body: some View {
         NavigationStack {
@@ -19,15 +20,19 @@ struct SettingsView: View {
                 }
 
                 Section("Import") {
-                    NavigationLink { ImportView(dismissAll: { isPresented = false }) } label: {
+                    Button { showImportBGG = true } label: {
                         SettingsRow(icon: "arrow.down.circle.fill", color: .orange, label: "Import from BGG")
                     }
+                    .foregroundStyle(.primary)
                     NavigationLink { CsvImportView() } label: {
                         SettingsRow(icon: "doc.text.fill", color: .green, label: "Import from CSV")
                     }
                 }
             }
             .navigationTitle("Settings")
+        }
+        .sheet(isPresented: $showImportBGG) {
+            ImportView(dismissAll: { showImportBGG = false; isPresented = false })
         }
     }
 }

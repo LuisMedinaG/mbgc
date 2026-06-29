@@ -8,6 +8,7 @@ struct FinderView: View {
     @Binding var active: Bool   // false = intro cover (chrome visible); true = test running (chrome hidden)
     @State private var flow = FinderFlow()
     @State private var hapticTrigger = 0
+    @State private var goingBack = false
     @Query private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
 
@@ -35,20 +36,22 @@ struct FinderView: View {
                         onSelect: { option in
                             hapticTrigger += 1
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                goingBack = false
                                 flow.select(option)
                             }
                         },
                         // Back arrow always present: step >0 goes back a question, step 0 exits the test.
                         onBack: {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                goingBack = true
                                 if flow.stepIndex > 0 { flow.back() } else { exitTest() }
                             }
                         }
                     )
                     .id(flow.stepIndex)
                     .transition(.asymmetric(
-                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                        removal:   .move(edge: .leading).combined(with: .opacity)
+                        insertion: .move(edge: goingBack ? .leading : .trailing).combined(with: .opacity),
+                        removal:   .move(edge: goingBack ? .trailing : .leading).combined(with: .opacity)
                     ))
                 }
             }
@@ -82,32 +85,42 @@ private struct FinderStartView: View {
     let onStart: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: "moon.stars.fill")
-                .font(.system(size: 56))
-                .foregroundStyle(.orange)
-            VStack(spacing: 8) {
-                Text("Tonight's Pick")
-                    .font(.largeTitle.bold())
-                Text("Answer a few quick questions and we'll narrow your collection down to the perfect game.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
+        ZStack {
+            LinearGradient(
+                colors: [Color(.systemBackground), Color.orange.opacity(0.12)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                Spacer()
+                Image(systemName: "moon.stars.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(.orange)
+                    .shadow(color: .orange.opacity(0.5), radius: 24, y: 8)
+                VStack(spacing: 8) {
+                    Text("Tonight's Pick")
+                        .font(.largeTitle.bold())
+                    Text("Answer a few quick questions and we'll narrow your collection down to the perfect game.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+                Spacer()
+                Button(action: onStart) {
+                    Text("Start")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.orange)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 120)
             }
-            Spacer()
-            Button(action: onStart) {
-                Text("Start")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.orange)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 120)
         }
     }
 }
@@ -160,7 +173,7 @@ private struct FinderStepView: View {
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(Color(.label))
                         .frame(width: 44, height: 44)
-                        .background(Color(.secondarySystemBackground))
+                        .background(.regularMaterial)
                         .clipShape(Circle())
                 }
                 .accessibilityLabel("Back")
@@ -276,123 +289,146 @@ struct FinderResultView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Tonight's Pick")
-                            .font(.largeTitle.bold())
-                        Text("\(flow.survivors.count) \(flow.survivors.count == 1 ? "game" : "games") matched")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 24)
-                    .id("topPick")
+        ZStack {
+            // Ambient background pulled from hero game art
+            if let hero = top.first {
+                CachedAsyncImage(url: URL(string: hero.image ?? hero.thumbnail ?? ""))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .blur(radius: 80)
+                    .opacity(0.25)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
 
-                    if top.isEmpty {
-                        ContentUnavailableView(
-                            "No Matches",
-                            systemImage: "questionmark.circle",
-                            description: Text("No games match those filters. Try different answers.")
-                        )
-                    } else {
-                        if let hero = top.first {
-                            NavigationLink(value: hero.bggId) {
-                                FinderHeroCard(game: hero)
-                            }
-                            .buttonStyle(.plain)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Tonight's Pick")
+                                .font(.largeTitle.bold())
+                            Text("\(flow.survivors.count) \(flow.survivors.count == 1 ? "game" : "games") matched")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
                         }
+                        .padding(.top, 24)
+                        .id("topPick")
 
-                        let runners = Array(top.dropFirst())
-                        if !runners.isEmpty {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Also great")
-                                    .font(.headline)
-                                    .foregroundStyle(.secondary)
-                                HStack(spacing: 12) {
-                                    ForEach(runners) { game in
-                                        NavigationLink(value: game.bggId) {
-                                            FinderRunnerCard(game: game)
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
+                        if top.isEmpty {
+                            ContentUnavailableView(
+                                "No Matches",
+                                systemImage: "questionmark.circle",
+                                description: Text("No games match those filters. Try different answers.")
+                            )
+                        } else {
+                            if let hero = top.first {
+                                NavigationLink(value: hero.bggId) {
+                                    FinderHeroCard(game: hero)
                                 }
+                                .buttonStyle(.plain)
                             }
-                        }
 
-                        if showAll {
-                            Button { toggleAll(proxy: proxy) } label: {
-                                HStack {
-                                    Text("All \(flow.ranked.count) games")
+                            let runners = Array(top.dropFirst())
+                            if !runners.isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Text("Also great")
                                         .font(.headline)
                                         .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Image(systemName: "chevron.up")
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-                            .id("allGames")
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
-                                    NavigationLink(value: game.bggId) {
-                                        HStack(spacing: 12) {
-                                            Text("\(idx + 1)")
-                                                .font(.caption.weight(.bold))
-                                                .foregroundStyle(.secondary)
-                                                .frame(width: 24)
-                                            AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                                                img.resizable().aspectRatio(contentMode: .fill)
-                                            } placeholder: {
-                                                Color(.systemGray5)
+                                    HStack(spacing: 12) {
+                                        ForEach(runners) { game in
+                                            NavigationLink(value: game.bggId) {
+                                                FinderRunnerCard(game: game)
                                             }
-                                            .frame(width: 44, height: 44)
-                                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(game.name).font(.body.weight(.semibold))
-                                                if let r = game.rating, r > 0 {
-                                                    Label(String(format: "%.1f", r), systemImage: "star.fill")
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                }
-                                            }
-                                            Spacer()
+                                            .buttonStyle(.plain)
                                         }
-                                        .padding(.vertical, 10)
-                                        .foregroundStyle(.primary)
-                                    }
-                                    .buttonStyle(.plain)
-
-                                    if idx < flow.ranked.count - 1 {
-                                        Divider().padding(.leading, 80)
                                     }
                                 }
                             }
-                        }
 
-                        if hasMore {
-                            Button { toggleAll(proxy: proxy) } label: {
-                                Label(showAll ? "Show less" : "See all \(flow.ranked.count) recommendations",
-                                      systemImage: showAll ? "chevron.up" : "list.number")
-                                    .font(.subheadline.weight(.medium))
-                                    .frame(maxWidth: .infinity)
+                            if showAll {
+                                Button { toggleAll(proxy: proxy) } label: {
+                                    HStack {
+                                        Text("All \(flow.ranked.count) games")
+                                            .font(.headline)
+                                            .foregroundStyle(.secondary)
+                                        Spacer()
+                                        Image(systemName: "chevron.up")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .padding(.horizontal, 16)
                                     .padding(.vertical, 12)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                }
+                                .buttonStyle(.plain)
+                                .id("allGames")
+                                LazyVStack(spacing: 0) {
+                                    ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
+                                        NavigationLink(value: game.bggId) {
+                                            HStack(spacing: 12) {
+                                                Text("\(idx + 1)")
+                                                    .font(.caption.weight(.bold))
+                                                    .foregroundStyle(.secondary)
+                                                    .frame(width: 24)
+                                                AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
+                                                    img.resizable().aspectRatio(contentMode: .fill)
+                                                } placeholder: {
+                                                    Color(.systemGray5)
+                                                }
+                                                .frame(width: 44, height: 44)
+                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(game.name).font(.body.weight(.semibold))
+                                                    if let r = game.rating, r > 0 {
+                                                        Label(String(format: "%.1f", r), systemImage: "star.fill")
+                                                            .font(.caption)
+                                                            .foregroundStyle(.secondary)
+                                                    }
+                                                }
+                                                Spacer()
+                                            }
+                                            .padding(.vertical, 10)
+                                            .padding(.horizontal, 16)
+                                            .foregroundStyle(.primary)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        if idx < flow.ranked.count - 1 {
+                                            Divider().padding(.leading, 96)
+                                        }
+                                    }
+                                }
+                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
                             }
-                            .buttonStyle(.bordered)
-                            .tint(.secondary)
+
+                            if hasMore {
+                                Button { toggleAll(proxy: proxy) } label: {
+                                    Label(showAll ? "Show less" : "See all \(flow.ranked.count) recommendations",
+                                          systemImage: showAll ? "chevron.up" : "list.number")
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 72)
+                    .gesture(DragGesture(minimumDistance: 40).onEnded { v in
+                        guard !showAll, v.translation.height < -60 else { return }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showAll = true }
+                    })
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 72)
+                .scrollDisabled(!showAll)
+                .scrollIndicators(showAll ? .automatic : .hidden)
+                .refreshable { onRestart() }   // ponytail: native pull-down → start over (only fires when showAll)
+                .overlay(alignment: .topTrailing) { menu }
+                // ponytail: toggle already animated via withAnimation in toggleAll; a
+                // blanket .animation here rasterizes the whole expanding list into one
+                // offscreen layer → "RBLayer: unable to create texture".
             }
-            .scrollIndicators(showAll ? .automatic : .hidden)
-            .refreshable { onRestart() }   // ponytail: native pull-down → start over
-            .overlay(alignment: .topTrailing) { menu }
-            // ponytail: toggle already animated via withAnimation in toggleAll; a
-            // blanket .animation here rasterizes the whole expanding list into one
-            // offscreen layer → "RBLayer: unable to create texture".
         }
     }
 
@@ -433,9 +469,12 @@ private struct FinderHeroCard: View {
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
+                .frame(maxWidth: .infinity)
+                .frame(height: 280)
+                .clipped()
 
             LinearGradient(
-                colors: [.clear, .black.opacity(0.7)],
+                colors: [.clear, .black.opacity(0.75)],
                 startPoint: .center,
                 endPoint: .bottom
             )
@@ -466,6 +505,7 @@ private struct FinderHeroCard: View {
             .padding(16)
         }
         .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
     }
 }
 
@@ -495,8 +535,8 @@ private struct FinderRunnerCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
     }
 }
 
