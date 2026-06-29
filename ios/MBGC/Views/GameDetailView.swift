@@ -7,23 +7,35 @@ struct GameDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = GameDetailViewModel()
     @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
-
-    private let langDep = ["", "No language", "Some text", "Moderate", "Extensive", "Unplayable"]
+    @State private var showDeleteAlert = false
+    @State private var showAddToCollection = false
+    @State private var isDescExpanded = false
 
     var body: some View {
         Group {
             if let game = viewModel.game {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(spacing: 0) {
                         heroImage(game)
+                            .ignoresSafeArea(edges: .top)
+                        titleSection(game)
                         statsRow(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                         descriptionSection(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                         tagsSection(game)
-                        collectionsSection(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                         linksSection(game)
-                        deleteSection(game)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
                     }
-                    .padding()
+                }
+                .safeAreaInset(edge: .bottom) { bottomBar(game) }
+                .sheet(isPresented: $showAddToCollection) {
+                    AddToCollectionSheet(game: game, allCollections: allCollections)
                 }
             } else if let error = viewModel.errorMessage {
                 Text(error).foregroundStyle(.red)
@@ -31,79 +43,101 @@ struct GameDetailView: View {
                 ProgressView()
             }
         }
-        .navigationTitle(viewModel.game?.name ?? "Game")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        // Make the nav bar background visible over the hero image so the menu
+        // button stays legible regardless of the artwork's lightness.
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button(role: .destructive) { showDeleteAlert = true } label: {
+                        Label("Delete Game", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel("More actions")
+            }
+        }
+        .alert("Delete \"\(viewModel.game?.name ?? "")\"?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .onAppear { viewModel.load(gameId: gameId, modelContext: modelContext) }
     }
 
     private func heroImage(_ game: Game) -> some View {
-        ZStack(alignment: .bottomLeading) {
-            AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Rectangle().fill(Color.gray.opacity(0.3))
-            }
-            .frame(height: 200)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+        CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
+        .frame(maxWidth: .infinity)
+        .frame(height: 320)
+        .clipped()
+    }
 
-            LinearGradient(colors: [.clear, .black.opacity(0.6)], startPoint: .top, endPoint: .bottom)
-                .frame(height: 100)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(game.name)
-                    .font(.title2).fontWeight(.bold).foregroundStyle(.white)
-                HStack(spacing: 8) {
-                    if let year = game.yearPublished, year > 0 {
-                        Text(String(year)).font(.caption).foregroundStyle(.white.opacity(0.85))
-                    }
-                    if let rating = game.rating, rating > 0 {
-                        Text("★ \(String(format: "%.1f", rating))").font(.caption).fontWeight(.bold).foregroundStyle(.white)
-                    }
-                    if let weight = game.weight, weight > 0 {
-                        Text(String(format: "%.1f", weight)).font(.caption).foregroundStyle(.white.opacity(0.85))
-                    }
-                    if let dep = game.languageDependence, langDep.indices.contains(dep) {
-                        Text(langDep[dep]).font(.caption).foregroundStyle(.white.opacity(0.85))
-                    }
-                }
+    private func titleSection(_ game: Game) -> some View {
+        VStack(spacing: 6) {
+            Text(game.name)
+                .font(.title2).fontWeight(.bold)
+                .multilineTextAlignment(.center)
+            // dot-separated: year · BGG rating · age+
+            let parts: [String] = [
+                game.yearPublished.map { $0 > 0 ? String($0) : nil } ?? nil,
+                game.rating.map { $0 > 0 ? "BGG \(String(format: "%.1f", $0))" : nil } ?? nil,
+                game.minAge.map { $0 > 0 ? "\($0)+" : nil } ?? nil
+            ].compactMap { $0 }
+            if !parts.isEmpty {
+                Text(parts.joined(separator: " · "))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            .padding()
         }
+        .frame(maxWidth: .infinity)
+        .padding(16)
     }
 
     private func statsRow(_ game: Game) -> some View {
         HStack {
-            VStack {
-                Text(playersStr(game)).font(.title3).fontWeight(.bold)
+            VStack(spacing: 2) {
                 Text("Players").font(.caption2).foregroundStyle(.secondary)
+                Text(playersStr(game)).font(.title3).fontWeight(.bold)
+                Text("count").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
-            VStack {
-                Text("\(game.playtime ?? 0)").font(.title3).fontWeight(.bold)
-                Text("Minutes").font(.caption2).foregroundStyle(.secondary)
+            VStack(spacing: 2) {
+                Text("Playtime").font(.caption2).foregroundStyle(.secondary)
+                Text(playtimeStr(game)).font(.title3).fontWeight(.bold)
+                Text("minutes").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
-            VStack {
+            VStack(spacing: 2) {
+                Text("Weight").font(.caption2).foregroundStyle(.secondary)
                 Text(game.weight.map { String(format: "%.1f", $0) } ?? "—").font(.title3).fontWeight(.bold)
-                Text("Complexity").font(.caption2).foregroundStyle(.secondary)
+                Text("complexity").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
         .padding()
         .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private func descriptionSection(_ game: Game) -> some View {
         Group {
             if let desc = game.gameDescription, !desc.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("About").font(.headline)
-                    Text(desc).font(.subheadline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(desc)
+                        .font(.subheadline)
+                        .lineLimit(isDescExpanded ? nil : 4)
+                    if !isDescExpanded {
+                        Button("Show more") { isDescExpanded = true }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                    }
                 }
             }
         }
@@ -112,23 +146,26 @@ struct GameDetailView: View {
     private func tagsSection(_ game: Game) -> some View {
         let categories = game.categories ?? []
         let mechanics = game.mechanics ?? []
+        let types = game.types ?? []
         return Group {
-            if !categories.isEmpty || !mechanics.isEmpty {
+            if !categories.isEmpty || !mechanics.isEmpty || !types.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
+                    if !types.isEmpty {
+                        Text("Type").font(.headline)
+                        FlowLayout(spacing: 6) {
+                            ForEach(types, id: \.self) { tagChip($0, color: .indigo) }
+                        }
+                    }
                     if !categories.isEmpty {
                         Text("Categories").font(.headline)
                         FlowLayout(spacing: 6) {
-                            ForEach(categories, id: \.self) { tag in
-                                tagChip(tag, color: .blue)
-                            }
+                            ForEach(categories, id: \.self) { tagChip($0, color: .blue) }
                         }
                     }
                     if !mechanics.isEmpty {
                         Text("Mechanics").font(.headline)
                         FlowLayout(spacing: 6) {
-                            ForEach(mechanics, id: \.self) { tag in
-                                tagChip(tag, color: .green)
-                            }
+                            ForEach(mechanics, id: \.self) { tagChip($0, color: .green) }
                         }
                     }
                 }
@@ -143,61 +180,6 @@ struct GameDetailView: View {
             .background(color.opacity(0.15))
             .foregroundStyle(color)
             .clipShape(Capsule())
-    }
-
-    private func collectionsSection(_ game: Game) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Collections").font(.headline)
-                Spacer()
-                if !viewModel.editingCollections {
-                    Button("Edit") { viewModel.startEditingCollections() }
-                        .font(.subheadline)
-                }
-            }
-
-            if viewModel.editingCollections {
-                ForEach(allCollections) { col in
-                    let isSelected = col.isDefault || viewModel.selectedCollectionIds.contains(col.persistentModelID)
-                    Button { viewModel.toggleCollection(col) } label: {
-                        HStack {
-                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                            Text(col.name)
-                        }
-                    }
-                    .disabled(col.isDefault)
-                    .foregroundStyle(.primary)
-                }
-                if allCollections.isEmpty {
-                    Text("No collections yet").font(.subheadline).foregroundStyle(.secondary)
-                }
-                HStack {
-                    Button("Save") {
-                        viewModel.saveCollections(allCollections: allCollections, modelContext: modelContext)
-                    }
-                    .disabled(viewModel.isSaving)
-                    Button("Cancel") { viewModel.editingCollections = false }
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                if game.collections.isEmpty {
-                    Text("Not in any collection")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                } else {
-                    FlowLayout(spacing: 6) {
-                        ForEach(game.collections.map(\.name), id: \.self) { name in
-                            tagChip(name, color: .purple)
-                        }
-                    }
-                }
-            }
-            if let error = viewModel.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red)
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func linksSection(_ game: Game) -> some View {
@@ -226,39 +208,93 @@ struct GameDetailView: View {
         }
         .padding()
         .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private func deleteSection(_ game: Game) -> some View {
-        VStack {
-            if viewModel.showDeleteConfirm {
-                HStack {
-                    Text("Delete \"\(game.name)\"?")
-                    Button("Yes") {
-                        if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(viewModel.isDeleting)
-                    Button("Cancel") { viewModel.showDeleteConfirm = false }
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                Button("Delete game", role: .destructive) {
-                    viewModel.showDeleteConfirm = true
-                }
-            }
+    private func bottomBar(_ game: Game) -> some View {
+        let nonDefaultCollections = game.collections.filter { !$0.isDefault }
+        let label = nonDefaultCollections.isEmpty
+            ? "Add to collection"
+            : "In \(nonDefaultCollections.count) collection\(nonDefaultCollections.count == 1 ? "" : "s")"
+        return Button { showAddToCollection = true } label: {
+            Label(label, systemImage: nonDefaultCollections.isEmpty ? "plus" : "folder.fill")
+                .font(.body.weight(.semibold))
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .frame(maxWidth: 320)
+                .background(Color.accentColor)
+                .foregroundStyle(.white)
+                .clipShape(Capsule())
         }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
     }
 
     private func playersStr(_ game: Game) -> String {
         if let min = game.minPlayers, let max = game.maxPlayers {
-            return min == max ? "\(min)" : "\(min)-\(max)"
+            return min == max ? "\(min)" : "\(min)–\(max)"
         }
         return "—"
+    }
+
+    /// "—" when BGG didn't publish a playtime — never "0" (would imply an instant game).
+    private func playtimeStr(_ game: Game) -> String {
+        game.playtime.map { "\($0)" } ?? "—"
+    }
+}
+
+struct AddToCollectionSheet: View {
+    let game: Game
+    let allCollections: [Collection]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedIds: Set<PersistentIdentifier>
+
+    init(game: Game, allCollections: [Collection]) {
+        self.game = game
+        self.allCollections = allCollections
+        _selectedIds = State(initialValue: Set(game.collections.map(\.persistentModelID)))
+    }
+
+    var body: some View {
+        NavigationStack {
+            List(allCollections) { col in
+                let isSelected = col.isDefault || selectedIds.contains(col.persistentModelID)
+                Button {
+                    guard !col.isDefault else { return }
+                    if selectedIds.contains(col.persistentModelID) { selectedIds.remove(col.persistentModelID) }
+                    else { selectedIds.insert(col.persistentModelID) }
+                } label: {
+                    HStack {
+                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(col.isDefault ? Color.secondary.opacity(0.6) : Color.accentColor)
+                        Text(col.name)
+                            .foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
+                        if col.isDefault {
+                            Text("Always included")
+                                .font(.caption)
+                                .foregroundStyle(Color.secondary)
+                        }
+                    }
+                }
+                .disabled(col.isDefault)
+                .accessibilityHint(col.isDefault ? "Library always contains every imported game" : "")
+            }
+            .listStyle(.plain)
+            .navigationTitle("Collections")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func save() {
+        game.collections = allCollections.filter { $0.isDefault || selectedIds.contains($0.persistentModelID) }
+        try? modelContext.save()
+        dismiss()
     }
 }
 

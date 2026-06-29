@@ -22,7 +22,8 @@ func Chain(h http.Handler, mw ...func(http.Handler) http.Handler) http.Handler {
 	return h
 }
 
-// SecurityHeaders adds standard security response headers.
+// SecurityHeaders injects standard security-related HTTP headers into the response
+// to mitigate common web vulnerabilities (e.g., XSS, Clickjacking, MIME-sniffing).
 func SecurityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -46,7 +47,9 @@ func ClientInfo(next http.Handler) http.Handler {
 	})
 }
 
-// CORS applies CORS headers for the given list of allowed origins.
+// CORS provides Cross-Origin Resource Sharing (CORS) support for the specified
+// list of allowed origins. It handles both preflight OPTIONS requests and
+// injecting the necessary headers into actual requests.
 func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	allowed := make(map[string]struct{}, len(allowedOrigins))
 	for _, o := range allowedOrigins {
@@ -77,7 +80,9 @@ func CORS(allowedOrigins []string) func(http.Handler) http.Handler {
 	}
 }
 
-// Recover catches panics, logs the stack trace, and returns 500.
+// Recover is a middleware that intercepts panics within handlers to prevent
+// the server process from crashing. It logs the panic value and stack trace
+// before returning a standard 500 Internal Server Error to the client.
 // ref: monitoring.SINK.2
 func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +99,10 @@ func Recover(next http.Handler) http.Handler {
 	})
 }
 
-// RequestID injects a unique request ID into context and the X-Request-ID response header.
+// RequestID ensures every request has a unique identifier. It reads the
+// X-Request-ID header from the request (if present) or generates a new UUID.
+// This ID is then injected into the request context and the response headers
+// for end-to-end tracing.
 func RequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-ID")
@@ -106,10 +114,14 @@ func RequestID(next http.Handler) http.Handler {
 	})
 }
 
-// Logger logs method, path, status, and latency via Record (structured,
-// allow-list-filtered). Event name is "request" for normal logs, with
-// "server_error" for 5xx, "auth_failure" for 401 on /auth/*, and "request"
-// for other 4xx (info level per monitoring.COST.1).
+// Logger provides structured logging for every HTTP request. It records the
+// method, path, status code, and latency.
+//
+// Event types:
+//   - "request": Standard successful or client-error (4xx) requests.
+//   - "server_error": Server-side errors (5xx).
+//   - "auth_failure": Unauthorized attempts (401) specifically on /auth/* paths.
+//
 // ref: monitoring.SINK.1, monitoring.SINK.4, monitoring.COST.1
 func Logger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

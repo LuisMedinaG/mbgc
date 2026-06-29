@@ -46,6 +46,8 @@ func NewHandler(svc gameStore, storage storage) *Handler {
 	return &Handler{svc: svc, storage: storage}
 }
 
+// MARK: - Routes
+
 func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) http.Handler) {
 	mux.Handle("GET /api/v1/games", auth(http.HandlerFunc(h.ListGames)))                                   // ref: collection.API.1
 	mux.Handle("GET /api/v1/games/{id}", auth(http.HandlerFunc(h.GetGame)))                                // ref: game-detail.DETAIL_VIEW.1
@@ -61,6 +63,10 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux, auth func(http.Handler) htt
 	mux.Handle("GET /api/v1/discover", auth(http.HandlerFunc(h.Discover)))                                 // ref: vibes.DISCOVER.1
 }
 
+// MARK: - Games
+
+// ListGames returns a paginated list of games in the user's collection,
+// optionally filtered by search query, category, etc.
 func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -84,6 +90,7 @@ func (h *Handler) ListGames(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(games, f.Page, f.Limit, total))
 }
 
+// GetGame returns the full details for a specific game.
 func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -102,6 +109,7 @@ func (h *Handler) GetGame(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, httpx.New(game))
 }
 
+// DeleteGame removes a game from the user's collection.
 func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -119,11 +127,14 @@ func (h *Handler) DeleteGame(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// MARK: - Collections
+
 type collectionRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
 
+// SetGameCollections updates the set of collections (vibes) a game belongs to.
 // ref: vibes.ASSIGN.2 — replaces entire collection assignment set for the game
 func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
@@ -149,6 +160,7 @@ func (h *Handler) SetGameCollections(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// UpdateRulesURL updates the manual rules URL for a game.
 // ref: game-detail.RULES_URL.1 — server-side allowlist runs in the store;
 // we only parse + truncate here.
 func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +191,7 @@ func (h *Handler) UpdateRulesURL(w http.ResponseWriter, r *http.Request) {
 	}))
 }
 
+// ListCollections returns all collections owned by the user.
 func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -192,6 +205,7 @@ func (h *Handler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, httpx.NewList(cols, 1, len(cols), len(cols)))
 }
 
+// CreateCollection creates a new named collection (vibe).
 func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -216,6 +230,7 @@ func (h *Handler) CreateCollection(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, httpx.New(col))
 }
 
+// UpdateCollection updates the name or description of an existing collection.
 func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -240,6 +255,7 @@ func (h *Handler) UpdateCollection(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// DeleteCollection removes a collection. Games within the collection are not deleted.
 func (h *Handler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -257,6 +273,7 @@ func (h *Handler) DeleteCollection(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// Discover provides smart-list like discovery within a collection.
 func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -293,11 +310,14 @@ func (h *Handler) Discover(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// MARK: - Player Aids
+
 type playerAidRequest struct {
 	Filename string  `json:"filename"`
 	Label    *string `json:"label,omitempty"`
 }
 
+// CreatePlayerAid handles file uploads for game player aids.
 func (h *Handler) CreatePlayerAid(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {
@@ -350,6 +370,7 @@ func (h *Handler) CreatePlayerAid(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusCreated, httpx.New(aid))
 }
 
+// DeletePlayerAid removes a player aid and its associated file from storage.
 func (h *Handler) DeletePlayerAid(w http.ResponseWriter, r *http.Request) {
 	userID, ok := httpx.RequireUserID(w, r)
 	if !ok {

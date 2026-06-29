@@ -3,8 +3,15 @@ import Foundation
 struct CollectionResult {
     let ids: [Int]
     let userRatings: [Int: Double]
+    let wantToPlay: [Int: Bool]
+    let numberOfPlays: [Int: Int]
 }
 
+/// A high-performance XML parser for BoardGameGeek XML API2 responses.
+///
+/// This parser uses `XMLParser` (SAX-style) for memory efficiency. It utilizes specialized
+/// delegates to handle different API endpoints (collection vs thing) while maintaining
+/// a robust state machine to navigate BGG's nested XML structure.
 enum BGGXMLParser {
     static func parseCollectionResponse(_ data: Data) throws -> CollectionResult {
         let delegate = CollectionDelegate()
@@ -16,7 +23,8 @@ enum BGGXMLParser {
             }
             throw URLError(.cannotParseResponse)
         }
-        return CollectionResult(ids: delegate.ids, userRatings: delegate.userRatings)
+        return CollectionResult(ids: delegate.ids, userRatings: delegate.userRatings,
+                               wantToPlay: delegate.wantToPlay, numberOfPlays: delegate.numberOfPlays)
     }
 
     static func parseThingResponse(_ data: Data) throws -> [BGGGame] {
@@ -32,13 +40,95 @@ enum BGGXMLParser {
         return delegate.games
     }
 
-    // SAX delegate that streams the BGG collection XML — only extracts item IDs and user ratings.
+    private static let entities: [(String, String)] = [
+        ("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", "\""), ("&apos;", "'"),
+        ("&#039;", "'"), ("&#39;", "'"), ("&nbsp;", " "), ("&rsquo;", "'"), ("&lsquo;", "'"),
+        ("&rdquo;", "\u{201D}"), ("&ldquo;", "\u{201C}"), ("&mdash;", "—"), ("&ndash;", "–"),
+        ("&bull;", "•"), ("&hellip;", "…")
+    ]
+
+    private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#(x?[0-9a-fA-F]+);", options: [])
+    private static let htmlTagRegex = try? NSRegularExpression(pattern: "<[^>]+>", options: [])
+    private static let multiWhitespaceRegex = try? NSRegularExpression(pattern: "[ \\t]+", options: [])
+    private static let multiNewlineRegex = try? NSRegularExpression(pattern: "\\n{3,}", options: [])
+
+    /// Strip BGG's HTML markup from descriptions so they render as plain text.
+    /// - Unescapes named and numeric HTML entities (&amp; &lt; &#10; etc.)
+    /// - Removes remaining tags (<br/>, <a href=...>, <i>, <b>, <img ...>, <err>, etc.)
+    /// - Collapses runs of spaces and excessive newlines
+    /// - Decodes &quot; etc. so quotes render correctly in SwiftUI Text
+    fileprivate static func unescapeHTML(_ s: String) -> String {
+        var result = s
+        if result.contains("&") {
+            for (entity, replacement) in entities {
+                result = result.replacingOccurrences(of: entity, with: replacement)
+            }
+            if result.contains("&#") {
+                result = unescapeNumericEntities(result)
+            }
+        }
+
+        // BGG stores descriptions as HTML — strip remaining tags so they render as plain text.
+        if result.contains("<"), let tagRegex = htmlTagRegex {
+            let nsRange = NSRange(location: 0, length: (result as NSString).length)
+            result = tagRegex.stringByReplacingMatches(in: result, options: [], range: nsRange, withTemplate: "")
+        }
+
+        // Collapse runs of spaces/tabs and excessive newlines for clean SwiftUI Text rendering.
+        if let wsRegex = multiWhitespaceRegex {
+            let nsRange = NSRange(location: 0, length: (result as NSString).length)
+            result = wsRegex.stringByReplacingMatches(in: result, options: [], range: nsRange, withTemplate: " ")
+        }
+        if let nlRegex = multiNewlineRegex {
+            let nsRange = NSRange(location: 0, length: (result as NSString).length)
+            result = nlRegex.stringByReplacingMatches(in: result, options: [], range: nsRange, withTemplate: "\n\n")
+        }
+
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func unescapeNumericEntities(_ s: String) -> String {
+        guard let regex = numericEntityRegex else { return s }
+        var result = s
+        let nsString = result as NSString
+        let matches = regex.matches(in: result, options: [], range: NSRange(location: 0, length: nsString.length))
+
+        for match in matches.reversed() {
+            let entityRange = match.range(at: 1)
+            let entityStr = nsString.substring(with: entityRange)
+            let codePoint: UInt32?
+            if entityStr.hasPrefix("x") {
+                codePoint = UInt32(entityStr.dropFirst(), radix: 16)
+            } else {
+                codePoint = UInt32(entityStr, radix: 10)
+            }
+
+            if let cp = codePoint, let scalar = UnicodeScalar(cp) {
+                result = (result as NSString).replacingCharacters(in: match.range, with: String(scalar))
+            }
+        }
+        return result
+    }
+
+    /// SAX delegate for parsing the `/collection` endpoint.
+    ///
+    /// It extracts:
+    /// - Game IDs (`objectid`)
+    /// - User personal ratings
+    /// - "Want to play" status
+    /// - Number of recorded plays
+    ///
+    /// It handles deduplication of items as BGG sometimes returns duplicate entries in this endpoint.
     private final class CollectionDelegate: NSObject, XMLParserDelegate {
         var ids: [Int] = []
         var userRatings: [Int: Double] = [:]
+        var wantToPlay: [Int: Bool] = [:]
+        var numberOfPlays: [Int: Int] = [:]
         private var seen = Set<Int>() // BGG can return duplicate <item> entries; deduplicate by objectid
         private var currentId: Int = 0
         private var inStats = false
+        private var inNumplays = false
+        private var numplaysBuffer = ""
 
         func parser(_ parser: XMLParser, didStartElement elementName: String,
                     namespaceURI: String?, qualifiedName qName: String?,
@@ -56,20 +146,42 @@ enum BGGXMLParser {
                 if let val = attributeDict["value"], let r = Double(val) {
                     userRatings[currentId] = r
                 }
+            case "status" where currentId > 0:
+                if attributeDict["wanttoplay"] == "1" { wantToPlay[currentId] = true }
+            case "numplays" where currentId > 0:
+                inNumplays = true
+                numplaysBuffer = ""
             default:
                 break
             }
         }
 
+        func parser(_ parser: XMLParser, foundCharacters string: String) {
+            if inNumplays { numplaysBuffer += string }
+        }
+
         func parser(_ parser: XMLParser, didEndElement elementName: String,
                     namespaceURI: String?, qualifiedName qName: String?) {
             if elementName == "stats" { inStats = false }
+            if elementName == "numplays" {
+                if let n = Int(numplaysBuffer.trimmingCharacters(in: .whitespaces)), n > 0 {
+                    numberOfPlays[currentId] = n
+                }
+                inNumplays = false
+            }
             if elementName == "item" { currentId = 0; inStats = false }
         }
     }
 
-    // SAX delegate for the BGG thing endpoint. Explicit nesting flags (inItem, inStatistics, inRatings)
-    // prevent collisions — BGG XML reuses element names like <rating> at different depths.
+    /// SAX delegate for parsing the `/thing` endpoint.
+    ///
+    /// This is the primary parser for detailed game metadata.
+    ///
+    /// **State Management**:
+    /// BGG XML is deeply nested and reuses element names (e.g., `<rating>` appears for both
+    /// the community average and the user's personal rating). This delegate uses explicit
+    /// state flags (`inItem`, `inStatistics`, `inRatings`) to track context and ensure
+    /// values are mapped to the correct properties.
     private final class ThingDelegate: NSObject, XMLParserDelegate {
         var games: [BGGGame] = []
 
@@ -88,11 +200,15 @@ enum BGGXMLParser {
         private var categories: [String] = []
         private var mechanics: [String] = []
         private var types: [String] = []
+        private var designers: [String] = []
+        private var artists: [String] = []
+        private var publishers: [String] = []
         private var rating: Double = 0
         private var geekRating: Double = 0
         private var bggRank: Int = 0
         private var weight: Double = 0
         private var languageDependence: Int = 0
+        private var minAge: Int = 0
         private var recommendedPlayers: [Int] = []
 
         private var inItem = false
@@ -121,7 +237,7 @@ enum BGGXMLParser {
 
             case "name" where inItem:
                 if attributeDict["type"] == "primary" {
-                    name = unescapeHTML(attributeDict["value"] ?? "")
+                    name = BGGXMLParser.unescapeHTML(attributeDict["value"] ?? "")
                 }
 
             case "yearpublished" where inItem:
@@ -132,14 +248,19 @@ enum BGGXMLParser {
                 maxPlayers = Int(attributeDict["value"] ?? "") ?? 0
             case "playingtime" where inItem:
                 playTime = Int(attributeDict["value"] ?? "") ?? 0
+            case "minage" where inItem:
+                minAge = Int(attributeDict["value"] ?? "") ?? 0
 
             case "link" where inItem:
                 let linkType = attributeDict["type"] ?? ""
-                let value = unescapeHTML(attributeDict["value"] ?? "")
+                let value = BGGXMLParser.unescapeHTML(attributeDict["value"] ?? "")
                 switch linkType {
-                case "boardgamecategory": categories.append(value)
-                case "boardgamemechanic": mechanics.append(value)
+                case "boardgamecategory":  categories.append(value)
+                case "boardgamemechanic":  mechanics.append(value)
                 case "boardgamesubdomain": types.append(value)
+                case "boardgamedesigner":  designers.append(value)
+                case "boardgameartist":    artists.append(value)
+                case "boardgamepublisher": publishers.append(value)
                 default: break
                 }
 
@@ -160,11 +281,16 @@ enum BGGXMLParser {
                 weight = Double(attributeDict["value"] ?? "") ?? 0
 
             case "poll" where inItem:
+                // Always reset first — if name is missing or unknown, an empty
+                // currentPollName makes the inner result/results cases no-op,
+                // preventing state bleed from a previous <poll>.
                 currentPollName = attributeDict["name"] ?? ""
                 if currentPollName == "language_dependence" {
                     langResults = []
                 } else if currentPollName == "suggested_numplayers" {
                     playerGroups = []
+                } else {
+                    currentPollName = ""
                 }
 
             case "results" where !currentPollName.isEmpty:
@@ -208,7 +334,7 @@ enum BGGXMLParser {
             case "image" where inItem:
                 image = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             case "description" where inItem:
-                desc = unescapeHTML(textBuffer.trimmingCharacters(in: .whitespacesAndNewlines))
+                desc = BGGXMLParser.unescapeHTML(textBuffer.trimmingCharacters(in: .whitespacesAndNewlines))
 
             case "statistics":
                 inStatistics = false
@@ -232,27 +358,37 @@ enum BGGXMLParser {
                 currentPollName = ""
 
             case "item":
-                games.append(BGGGame(
-                    bggId: currentItemId,
-                    name: name.isEmpty ? "(unnamed BGG \(currentItemId))" : name,
-                    description: desc,
-                    yearPublished: yearPublished,
-                    image: image,
-                    thumbnail: thumbnail,
-                    minPlayers: minPlayers,
-                    maxPlayers: maxPlayers,
-                    playTime: playTime,
-                    categories: categories,
-                    mechanics: mechanics,
-                    types: types,
-                    weight: weight,
-                    rating: rating,
-                    geekRating: geekRating,
-                    bggRank: bggRank,
-                    userRating: 0,
-                    languageDependence: languageDependence,
-                    recommendedPlayers: recommendedPlayers
-                ))
+                // Skip items with malformed/missing id — a zero bggId would
+                // collide with the @Attribute(.unique) Game row in SwiftData.
+                if currentItemId > 0 {
+                    games.append(BGGGame(
+                        bggId: currentItemId,
+                        name: name.isEmpty ? "(unnamed BGG \(currentItemId))" : name,
+                        description: desc,
+                        yearPublished: yearPublished,
+                        image: image,
+                        thumbnail: thumbnail,
+                        minPlayers: minPlayers,
+                        maxPlayers: maxPlayers,
+                        playTime: playTime,
+                        categories: categories,
+                        mechanics: mechanics,
+                        types: types,
+                        weight: weight,
+                        rating: rating,
+                        geekRating: geekRating,
+                        bggRank: bggRank,
+                        userRating: 0,
+                        wantToPlay: false,
+                        numberOfPlays: 0,
+                        languageDependence: languageDependence,
+                        recommendedPlayers: recommendedPlayers,
+                        designers: designers,
+                        artists: artists,
+                        publishers: publishers,
+                        minAge: minAge
+                    ))
+                }
                 inItem = false
 
             default:
@@ -272,11 +408,15 @@ enum BGGXMLParser {
             categories = []
             mechanics = []
             types = []
+            designers = []
+            artists = []
+            publishers = []
             rating = 0
             geekRating = 0
             bggRank = 0
             weight = 0
             languageDependence = 0
+            minAge = 0
             recommendedPlayers = []
             currentPollName = ""
             langResults = []
@@ -285,8 +425,9 @@ enum BGGXMLParser {
             inRatings = false
         }
 
-        // Returns the language-dependence level with the most community votes (mode).
-        // Returns 0 if no votes were cast (poll absent or all zeros).
+        /// Computes the language-dependence level based on community poll results.
+        ///
+        /// - Returns: The level (1-5) with the most community votes (mode), or 0 if no votes were cast.
         private func computeLanguageDependence() -> Int {
             guard !langResults.isEmpty else { return 0 }
             var bestLevel = 0
@@ -300,8 +441,11 @@ enum BGGXMLParser {
             return bestVotes > 0 ? bestLevel : 0
         }
 
-        // A player count is "recommended" when (Best + Recommended) votes outnumber Not Recommended votes.
-        // This mirrors the threshold BGG uses to display the green/yellow badges on game pages.
+        /// Computes which player counts are "recommended" by the community.
+        ///
+        /// A player count is considered recommended if the sum of "Best" and "Recommended"
+        /// votes exceeds "Not Recommended" votes. This logic matches the badge logic
+        /// seen on BoardGameGeek.com.
         private func computeRecommendedPlayers() -> [Int] {
             var result: [Int] = []
             var seen = Set<Int>()
@@ -314,29 +458,5 @@ enum BGGXMLParser {
             return result
         }
 
-        private func unescapeHTML(_ s: String) -> String {
-            guard s.contains("&") else { return s }
-            var result = s
-            let entities: [(String, String)] = [
-                ("&amp;", "&"),
-                ("&lt;", "<"),
-                ("&gt;", ">"),
-                ("&quot;", "\""),
-                ("&apos;", "'"),
-                ("&#039;", "'"),
-                ("&#39;", "'"),
-                ("&nbsp;", " "),
-                ("&rsquo;", "'"),
-                ("&lsquo;", "'"),
-                ("&rdquo;", "\u{201D}"),
-                ("&ldquo;", "\u{201C}"),
-                ("&mdash;", "—"),
-                ("&ndash;", "–")
-            ]
-            for (entity, replacement) in entities {
-                result = result.replacingOccurrences(of: entity, with: replacement)
-            }
-            return result
-        }
     }
 }

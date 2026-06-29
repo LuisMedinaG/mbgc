@@ -6,12 +6,16 @@ enum HomeTab { case collection, tonight }
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var vibesViewModel = VibesViewModel()
     @State private var tab: HomeTab = .tonight
     @State private var collectionPath: [Collection] = []
+    @State private var finderPath: [Int] = []
+    @State private var finderActive = false   // test running → hide pill/search chrome
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
+    @State private var createKind: CollectionKind?
 
     private var preferredScheme: ColorScheme? {
         switch appearanceMode {
@@ -22,66 +26,93 @@ struct ContentView: View {
     }
 
     // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
-    private var isInDetailView: Bool { !collectionPath.isEmpty && tab == .collection }
+    private var isInDetailView: Bool {
+        (!collectionPath.isEmpty && tab == .collection) ||
+        (!finderPath.isEmpty && tab == .tonight)
+    }
 
     var body: some View {
         Group {
             switch tab {
             case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
-            case .tonight:    FinderView()
+            case .tonight:    FinderView(path: $finderPath, active: $finderActive)
+            }
+        }
+        .overlay {
+            // Tap-away to dismiss the create chooser. No dim — sits under the bottom bar/chooser.
+            if showCreate {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation(.spring(duration: 0.25)) { showCreate = false } }
             }
         }
         .safeAreaInset(edge: .bottom) {
             if !isInDetailView {
-                HStack(alignment: .center) {
-                    HomePillView(tab: $tab)
-                    Spacer()
-                    Button { showSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(Color(.label))
-                            .frame(width: 54, height: 54)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(Circle())
+                VStack(spacing: 0) {
+                    if showCreate {
+                        CreateTypeChooser { kind in
+                            withAnimation(.spring(duration: 0.25)) { showCreate = false }
+                            createKind = kind
+                        }
+                        .transition(.opacity)
                     }
-                    .overlay(alignment: .top) {
-                        if tab == .collection && collectionPath.isEmpty {
-                            Button { showCreate = true } label: {
-                                Image(systemName: "plus")
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 52, height: 52)
-                                    .background(Color.orange)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    HStack(alignment: .center) {
+                        HomePillView(tab: $tab)
+                        Spacer()
+                        HomeChromeButton(systemName: "magnifyingglass", size: 54) {
+                            showSearch = true
+                        }
+                        .accessibilityLabel("Search")
+                        // Plus floats above the search button via overlay so it adds no
+                        // layout height — keeps the search button centered with the pill.
+                        .overlay(alignment: .top) {
+                            if tab == .collection && collectionPath.isEmpty && !showCreate {
+                                Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
+                                    Image(systemName: "plus")
+                                        .font(.title2.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 52, height: 52)
+                                        .background(Color.accentColor)
+                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                }
+                                .accessibilityLabel("New Collection")
+                                .offset(y: -(52 + 10))
+                                .transition(.scale.combined(with: .opacity))
                             }
-                            .offset(y: -62)
                         }
                     }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tab)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 0)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
             }
         }
         .overlay(alignment: .topTrailing) {
             if !isInDetailView && tab != .tonight {
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color(.label))
-                        .frame(width: 44, height: 44)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(Circle())
+                HomeChromeButton(systemName: "gearshape", size: 44) {
+                    showSettings = true
                 }
+                .accessibilityLabel("Settings")
                 .padding(.top, 8)
                 .padding(.trailing, 20)
             }
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
         .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
-        // CreateCollectionSheet has its own @Environment(\.modelContext) — no context capture issue
-        .sheet(isPresented: $showCreate)   { CreateCollectionSheet().preferredColorScheme(preferredScheme) }
+        // CreateCollectionSheet has its own @Environment(\.modelContext)
+        .sheet(item: $createKind) { CreateCollectionSheet(kind: $0).preferredColorScheme(preferredScheme) }
+        .fullScreenCover(isPresented: .init(
+            get: { !hasSeenOnboarding },
+            set: { if !$0 { hasSeenOnboarding = true } })) {
+            OnboardingView { hasSeenOnboarding = true }
+                .preferredColorScheme(preferredScheme)
+        }
+        .animation(.spring(duration: 0.25), value: showCreate)
         .preferredColorScheme(preferredScheme)
+        // Note: avoid .id(appearanceMode) — it would force SwiftUI to rebuild
+        // the entire view tree on theme change, wiping navigation stacks and
+        // sheet state. preferredColorScheme alone is enough.
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
@@ -95,6 +126,23 @@ struct ContentView: View {
     }
 }
 
+struct HomeChromeButton: View {
+    let systemName: String
+    let size: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color(.label))
+                .frame(width: size, height: size)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(Circle())
+        }
+    }
+}
+
 struct HomePillView: View {
     @Binding var tab: HomeTab
 
@@ -103,8 +151,10 @@ struct HomePillView: View {
             pillButton("Collection", icon: "square.stack.fill", for: .collection)
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
-        .background(Color(.secondarySystemBackground))
+        .padding(4)
+        .background(Color.white)
         .clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
         .sensoryFeedback(.selection, trigger: tab)
     }
 
@@ -113,14 +163,16 @@ struct HomePillView: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
+                    .foregroundStyle(Color(red: 0.25, green: 0.35, blue: 0.6))
                 Text(label)
                     .font(.caption2.weight(tab == target ? .semibold : .regular))
+                    .foregroundStyle(tab == target ? Color.primary : .secondary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .foregroundStyle(tab == target ? Color(.systemBackground) : .secondary)
-            .background(tab == target ? Color(.label) : Color.clear)
+            .background(tab == target ? Color(.systemGray5) : Color.clear)
             .clipShape(Capsule())
         }
+        .accessibilityLabel(label)
     }
 }

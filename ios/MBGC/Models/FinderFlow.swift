@@ -68,10 +68,19 @@ enum FinderAxis: String, CaseIterable {
     }
 
     private func vibeOptions(games: [Game], collections: [Collection]) -> [FinderOption] {
-        collections
+        var manualCounts: [String: Int] = [:]
+        for game in games {
+            for collection in game.collections where !collection.isSmart {
+                manualCounts[collection.name, default: 0] += 1
+            }
+        }
+
+        return collections
             .filter { !$0.isDefault }
-            .compactMap { col in
-                let n = games.filter { $0.collections.contains(where: { $0.name == col.name }) }.count
+            .compactMap { col -> FinderOption? in
+                let n = col.isSmart
+                    ? col.smartGames(collections: collections, allGames: games).count
+                    : manualCounts[col.name, default: 0]
                 guard n > 0 else { return nil }
                 return FinderOption(
                     id: "vibe:\(col.name)", label: col.name, count: n,
@@ -84,36 +93,51 @@ enum FinderAxis: String, CaseIterable {
         let cap = FinderConfig.playerCap
         let tints = FinderConfig.playerTints
 
-        // Build a map of playerCount → number of games that support it.
-        var gamesPerCount: [Int: Int] = [:]
+        // Index by player count so options are already ordered and no sort is needed.
+        var gamesPerCount = Array(repeating: 0, count: cap + 1)
         for game in games {
             let lo = game.minPlayers ?? 1
             let hi = min(game.maxPlayers ?? lo, cap)
             guard lo <= hi else { continue }
             for count in lo...hi {
-                gamesPerCount[count, default: 0] += 1
+                gamesPerCount[count] += 1
             }
         }
 
-        return gamesPerCount
-            .sorted { $0.key < $1.key }
-            .enumerated()
-            .map { index, entry in
-                let label = entry.key == 1     ? "Solo"
-                          : entry.key >= cap   ? "\(cap)+"
-                          :                     "\(entry.key) players"
-                return FinderOption(
-                    id: "players:\(entry.key)",
-                    label: label,
-                    count: entry.value,
-                    tint: tints[min(index, tints.count - 1)]
-                )
-            }
+        return (1...cap).compactMap { count -> FinderOption? in
+            let gameCount = gamesPerCount[count]
+            guard gameCount > 0 else { return nil }
+
+            let index = count - 1
+            let label = count == 1   ? "Solo"
+                      : count >= cap ? "\(cap)+"
+                      :                "\(count) players"
+            return FinderOption(
+                id: "players:\(count)",
+                label: label,
+                count: gameCount,
+                tint: tints[min(index, tints.count - 1)]
+            )
+        }
     }
 
     private func durationOptions(games: [Game]) -> [FinderOption] {
-        DurationBucket.allCases.compactMap { bucket in
-            let n = games.filter { bucket.matches($0.playtime) }.count
+        var counts: [DurationBucket: Int] = [:]
+        for game in games {
+            let bucket: DurationBucket
+            if let playtime = game.playtime {
+                bucket = playtime < 30 ? .quick
+                       : playtime <= 60 ? .short
+                       : playtime <= 120 ? .medium
+                       : .long
+            } else {
+                bucket = .unknown
+            }
+            counts[bucket, default: 0] += 1
+        }
+
+        return DurationBucket.allCases.compactMap { bucket -> FinderOption? in
+            let n = counts[bucket, default: 0]
             guard n > 0 else { return nil }
             return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
                                 count: n, tint: FinderConfig.durationTints[bucket])
@@ -145,7 +169,11 @@ enum FinderAxis: String, CaseIterable {
         switch self {
         case .vibe:
             let name = String(option.id.dropFirst("vibe:".count))
-            return games.filter { $0.collections.contains(where: { $0.name == name }) }
+            guard let col = collections.first(where: { $0.name == name }) else { return [] }
+            let filtered = col.isSmart
+                ? col.smartGames(collections: collections, allGames: games)
+                : games.filter { $0.collections.contains(where: { $0.name == name }) }
+            return filtered
 
         case .players:
             // "Supports N" — game is playable with N people when N is in its [min, max] range.

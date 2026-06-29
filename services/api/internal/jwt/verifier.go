@@ -44,9 +44,16 @@ func (c *claims) isAdmin() bool {
 	return false
 }
 
-// Verifier validates Supabase JWTs.
-// Primary path: ES256/RS256 via JWKS (auto-refreshed, public keys only).
-// Legacy path: HS256 via SUPABASE_JWT_SECRET (only when explicitly set).
+// Verifier handles the validation of Supabase-issued JSON Web Tokens (JWTs).
+// It supports a dual-path verification strategy:
+//
+//  1. Primary Path (JWKS): Validates ES256 or RS256 signatures using public keys
+//     automatically fetched and refreshed from Supabase's JWKS endpoint. This is
+//     the modern, recommended approach.
+//
+//  2. Legacy Path (HS256): Validates signatures using a shared secret
+//     (SUPABASE_JWT_SECRET). This is only enabled if the secret is provided
+//     and is intended for backward compatibility with older tokens.
 type Verifier struct {
 	keyfunc jwtlib.Keyfunc
 	issuer  string
@@ -124,7 +131,15 @@ func (v *Verifier) parse(tokenStr string) (*claims, error) {
 	return c, nil
 }
 
-// RequireAuth is middleware that validates the Bearer JWT and populates context.
+// RequireAuth is a middleware that enforces authentication by validating the
+// Bearer JWT provided in the Authorization header.
+//
+// If the token is valid, it extracts the user ID (Subject), username, and
+// admin status, injecting them into the request context for downstream handlers.
+//
+// If the token is missing, malformed, or invalid, it returns a 401 Unauthorized
+// response with a standardized error envelope.
+//
 // ref: auth.JWT_VALIDATION.9 — extracts user identity into request context
 // ref: auth.JWT_VALIDATION.10 — returns 401 for any validation failure
 // ref: profile.ADMIN.3 — admin flag available via httpx.IsAdminFromContext

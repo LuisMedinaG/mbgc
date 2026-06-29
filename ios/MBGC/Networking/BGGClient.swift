@@ -39,14 +39,24 @@ enum BGGError: Error, LocalizedError {
     }
 }
 
-/// Async BGG API client. `actor` isolation serializes all network state — no data races.
+/// Async BGG API client.
+///
+/// This actor provides a centralized and thread-safe interface for interacting with the BoardGameGeek XML API2.
+///
+/// Key Architectural Features:
+/// - **Actor Isolation**: Uses Swift actors to serialize all network state and configuration, ensuring no data races.
+/// - **Pacing & Rate Limiting**: Implements a strict 5-second delay between requests to BGG to avoid aggressive
+///   rate-limiting from their servers.
+/// - **Resilience**: Includes exponential backoff and retries (up to 4 attempts) for transient failures (202, 429, 5xx).
+/// - **Batching**: Handles BGG's batch limit (20 items per request) automatically in `fetchThings`.
 actor BGGClient {
     static let shared = BGGClient()
 
     private let session: URLSession
     private let batchSize = 20   // BGG thing endpoint caps at 20 IDs per request
     private let maxAttempts = 4
-    private let requestDelay: UInt64 = 5_000_000_000 // 5s pre-delay; BGG throttles hard on burst requests
+    private let requestDelay: UInt64 = 5_000_000_000 // 5s between requests; BGG throttles hard on burst requests
+    private var lastRequestTime: Date?
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -55,6 +65,11 @@ actor BGGClient {
         session = URLSession(configuration: config)
     }
 
+    /// Fetches the public collection for a given BGG username.
+    ///
+    /// This method is the entry point for importing a user's library.
+    /// Note: BGG often returns a 202 status when a collection is being prepared;
+    /// the client automatically retries in these cases.
     func fetchCollection(username: String, token: String? = nil) async throws -> CollectionResult {
         var components = URLComponents(string: "https://boardgamegeek.com/xmlapi2/collection")
         components?.queryItems = [
@@ -68,7 +83,7 @@ actor BGGClient {
 
         var delay = requestDelay
         for attempt in 1...maxAttempts {
-            try await Task.sleep(nanoseconds: requestDelay)
+            await waitForRateLimit()
 
             let request = request(for: url, token: token)
 
@@ -102,14 +117,21 @@ actor BGGClient {
                 throw BGGError.xmlParse(error)
             }
         }
-        return CollectionResult(ids: [], userRatings: [:])
+        return CollectionResult(ids: [], userRatings: [:], wantToPlay: [:], numberOfPlays: [:])
     }
 
-    /// `onProgress(done, total)` is called on each completed batch.
+    /// Fetches detailed game data ("things") for a list of BGG IDs.
+    ///
+    /// This method handles batching IDs into groups of 20 and provides progress updates.
+    ///
+    /// - Parameters:
+    ///   - onProgress: A callback invoked after each batch completes, providing (currentCount, totalCount).
     func fetchThings(
         ids: [Int],
         token: String? = nil,
         userRatings: [Int: Double] = [:],
+        wantToPlay: [Int: Bool] = [:],
+        numberOfPlays: [Int: Int] = [:],
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
     ) async throws -> [BGGGame] {
         var allGames: [BGGGame] = []
@@ -121,10 +143,12 @@ actor BGGClient {
             allGames.append(contentsOf: games)
             onProgress?(allGames.count, total)
         }
-        guard !userRatings.isEmpty else { return allGames }
+        if userRatings.isEmpty && wantToPlay.isEmpty && numberOfPlays.isEmpty { return allGames }
         return allGames.map { game in
             var g = game
             g.userRating = userRatings[game.bggId] ?? 0
+            g.wantToPlay = wantToPlay[game.bggId] ?? false
+            g.numberOfPlays = numberOfPlays[game.bggId] ?? 0
             return g
         }
     }
@@ -138,7 +162,7 @@ actor BGGClient {
 
         var delay: UInt64 = 500_000_000
         for attempt in 1...maxAttempts {
-            try await Task.sleep(nanoseconds: requestDelay)
+            await waitForRateLimit()
 
             let request = request(for: url, token: token)
 
@@ -198,5 +222,21 @@ actor BGGClient {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         return request
+    }
+
+    private func waitForRateLimit() async {
+        if let lastRequestTime {
+            let elapsed = Date().timeIntervalSince(lastRequestTime)
+            let waitSeconds = Double(requestDelay) / 1_000_000_000.0 - elapsed
+            if waitSeconds > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(waitSeconds * 1_000_000_000))
+                } catch {
+                    // Task was cancelled, don't update lastRequestTime and just return
+                    return
+                }
+            }
+        }
+        lastRequestTime = Date()
     }
 }
