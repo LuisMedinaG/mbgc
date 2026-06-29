@@ -421,6 +421,11 @@ struct CollectionPickerView: View {
     }
 
     private func setDefaultSelection() {
+        // Keep an existing valid pick — otherwise the @Query refresh after
+        // createAndSelect() would clobber the just-created collection back to Library.
+        if let id = selectedID, collections.contains(where: { $0.persistentModelID == id }) {
+            return
+        }
         selectedID = collections.first(where: { $0.isDefault })?.persistentModelID
             ?? collections.first?.persistentModelID
     }

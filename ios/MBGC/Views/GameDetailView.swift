@@ -73,11 +73,7 @@ struct GameDetailView: View {
     }
 
     private func heroImage(_ game: Game) -> some View {
-        CachedAsyncImage(
-            url: URL(string: game.image ?? game.thumbnail ?? ""),
-            content: { image in image.resizable().aspectRatio(contentMode: .fill) },
-            placeholder: { Rectangle().fill(Color(.systemGray5)) }
-        )
+        CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
         .frame(maxWidth: .infinity)
         .frame(height: 320)
         .clipped()

@@ -1,17 +1,20 @@
 import SwiftUI
 
-/// Drop-in replacement for `AsyncImage` that uses a dedicated URLSession with
-/// a generous URLCache sized for board game thumbnails (~50KB each).
-///
-/// Replaces raw `AsyncImage` in collection rows so thumbnails stay cached
-/// across scroll instead of being re-fetched every time a cell recycles.
+/// Square thumbnail backed by a dedicated URLSession + URLCache sized for board
+/// game art (~50KB each), so images stay cached across scroll instead of being
+/// re-fetched every time a cell recycles.
 ///
 /// Avoids mutating the global `URLCache.shared` (which would affect every
 /// URLSession in the app — including future telemetry / crash reporters).
-struct CachedAsyncImage<Content: View, Placeholder: View>: View {
+///
+/// ponytail: non-generic on purpose. Every call site wants the same square
+/// thumbnail. Add a custom-content/placeholder init only when a screen needs one.
+struct CachedAsyncImage: View {
     let url: URL?
-    let content: (Image) -> Content
-    let placeholder: () -> Placeholder
+    /// Square side length. When nil the image fills its parent — the caller is
+    /// responsible for sizing and clipping (used by hero / full-bleed images).
+    var size: CGFloat?
+    var cornerRadius: CGFloat = 8
 
     @State private var phase: Phase = .empty
 
@@ -22,14 +25,14 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     var body: some View {
         Group {
             switch phase {
-            case .empty, .loading:
-                placeholder()
             case .success(let image):
-                content(image)
-            case .failure:
-                placeholder()
+                image.resizable()
+                    .aspectRatio(contentMode: .fill)
+            case .empty, .loading, .failure:
+                Color(.systemGray5)
             }
         }
+        .modifier(SquareThumbnail(size: size, cornerRadius: cornerRadius))
         .task(id: url) { await load() }
     }
 
@@ -50,25 +53,20 @@ struct CachedAsyncImage<Content: View, Placeholder: View>: View {
     }
 }
 
-extension CachedAsyncImage where Placeholder == Color {
-    /// Convenience initializer for the most common case: square thumbnail
-    /// with a gray placeholder and rounded corners. Use the main init when
-    /// you need a custom placeholder (e.g. ProgressView or shimmer).
-    init(url: URL?, size: CGFloat = 60, cornerRadius: CGFloat = 8) {
-        self.init(
-            url: url,
-            content: { image in
-                image.resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            },
-            placeholder: {
-                Color(.systemGray5)
-                    .frame(width: size, height: size)
-                    .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            }
-        )
+/// Applies a square frame + rounded clip when `size` is set; otherwise no-op so
+/// the parent controls sizing (hero / full-bleed images).
+private struct SquareThumbnail: ViewModifier {
+    let size: CGFloat?
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if let size {
+            content
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        } else {
+            content
+        }
     }
 }
 
