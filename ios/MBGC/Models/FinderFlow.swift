@@ -3,44 +3,66 @@ import SwiftData
 
 // MARK: - Option
 
+/// One selectable option inside a quiz step.
+/// `subtitle` shows optional secondary text under the label (used by duration buckets).
+/// `tint`/`solidBg` are kept for backwards-compat with persisted data, but the UI no
+/// longer reads them — every quiz option now renders through SelectableCard.
 struct FinderOption: Identifiable, Equatable {
     let id: String
     let label: String
     let count: Int
-    var tint: String? = nil    // "#RRGGBB" background; nil = secondarySystemBackground
-    var symbol: String? = nil  // SF Symbol name; nil = no icon
-    var solidBg: Bool = false  // true = full-opacity bg with white text (vibe); false = pastel tint
+    var subtitle: String? = nil
+    var symbol: String? = nil
+    var tint: String? = nil
+    var solidBg: Bool = false
 }
 
 // MARK: - Duration
+//
+// Quiz step 3 buckets aligned with the design spec:
+//   Short  — under 45 min
+//   Medium — 45–90 min
+//   Long   — 90+ min
+//   Any    — matches everything (an explicit "no constraint" option)
+//
+// `quick` and `unknown` are retained for backend filtering so older persisted
+// game data still scores correctly, but the picker never surfaces them.
 
 enum DurationBucket: String, CaseIterable {
-    case quick   = "Quick"
-    case short   = "Short"
-    case medium  = "Medium"
-    case long    = "Long"
-    case unknown = "Open-ended"
+    case short = "Short"
+    case medium = "Medium"
+    case long = "Long"
+    case any = "Any"
+    case quick = "Quick"      // legacy, not surfaced
+    case unknown = "Open-ended"  // legacy, not surfaced
 
-    var subtitle: String {
+    /// Display subtitle shown under the label in the quiz card.
+    var quizSubtitle: String? {
         switch self {
-        case .quick:   return "Under 30 min"
-        case .short:   return "30 – 60 min"
-        case .medium:  return "1 – 2 hours"
-        case .long:    return "2+ hours"
-        case .unknown: return "No time set"
+        case .short:  return "Under 45 min"
+        case .medium: return "45 – 90 min"
+        case .long:   return "90+ min"
+        case .any:    return "No time constraint"
+        default:      return nil
         }
     }
 
     func matches(_ playtime: Int?) -> Bool {
+        // `any` matches everything — including unknown playtimes.
+        if self == .any { return true }
         guard let pt = playtime else { return self == .unknown }
         switch self {
-        case .quick:   return pt < 30
-        case .short:   return pt >= 30 && pt <= 60
-        case .medium:  return pt > 60 && pt <= 120
-        case .long:    return pt > 120
+        case .short:  return pt < 45
+        case .medium: return pt >= 45 && pt <= 90
+        case .long:   return pt > 90
+        case .any:    return true
+        case .quick:  return pt < 30
         case .unknown: return false
         }
     }
+
+    /// Buckets the quiz step surfaces, in display order.
+    static var selectableCases: [DurationBucket] { [.short, .medium, .long, .any] }
 }
 
 // MARK: - Axis
@@ -49,11 +71,12 @@ enum DurationBucket: String, CaseIterable {
 enum FinderAxis: String, CaseIterable {
     case vibe, players, duration
 
+    /// User-facing question title for the step header.
     var question: String {
         switch self {
-        case .vibe:     return "What's the vibe?"
-        case .players:  return "How many players tonight?"
-        case .duration: return "How much time do you have?"
+        case .vibe:     return "Select a Playstyle"
+        case .players:  return "Player Count"
+        case .duration: return "Duration"
         }
     }
 
@@ -68,6 +91,8 @@ enum FinderAxis: String, CaseIterable {
     }
 
     private func vibeOptions(games: [Game], collections: [Collection]) -> [FinderOption] {
+        // Manual collections count their explicit members; smart collections count
+        // the live membership computed by `smartGames`.
         var manualCounts: [String: Int] = [:]
         for game in games {
             for collection in game.collections where !collection.isSmart {
@@ -83,16 +108,18 @@ enum FinderAxis: String, CaseIterable {
                     : manualCounts[col.name, default: 0]
                 guard n > 0 else { return nil }
                 return FinderOption(
-                    id: "vibe:\(col.name)", label: col.name, count: n,
-                    tint: col.effectiveColorHex, symbol: col.effectiveIconName, solidBg: true
+                    id: "vibe:\(col.name)",
+                    label: col.name,
+                    count: n,
+                    symbol: col.effectiveIconName
                 )
             }
+            // Largest membership first → most relevant picks at the top.
+            .sorted { $0.count > $1.count }
     }
 
     private func playerOptions(games: [Game]) -> [FinderOption] {
         let cap = FinderConfig.playerCap
-        let tints = FinderConfig.playerTints
-
         // Index by player count so options are already ordered and no sort is needed.
         var gamesPerCount = Array(repeating: 0, count: cap + 1)
         for game in games {
@@ -107,40 +134,50 @@ enum FinderAxis: String, CaseIterable {
         return (1...cap).compactMap { count -> FinderOption? in
             let gameCount = gamesPerCount[count]
             guard gameCount > 0 else { return nil }
-
-            let index = count - 1
-            let label = count == 1   ? "Solo"
-                      : count >= cap ? "\(cap)+"
-                      :                "\(count) players"
+            let label: String
+            switch count {
+            case 1:    label = "Solo"
+            default:   label = "\(count) players"
+            }
             return FinderOption(
                 id: "players:\(count)",
                 label: label,
                 count: gameCount,
-                tint: tints[min(index, tints.count - 1)]
+                symbol: "person.2.fill"
             )
         }
     }
 
     private func durationOptions(games: [Game]) -> [FinderOption] {
+        // Only surface the four spec-aligned buckets. `quick` and `unknown`
+        // exist for legacy filtering but are not options in the picker.
+        let surfaceBuckets = DurationBucket.selectableCases
         var counts: [DurationBucket: Int] = [:]
+        for bucket in surfaceBuckets { counts[bucket] = 0 }
         for game in games {
             let bucket: DurationBucket
-            if let playtime = game.playtime {
-                bucket = playtime < 30 ? .quick
-                       : playtime <= 60 ? .short
-                       : playtime <= 120 ? .medium
+            if let pt = game.playtime {
+                bucket = pt < 45 ? .short
+                       : pt <= 90 ? .medium
                        : .long
             } else {
-                bucket = .unknown
+                bucket = .any
             }
             counts[bucket, default: 0] += 1
         }
+        // "Any" is always offered — the user might explicitly opt out of a time filter.
+        counts[.any] = games.count
 
-        return DurationBucket.allCases.compactMap { bucket -> FinderOption? in
+        return surfaceBuckets.compactMap { bucket -> FinderOption? in
             let n = counts[bucket, default: 0]
             guard n > 0 else { return nil }
-            return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
-                                count: n, tint: FinderConfig.durationTints[bucket])
+            return FinderOption(
+                id: "duration:\(bucket.rawValue)",
+                label: bucket.rawValue,
+                count: n,
+                subtitle: bucket.quizSubtitle,
+                symbol: bucket == .any ? "infinity" : "clock.fill"
+            )
         }
     }
 
@@ -237,6 +274,41 @@ final class FinderFlow {
     var chosenPlayerCount: Int? {
         picks.first { $0.id.hasPrefix("players:") }
             .flatMap { FinderAxis.playerCount(from: $0.id) }
+    }
+
+    /// Explanations for the "Why this match" card. The renderer collapses
+    /// the labels into a sentence + a row of pills.
+    var chosenPlayerLabel: String? {
+        guard let count = chosenPlayerCount else { return nil }
+        return count == 1 ? "Solo" : "\(count) Players"
+    }
+
+    var chosenVibeLabel: String? {
+        picks.first { $0.id.hasPrefix("vibe:") }
+            .map { String($0.id.dropFirst("vibe:".count)) }
+    }
+
+    var chosenDurationLabel: String? {
+        picks.first { $0.id.hasPrefix("duration:") }
+            .map { String($0.id.dropFirst("duration:".count)) }
+    }
+
+    /// 0–100 match score for a single game, computed against the current picks.
+    /// Used in the full ranking list to display "96% match".
+    func matchPercent(for game: Game) -> Int {
+        // Per-axis filter pass (already done in `survivors`), so the score
+        // contribution comes from the ranking signals only.
+        let w = FinderConfig.rankingWeights
+        let s = FinderConfig.score(game)
+        let axisContribution = funnel.enumerated().reduce(0.0) { sum, item in
+            let pick = item.offset < picks.count ? picks[item.offset] : nil
+            return sum + item.element.scoreContribution(pick: pick, game: game, weights: w)
+        }
+        let raw = s + axisContribution
+        // Calibrate: max realistic score is around the sum of all weights.
+        let ceiling = w.userRating + w.geekRating + w.wantToPlay + w.recommendedPlayers + w.bggRank
+        let pct = ceiling > 0 ? min(max(raw / ceiling, 0), 1) : 0
+        return Int((pct * 100).rounded())
     }
 
     var ranked: [Game] {

@@ -1,8 +1,8 @@
 import SwiftData
 import SwiftUI
 
-enum HomeTab { case collection, tonight }
-
+/// Root switcher: Collection tab ↔ Tonight (finder) tab.
+/// Hides the floating tab bar while the user is inside a detail or quiz flow.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appearanceMode") private var appearanceMode = "system"
@@ -25,10 +25,15 @@ struct ContentView: View {
         }
     }
 
-    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
+    /// Bottom nav is reserved on root screens only — it disappears once the
+    /// user opens a detail (Collection) or the quiz (Tonight).
     private var isInDetailView: Bool {
         (!collectionPath.isEmpty && tab == .collection) ||
         (!finderPath.isEmpty && tab == .tonight)
+    }
+
+    private var shouldShowFloatingNav: Bool {
+        !isInDetailView && !finderActive
     }
 
     var body: some View {
@@ -47,8 +52,8 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !isInDetailView {
-                VStack(spacing: 0) {
+            if shouldShowFloatingNav {
+                VStack(spacing: Spacing.md) {
                     if showCreate {
                         CreateTypeChooser { kind in
                             withAnimation(.spring(duration: 0.25)) { showCreate = false }
@@ -56,46 +61,30 @@ struct ContentView: View {
                         }
                         .transition(.opacity)
                     }
-                    HStack(alignment: .center) {
-                        HomePillView(tab: $tab)
-                        Spacer()
-                        HomeChromeButton(systemName: "magnifyingglass", size: 54) {
-                            showSearch = true
-                        }
-                        .accessibilityLabel("Search")
-                        // Plus floats above the search button via overlay so it adds no
-                        // layout height — keeps the search button centered with the pill.
-                        .overlay(alignment: .top) {
-                            if tab == .collection && collectionPath.isEmpty && !showCreate {
-                                Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
-                                    Image(systemName: "plus")
-                                        .font(.title2.weight(.semibold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 52, height: 52)
-                                        .background(Color.accentColor)
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                                }
-                                .accessibilityLabel("New Collection")
-                                .offset(y: -(52 + 10))
-                                .transition(.scale.combined(with: .opacity))
-                            }
-                        }
-                    }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tab)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 0)
+                    FloatingBottomNav(
+                        tab: $tab,
+                        onSearch: { showSearch = true },
+                        onNew: {
+                            // New Collection is only meaningful on the Collection tab.
+                            guard tab == .collection, collectionPath.isEmpty, !showCreate else { return }
+                            withAnimation(.spring(duration: 0.25)) { showCreate = true }
+                        },
+                        showNewButton: tab == .collection && collectionPath.isEmpty
+                    )
                 }
+                .padding(.horizontal, Spacing.screen)
+                .padding(.top, Spacing.sm)
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !isInDetailView && tab != .tonight {
-                HomeChromeButton(systemName: "gearshape", size: 44) {
+            if shouldShowFloatingNav && tab == .collection {
+                ChromeButton(systemName: "gearshape") {
                     showSettings = true
                 }
                 .accessibilityLabel("Settings")
-                .padding(.top, 8)
-                .padding(.trailing, 20)
+                .padding(.trailing, Spacing.screen)
+                // Clear the Dynamic Island / status bar on every device.
+                .padding(.top, 56)
             }
         }
         .sheet(isPresented: $showSearch)   { SearchView().preferredColorScheme(preferredScheme) }
@@ -110,9 +99,6 @@ struct ContentView: View {
         }
         .animation(.spring(duration: 0.25), value: showCreate)
         .preferredColorScheme(preferredScheme)
-        // Note: avoid .id(appearanceMode) — it would force SwiftUI to rebuild
-        // the entire view tree on theme change, wiping navigation stacks and
-        // sheet state. preferredColorScheme alone is enough.
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
@@ -126,53 +112,44 @@ struct ContentView: View {
     }
 }
 
-struct HomeChromeButton: View {
-    let systemName: String
-    let size: CGFloat
-    let action: () -> Void
+// MARK: — Floating bottom nav
 
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(Color(.label))
-                .frame(width: size, height: size)
-                .background(Color(.secondarySystemBackground))
-                .clipShape(Circle())
-        }
-    }
-}
-
-struct HomePillView: View {
+/// Single floating control surface at the bottom of root screens.
+/// Two tabs (Collection, Tonight), a search button on the trailing edge, and
+/// an optional "+" overlay button on the Collection tab. Replaces the older
+/// white capsule pill so the bar reads as native iOS material.
+struct FloatingBottomNav: View {
     @Binding var tab: HomeTab
+    let onSearch: () -> Void
+    let onNew: () -> Void
+    let showNewButton: Bool
 
     var body: some View {
-        HStack(spacing: 0) {
-            pillButton("Collection", icon: "square.stack.fill", for: .collection)
-            pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
-        }
-        .padding(4)
-        .background(Color.white)
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
-        .sensoryFeedback(.selection, trigger: tab)
-    }
+        HStack(spacing: Spacing.md) {
+            // Capsule tab bar grows to fill, leaving a fixed slot for the
+            // search button on the trailing edge.
+            FloatingTabBar(tab: $tab)
+                .frame(maxWidth: .infinity)
 
-    private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {
-        Button { tab = target } label: {
-            VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 0.25, green: 0.35, blue: 0.6))
-                Text(label)
-                    .font(.caption2.weight(tab == target ? .semibold : .regular))
-                    .foregroundStyle(tab == target ? Color.primary : .secondary)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(tab == target ? Color(.systemGray5) : Color.clear)
-            .clipShape(Capsule())
+            ChromeButton(systemName: "magnifyingglass", size: 56, action: onSearch)
+                .accessibilityLabel("Search")
+                .overlay(alignment: .top) {
+                    if showNewButton {
+                        Button(action: onNew) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 32, height: 32)
+                                .background(Circle().fill(BrandAccent.color))
+                                .overlay(Circle().strokeBorder(Surface.elevated, lineWidth: 2))
+                        }
+                        .accessibilityLabel("New Collection")
+                        .offset(y: -14)
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                }
         }
-        .accessibilityLabel(label)
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tab)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: showNewButton)
     }
 }

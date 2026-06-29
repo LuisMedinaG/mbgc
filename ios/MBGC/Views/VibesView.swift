@@ -16,12 +16,10 @@ struct VibesView: View {
     var body: some View {
         NavigationStack(path: $path) {
             VStack(alignment: .leading, spacing: 0) {
-                // Custom title — matches the large header style in design
-                Text("Collection")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, 20)
-                    .padding(.top, 60)
-                    .padding(.bottom, 4)
+                ScreenTitle("Collection", subtitle: "\(collections.count) \(collections.count == 1 ? "list" : "lists")")
+                    .padding(.horizontal, Spacing.screen)
+                    .padding(.top, Spacing.sm)
+                    .padding(.bottom, Spacing.lg)
 
                 if collections.isEmpty {
                     Spacer()
@@ -36,7 +34,9 @@ struct VibesView: View {
                         NavigationLink(value: col) {
                             collectionRow(col)
                         }
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: Spacing.md, leading: Spacing.lg, bottom: Spacing.md, trailing: Spacing.lg))
+                        .listRowBackground(Surface.card)
+                        .listRowSeparator(.hidden)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if !col.isDefault {
                                 Button(role: .destructive) {
@@ -54,6 +54,7 @@ struct VibesView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationDestination(for: Collection.self) { col in
@@ -86,22 +87,19 @@ struct VibesView: View {
     }
 
     private func collectionRow(_ col: Collection) -> some View {
-        HStack(spacing: 14) {
-            // Icon
+        HStack(spacing: Spacing.lg) {
             collectionIcon(col)
-
-            // Name
             Text(col.name)
-                .font(.headline)
-
+                .font(Typography.bodyEmphasis)
+                .foregroundStyle(.primary)
             Spacer()
-
-            // Count — number only, no "games" label
             Text("\(count(for: col))")
-                .font(.title3.weight(.semibold))
+                .font(Typography.bodyEmphasis)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
+        .padding(.vertical, Spacing.xs)
+        .contentShape(Rectangle())
     }
 
     private func count(for col: Collection) -> Int {
@@ -112,15 +110,15 @@ struct VibesView: View {
 
     private func collectionIcon(_ col: Collection) -> some View {
         let bg: Color = col.isDefault
-            ? .blue
+            ? BrandAccent.color
             : Color(hex: col.effectiveColorHex) ?? .orange
         let icon = col.isDefault ? "square.grid.2x2.fill" : col.effectiveIconName
         return Image(systemName: icon)
-            .font(.system(size: 20, weight: .semibold))
+            .font(.system(size: 18, weight: .semibold))
             .foregroundStyle(.white)
-            .frame(width: 48, height: 48)
+            .frame(width: 44, height: 44)
             .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: Radius.medium))
     }
 }
 
@@ -298,6 +296,8 @@ enum CollectionKind: String, CaseIterable, Identifiable {
 }
 
 /// Inline floating card presented by the "+" button — pick a list type.
+/// One neutral card with three rows. The accent color (not saturated tints)
+/// signals the active state, keeping the chooser calm.
 struct CreateTypeChooser: View {
     let onSelect: (CollectionKind) -> Void
 
@@ -306,31 +306,38 @@ struct CreateTypeChooser: View {
             ForEach(CollectionKind.allCases) { kind in
                 Button { onSelect(kind) } label: { row(kind) }
                     .buttonStyle(.plain)
+                if kind != CollectionKind.allCases.last {
+                    Rectangle()
+                        .fill(Surface.separator)
+                        .frame(height: 1)
+                        .padding(.leading, Spacing.xxl + 44)
+                }
             }
         }
-        .background(Color(red: 0.99, green: 0.98, blue: 0.96))
-        .clipShape(RoundedRectangle(cornerRadius: 32))
-        .shadow(color: .black.opacity(0.15), radius: 24, x: 0, y: 8)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
+        .shadow(color: .black.opacity(0.12), radius: 24, x: 0, y: 8)
+        .padding(.horizontal, Spacing.md)
+        .padding(.bottom, Spacing.md)
     }
 
     private func row(_ kind: CollectionKind) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Spacing.lg) {
             Image(systemName: kind.icon)
-                .font(.system(size: 20, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 48, height: 48)
-                .background(kind.tint)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(BrandAccent.color)
+                .frame(width: 44, height: 44)
+                .background(BrandAccent.tint, in: RoundedRectangle(cornerRadius: Radius.medium))
             VStack(alignment: .leading, spacing: 2) {
-                Text(kind.title).font(.headline).foregroundStyle(.primary)
-                Text(kind.subtitle).font(.subheadline).foregroundStyle(.secondary)
+                Text(kind.title).font(Typography.bodyEmphasis).foregroundStyle(.primary)
+                Text(kind.subtitle).font(Typography.metadata).foregroundStyle(.secondary)
             }
             Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.md)
         .contentShape(Rectangle())
     }
 }

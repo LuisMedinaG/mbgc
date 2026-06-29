@@ -64,14 +64,23 @@ struct SearchView: View {
     }
 
     private func gameRow(_ game: Game) -> some View {
-        HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
+        HStack(spacing: Spacing.md) {
+            GameCoverImage(
+                url: URL(string: game.thumbnail ?? game.image ?? ""),
+                size: 60,
+                cornerRadius: Radius.small
+            )
 
-            if let year = game.yearPublished, year > 0 {
-                Text("\(game.name) ") + Text("(\(year))").foregroundColor(.secondary)
-            } else {
-                Text(game.name)
+            VStack(alignment: .leading, spacing: 2) {
+                if let year = game.yearPublished, year > 0 {
+                    Text("\(game.name) ") + Text("(\(year))").foregroundColor(.secondary)
+                } else {
+                    Text(game.name)
+                        .font(Typography.bodyEmphasis)
+                        .foregroundStyle(.primary)
+                }
             }
         }
+        .padding(.vertical, Spacing.xs)
     }
 }

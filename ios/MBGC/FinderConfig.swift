@@ -5,24 +5,13 @@ enum FinderConfig {
     /// Order of questions in the picker. Reorder or trim to change the funnel.
     static let funnel: [FinderAxis] = [.vibe, .players, .duration]
 
-    /// Largest distinct player count shown; counts at or above this fold into "N+".
+    /// Largest distinct player count shown as a separate option.
+    /// Counts above this could be folded into "N+" but the app currently caps at 5.
     static let playerCap = 5
-
-    /// Player-count button tints, lightest (few players) → deepest (many).
-    static let playerTints = [
-        "#DBEAFE", "#BFDBFE", "#93C5FD", "#60A5FA",
-        "#3B82F6", "#2563EB", "#1D4ED8", "#1E40AF",
-    ]
-
-    /// Duration bucket button tints.
-    static let durationTints: [DurationBucket: String] = [
-        .quick:  "#DCFCE7", .short:   "#FEF9C3", .medium: "#FED7AA",
-        .long:   "#FECACA", .unknown: "#E2E8F0",
-    ]
 
     // MARK: - Ranking
 
-    /// Scoring weights for the "Tonight's Pick" ranking.
+    /// Scoring weights for the "Best Match" ranking.
     /// All signals are normalized to 0–1 before multiplication, so weights are directly comparable.
     /// Higher weight = stronger pull on the final order. Change numbers here to retune.
     struct RankingWeights {

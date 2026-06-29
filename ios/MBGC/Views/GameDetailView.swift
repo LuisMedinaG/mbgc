@@ -20,17 +20,12 @@ struct GameDetailView: View {
                             .ignoresSafeArea(edges: .top)
                         titleSection(game)
                         statsRow(game)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 16)
+                            .padding(.horizontal, Spacing.screen)
+                            .padding(.bottom, Spacing.lg)
                         descriptionSection(game)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 16)
                         tagsSection(game)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 16)
                         linksSection(game)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 16)
+                        Spacer(minLength: Spacing.section)
                     }
                 }
                 .safeAreaInset(edge: .bottom) { bottomBar(game) }
@@ -73,72 +68,82 @@ struct GameDetailView: View {
     private func heroImage(_ game: Game) -> some View {
         CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
         .frame(maxWidth: .infinity)
-        .frame(height: 320)
+        .frame(height: 280)
         .clipped()
     }
 
     private func titleSection(_ game: Game) -> some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Text(game.name)
-                .font(.title2).fontWeight(.bold)
-                .multilineTextAlignment(.center)
-            // dot-separated: year · BGG rating · age+
-            let parts: [String] = [
-                game.yearPublished.map { $0 > 0 ? String($0) : nil } ?? nil,
-                game.rating.map { $0 > 0 ? "BGG \(String(format: "%.1f", $0))" : nil } ?? nil,
-                game.minAge.map { $0 > 0 ? "\($0)+" : nil } ?? nil
-            ].compactMap { $0 }
-            if !parts.isEmpty {
-                Text(parts.joined(separator: " · "))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+                .font(Typography.cardTitle)
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+            GameMetadataRow(
+                rating: game.rating,
+                minPlayers: game.minPlayers,
+                maxPlayers: game.maxPlayers,
+                playtime: game.playtime
+            )
         }
-        .frame(maxWidth: .infinity)
-        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, Spacing.screen)
+        .padding(.top, Spacing.lg)
+        .padding(.bottom, Spacing.md)
     }
 
     private func statsRow(_ game: Game) -> some View {
-        HStack {
-            VStack(spacing: 2) {
-                Text("Players").font(.caption2).foregroundStyle(.secondary)
-                Text(playersStr(game)).font(.title3).fontWeight(.bold)
-                Text("count").font(.caption2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            Divider()
-            VStack(spacing: 2) {
-                Text("Playtime").font(.caption2).foregroundStyle(.secondary)
-                Text(playtimeStr(game)).font(.title3).fontWeight(.bold)
-                Text("minutes").font(.caption2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            Divider()
-            VStack(spacing: 2) {
-                Text("Weight").font(.caption2).foregroundStyle(.secondary)
-                Text(game.weight.map { String(format: "%.1f", $0) } ?? "—").font(.title3).fontWeight(.bold)
-                Text("complexity").font(.caption2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
+        HStack(alignment: .top, spacing: 0) {
+            statBlock(label: "Players",  value: playersStr(game))
+            divider
+            statBlock(label: "Playtime", value: "\(playtimeStr(game)) min")
+            divider
+            statBlock(label: "Weight",   value: game.weight.map { String(format: "%.1f", $0) } ?? "—")
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, Spacing.lg)
+        .frame(maxWidth: .infinity)
+        .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
+    }
+
+    private func statBlock(label: String, value: String) -> some View {
+        VStack(spacing: Spacing.xs) {
+            Text(value)
+                .font(Typography.cardTitle)
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Surface.separator)
+            .frame(width: 1)
+            .frame(maxHeight: 36)
+            .padding(.vertical, Spacing.xs)
     }
 
     private func descriptionSection(_ game: Game) -> some View {
         Group {
             if let desc = game.gameDescription, !desc.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: Spacing.sm) {
                     Text(desc)
-                        .font(.subheadline)
+                        .font(Typography.body)
+                        .foregroundStyle(.secondary)
                         .lineLimit(isDescExpanded ? nil : 4)
+                        .fixedSize(horizontal: false, vertical: true)
                     if !isDescExpanded {
                         Button("Show more") { isDescExpanded = true }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
+                            .font(Typography.bodyEmphasis)
+                            .foregroundStyle(BrandAccent.color)
                     }
                 }
+                .padding(.horizontal, Spacing.screen)
+                .padding(.bottom, Spacing.lg)
             }
         }
     }
@@ -149,41 +154,38 @@ struct GameDetailView: View {
         let types = game.types ?? []
         return Group {
             if !categories.isEmpty || !mechanics.isEmpty || !types.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
                     if !types.isEmpty {
-                        Text("Type").font(.headline)
-                        FlowLayout(spacing: 6) {
-                            ForEach(types, id: \.self) { tagChip($0, color: .indigo) }
-                        }
+                        tagGroup(title: "Type", items: types)
                     }
                     if !categories.isEmpty {
-                        Text("Categories").font(.headline)
-                        FlowLayout(spacing: 6) {
-                            ForEach(categories, id: \.self) { tagChip($0, color: .blue) }
-                        }
+                        tagGroup(title: "Categories", items: categories)
                     }
                     if !mechanics.isEmpty {
-                        Text("Mechanics").font(.headline)
-                        FlowLayout(spacing: 6) {
-                            ForEach(mechanics, id: \.self) { tagChip($0, color: .green) }
-                        }
+                        tagGroup(title: "Mechanics", items: mechanics)
                     }
+                }
+                .padding(.horizontal, Spacing.screen)
+                .padding(.bottom, Spacing.lg)
+            }
+        }
+    }
+
+    private func tagGroup(title: String, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title)
+                .font(Typography.cardTitle)
+                .foregroundStyle(.primary)
+            FlowLayout(spacing: Spacing.sm, runSpacing: Spacing.sm) {
+                ForEach(items, id: \.self) { tag in
+                    TagPill(text: tag)
                 }
             }
         }
     }
 
-    private func tagChip(_ tag: String, color: Color) -> some View {
-        Text(tag)
-            .font(.caption)
-            .padding(.horizontal, 8).padding(.vertical, 4)
-            .background(color.opacity(0.15))
-            .foregroundStyle(color)
-            .clipShape(Capsule())
-    }
-
     private func linksSection(_ game: Game) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Spacing.sm) {
             if let rulesUrl = game.rulesUrl, !rulesUrl.isEmpty, let url = URL(string: rulesUrl) {
                 Link(destination: url) {
                     HStack {
@@ -191,43 +193,53 @@ struct GameDetailView: View {
                         Text("Rules")
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
+                            .foregroundStyle(.secondary)
                     }
+                    .font(Typography.bodyEmphasis)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.lg)
+                    .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
                 }
             }
             let bggId = game.bggId
             if bggId > 0 {
                 Link(destination: URL(string: "https://boardgamegeek.com/boardgame/\(bggId)")!) {
                     HStack {
-                        Image(systemName: "gamecontroller")
+                        Image(systemName: "globe")
                         Text("View on BGG")
                         Spacer()
                         Image(systemName: "arrow.up.right.square")
+                            .foregroundStyle(.secondary)
                     }
+                    .font(Typography.bodyEmphasis)
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.lg)
+                    .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
                 }
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, Spacing.screen)
+        .padding(.bottom, Spacing.lg)
     }
 
     private func bottomBar(_ game: Game) -> some View {
         let nonDefaultCollections = game.collections.filter { !$0.isDefault }
         let label = nonDefaultCollections.isEmpty
-            ? "Add to collection"
-            : "In \(nonDefaultCollections.count) collection\(nonDefaultCollections.count == 1 ? "" : "s")"
+            ? "Add to Collection"
+            : "In \(nonDefaultCollections.count) Collection\(nonDefaultCollections.count == 1 ? "" : "s")"
         return Button { showAddToCollection = true } label: {
             Label(label, systemImage: nonDefaultCollections.isEmpty ? "plus" : "folder.fill")
-                .font(.body.weight(.semibold))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .frame(maxWidth: 320)
-                .background(Color.accentColor)
+                .font(Typography.bodyEmphasis)
                 .foregroundStyle(.white)
-                .clipShape(Capsule())
+                .padding(.vertical, Spacing.lg)
+                .frame(maxWidth: .infinity)
+                .background(Capsule().fill(BrandAccent.color))
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Spacing.screen)
+        .padding(.vertical, Spacing.sm)
+        .background(Surface.elevated.opacity(0.001))   // ensures the bar catches safe-area taps cleanly
     }
 
     private func playersStr(_ game: Game) -> String {
@@ -298,31 +310,4 @@ struct AddToCollectionSheet: View {
     }
 }
 
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing).size
-    }
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
-        for (index, subview) in subviews.enumerated() {
-            subview.place(at: CGPoint(x: bounds.minX + result.positions[index].x,
-                                      y: bounds.minY + result.positions[index].y), proposal: .unspecified)
-        }
-    }
-    struct FlowResult {
-        var size: CGSize = .zero
-        var positions: [CGPoint] = []
-        init(in width: CGFloat, subviews: Subviews, spacing: CGFloat) {
-            var x: CGFloat = 0; var y: CGFloat = 0; var lineHeight: CGFloat = 0
-            for subview in subviews {
-                let sz = subview.sizeThatFits(.unspecified)
-                if x + sz.width > width, x > 0 { x = 0; y += lineHeight + spacing; lineHeight = 0 }
-                positions.append(CGPoint(x: x, y: y))
-                lineHeight = max(lineHeight, sz.height)
-                x += sz.width + spacing
-            }
-            size = CGSize(width: width, height: y + lineHeight)
-        }
-    }
-}
+

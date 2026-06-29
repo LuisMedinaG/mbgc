@@ -3,9 +3,12 @@ import SwiftUI
 
 // MARK: - Container
 
+/// Tonight tab. Holds the three-state machine: intro cover → quiz funnel → result.
+/// `active` flips between intro and the running test so ContentView can hide the
+/// floating nav during the quiz.
 struct FinderView: View {
     @Binding var path: [Int]
-    @Binding var active: Bool   // false = intro cover (chrome visible); true = test running (chrome hidden)
+    @Binding var active: Bool
     @State private var flow = FinderFlow()
     @State private var hapticTrigger = 0
     @State private var goingBack = false
@@ -15,7 +18,7 @@ struct FinderView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                Surface.background.ignoresSafeArea()
 
                 if !flow.hasCollections {
                     FinderEmptyView()
@@ -27,9 +30,9 @@ struct FinderView: View {
                             goingBack = true
                             flow.back()
                         }
-                    }) {
+                    }, onRestart: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { exitTest() }
-                    }
+                    })
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 } else if let axis = flow.currentAxis {
                     FinderStepView(
@@ -45,7 +48,6 @@ struct FinderView: View {
                                 flow.select(option)
                             }
                         },
-                        // Back arrow always present: step >0 goes back a question, step 0 exits the test.
                         onBack: {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
                                 goingBack = true
@@ -91,54 +93,57 @@ private struct FinderStartView: View {
     @State private var showSettings = false
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(.systemBackground), Color.orange.opacity(0.12)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+        ZStack(alignment: .top) {
+            Surface.background.ignoresSafeArea()
 
-            VStack(spacing: 20) {
-                Spacer()
-                Image(systemName: "moon.stars.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(.orange)
-                    .shadow(color: .orange.opacity(0.5), radius: 24, y: 8)
-                VStack(spacing: 12) {
-                    Text("Tonight's Pick")
-                        .font(.largeTitle.bold())
-                    Text("Answer a few quick questions and we'll narrow your collection down to the perfect game.")
-                        .font(.body)
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: Spacing.section)
+
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    Text("Tonight")
+                        .font(.system(size: 17, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                    Text("Best Match")
+                        .font(Typography.screenTitle)
+                        .foregroundStyle(.primary)
+                    Text("Answer a few quick questions and we'll recommend a game from your collection.")
+                        .font(Typography.body)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Button(action: onStart) {
-                    Text("Start")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color.orange)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, Spacing.screen)
+
+                Spacer()
+
+                VStack(spacing: Spacing.md) {
+                    Button(action: onStart) {
+                        Text("Start")
+                            .font(Typography.bodyEmphasis)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.lg)
+                            .background(Capsule().fill(BrandAccent.color))
+                    }
+
+                    Text("Three quick questions · about a minute")
+                        .font(Typography.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 120)
+                .padding(.horizontal, Spacing.screen)
+                .padding(.bottom, Spacing.section)
             }
 
-            VStack {
-                HStack {
-                    Spacer()
-                    HomeChromeButton(systemName: "gearshape", size: 44) {
-                        showSettings = true
-                    }
-                    .accessibilityLabel("Settings")
-                    .padding(.trailing, 20)
-                }
+            HStack {
                 Spacer()
+                ChromeButton(systemName: "gearshape") {
+                    showSettings = true
+                }
+                .accessibilityLabel("Settings")
+                .padding(.trailing, Spacing.screen)
+                // Clear the Dynamic Island / status bar on every device.
+                .padding(.top, 56)
             }
-            .padding(.top, 8)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView(isPresented: $showSettings)
@@ -157,32 +162,15 @@ private struct FinderStepView: View {
     let onSelect: (FinderOption) -> Void
     let onBack: (() -> Void)?
 
-    // ponytail: thresholds match user spec — 2-col ≤4, 3-col 5-9, 4-col scrollable 10+
-    private var cols: Int {
-        switch options.count {
-        case ...4:  return 2
-        case 5...9: return 3
-        default:    return 4
-        }
-    }
-    private var isScrollable: Bool { options.count > 9 }
-    private var rows: Int { (options.count + cols - 1) / cols }
-    private let spacing: CGFloat = 10
-
-    private var gridCols: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: spacing), count: cols)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             header
             questionBlock
-            optionGrid
+            optionList
         }
-        .padding(.bottom, 110)
-        // Swipe right → back, same gesture as FinderResultView. Horizontal-only
-        // threshold (width>80, |height|<80) keeps it from firing while the user
-        // scrolls the option grid vertically.
+        .padding(.bottom, Spacing.floatingNavReserved)
+        // Swipe right → back. Horizontal-only threshold keeps it from firing
+        // while the user scrolls the option list vertically.
         .gesture(
             DragGesture(minimumDistance: 20)
                 .onEnded { v in
@@ -194,163 +182,130 @@ private struct FinderStepView: View {
     private var header: some View {
         HStack {
             if let onBack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color(.label))
-                        .frame(width: 44, height: 44)
-                        .background(.regularMaterial)
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("Back")
+                ChromeButton(systemName: "chevron.left", action: onBack)
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }
             Spacer()
             Text("Step \(step + 1) of \(total)")
-                .font(.caption.weight(.medium))
+                .font(Typography.step)
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Skip") {
                 onSelect(FinderOption(id: "skip", label: "Skip", count: survivorCount))
             }
-            .font(.subheadline.weight(.medium))
+            .font(Typography.bodyEmphasis)
             .foregroundStyle(.secondary)
             .frame(width: 44, height: 44)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .padding(.horizontal, Spacing.screen)
+        // Clear the Dynamic Island / status bar on every device.
+        .padding(.top, 56)
     }
 
     private var questionBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             Text(axis.question)
-                .font(.largeTitle.bold())
-                .foregroundStyle(Color(.label))
+                .font(Typography.screenTitle)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Text("\(survivorCount) \(survivorCount == 1 ? "game" : "games") available")
-                .font(.subheadline)
+                .font(Typography.metadata)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.horizontal, Spacing.screen)
+        .padding(.top, Spacing.lg)
+        .padding(.bottom, Spacing.xxl)
     }
 
-    @ViewBuilder
-    private var optionGrid: some View {
-        if isScrollable {
-            ScrollView {
-                LazyVGrid(columns: gridCols, spacing: spacing) {
-                    ForEach(options) { opt in optionButton(opt).frame(height: 90) }
-                }
-                .padding(.horizontal, 16)
-            }
-            .contentMargins(.bottom, 16, for: .scrollContent)
-        } else {
-            // GeometryReader fills the remaining VStack height so buttons expand to fill the screen.
-            GeometryReader { geo in
-                let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
-                LazyVGrid(columns: gridCols, spacing: spacing) {
-                    ForEach(options) { opt in optionButton(opt).frame(height: max(rowH, 60)) }
+    private var optionList: some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.md) {
+                ForEach(options) { option in
+                    SelectableCard(
+                        label: option.label,
+                        count: option.count,
+                        symbol: option.symbol,
+                        isSelected: false,
+                        onTap: { onSelect(option) }
+                    )
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, Spacing.screen)
+            .padding(.bottom, Spacing.section)
         }
-    }
-
-    private func optionButton(_ option: FinderOption) -> some View {
-        let bg: Color = option.tint.flatMap { Color(hex: $0) } ?? Color(.secondarySystemBackground)
-        let fgPrimary:   Color = option.solidBg ? .white : Color(.label)
-        let fgSecondary: Color = option.solidBg ? .white.opacity(0.75) : .secondary
-
-        return Button { onSelect(option) } label: {
-            VStack(spacing: 6) {
-                if let sym = option.symbol {
-                    Image(systemName: sym)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(fgPrimary)
-                }
-                Text(option.label)
-                    .font(.title2.bold())
-                    .foregroundStyle(fgPrimary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                Text("\(option.count) \(option.count == 1 ? "game" : "games")")
-                    .font(.subheadline)
-                    .foregroundStyle(fgSecondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(bg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-        }
-        .buttonStyle(FinderButtonStyle())
-    }
-}
-
-// Slight press scale — same pattern as the rest of the app
-private struct FinderButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.spring(response: 0.2), value: configuration.isPressed)
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
 // MARK: - Result
 
+/// Final recommendation screen. Shows the top match as a hero card,
+/// "Why this match" explanation, two compact alternatives, and the full ranking.
 struct FinderResultView: View {
     let flow: FinderFlow
     let onBack: (() -> Void)?
     let onRestart: () -> Void
 
     @State private var showAll = false
-    @State private var showRecommendationDetails = false
     @State private var bounce: CGFloat = 0
     @AppStorage("finderStartOverHintSeen") private var hintSeen = false
 
     private var top: [Game] { Array(flow.ranked.prefix(3)) }
+    private var alternatives: [Game] { Array(top.dropFirst()) }
     private var hasMore: Bool { flow.ranked.count > 3 }
+    private var matchCountText: String {
+        "\(flow.survivors.count) matching \(flow.survivors.count == 1 ? "game" : "games")"
+    }
+
+    /// Plain-language explanation of why the top match was chosen.
     private var explanation: String {
-        let selected = flow.picks
-            .filter { $0.id != "skip" }
-            .map(\.label)
-        guard !selected.isEmpty else {
+        var parts: [String] = []
+        if let vibe = flow.chosenVibeLabel { parts.append("your \(vibe.lowercased()) playstyle") }
+        if let players = flow.chosenPlayerLabel { parts.append("\(players.lowercased())") }
+        if let duration = flow.chosenDurationLabel, duration != "Any" {
+            parts.append("a \(duration.lowercased()) session")
+        }
+        guard !parts.isEmpty else {
             return "This game rose to the top from your collection using ratings, rank, and overall fit."
         }
-        return "Chosen because it fits \(selected.joined(separator: ", ")) and ranked highest across your ratings, BGG ratings, and overall fit."
+        return "Matches your preferences for \(parts.joined(separator: ", "))."
+    }
+
+    /// Pills shown under the explanation. Order matters — most relevant signal first.
+    private var explanationPills: [String] {
+        var pills: [String] = []
+        if let vibe = flow.chosenVibeLabel { pills.append(vibe) }
+        if let players = flow.chosenPlayerLabel { pills.append(players) }
+        if let duration = flow.chosenDurationLabel, duration != "Any" {
+            pills.append(duration)
+        }
+        return pills
     }
 
     private var shareTopPick: String? {
         guard let game = top.first else { return nil }
-        return "Tonight's pick: \(game.name)\nhttps://boardgamegeek.com/boardgame/\(game.bggId)"
+        return "Best match: \(game.name)\nhttps://boardgamegeek.com/boardgame/\(game.bggId)"
     }
 
     var body: some View {
-        ZStack {
-            // Ambient background pulled from hero game art
-            if let hero = top.first {
-                CachedAsyncImage(url: URL(string: hero.image ?? hero.thumbnail ?? ""))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .blur(radius: 80)
-                    .opacity(0.25)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
+        ZStack(alignment: .top) {
+            Surface.background.ignoresSafeArea()
 
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: Spacing.section) {
                         // ponytail: overscroll hint, .refreshable still does the work.
                         GeometryReader { geo in
-                            // Real pull (scroll minY) OR the one-time tutorial bounce reveals the hint.
                             let drive = max(geo.frame(in: .named("finderScroll")).minY, bounce)
-                            VStack(spacing: 4) {
+                            VStack(spacing: Spacing.xs) {
                                 Image(systemName: "arrow.down")
                                 Text("Start over…")
                             }
-                            .font(.subheadline)
+                            .font(Typography.metadata)
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity)
                             .opacity(min(max(drive / 60, 0), 1))
@@ -358,15 +313,8 @@ struct FinderResultView: View {
                         }
                         .frame(height: 0)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Tonight's Pick")
-                                .font(.largeTitle.bold())
-                            Text("\(flow.survivors.count) \(flow.survivors.count == 1 ? "game" : "games") matched")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.top, 30)
-                        .id("topPick")
+                        header
+                            .id("topPick")
 
                         if top.isEmpty {
                             ContentUnavailableView(
@@ -374,123 +322,39 @@ struct FinderResultView: View {
                                 systemImage: "questionmark.circle",
                                 description: Text("No games match those filters. Try different answers.")
                             )
+                            .padding(.top, Spacing.section)
                         } else {
                             if let hero = top.first {
                                 NavigationLink(value: hero.bggId) {
-                                    FinderHeroCard(game: hero)
-                                }
-                                .buttonStyle(.plain)
-                                .padding(.top, -14)
-
-                            }
-
-                            let runners = Array(top.dropFirst())
-                            if !runners.isEmpty {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Also great")
-                                        .font(.headline)
-                                        .foregroundStyle(.secondary)
-                                    HStack(spacing: 12) {
-                                        ForEach(runners) { game in
-                                            NavigationLink(value: game.bggId) {
-                                                FinderRunnerCard(game: game)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                            }
-
-                            if showAll {
-                                Button { toggleAll(proxy: proxy) } label: {
-                                    HStack {
-                                        Text("All \(flow.ranked.count) games")
-                                            .font(.headline)
-                                            .foregroundStyle(.secondary)
-                                        Spacer()
-                                        Image(systemName: "chevron.up")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                                }
-                                .buttonStyle(.plain)
-                                .id("allGames")
-                                LazyVStack(spacing: 0) {
-                                    ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
-                                        NavigationLink(value: game.bggId) {
-                                            HStack(spacing: 12) {
-                                                Text("\(idx + 1)")
-                                                    .font(.caption.weight(.bold))
-                                                    .foregroundStyle(.secondary)
-                                                    .frame(width: 24)
-                                                AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                                                    img.resizable().aspectRatio(contentMode: .fill)
-                                                } placeholder: {
-                                                    Color(.systemGray5)
-                                                }
-                                                .frame(width: 44, height: 44)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(game.name).font(.body.weight(.semibold))
-                                                    if let r = game.rating, r > 0 {
-                                                        Label(String(format: "%.1f", r), systemImage: "star.fill")
-                                                            .font(.caption)
-                                                            .foregroundStyle(.secondary)
-                                                    }
-                                                }
-                                                Spacer()
-                                            }
-                                            .padding(.vertical, 10)
-                                            .padding(.horizontal, 16)
-                                            .foregroundStyle(.primary)
-                                        }
-                                        .buttonStyle(.plain)
-
-                                        if idx < flow.ranked.count - 1 {
-                                            Divider().padding(.leading, 96)
-                                        }
-                                    }
-                                }
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-                            }
-
-                            if hasMore {
-                                Button { toggleAll(proxy: proxy) } label: {
-                                    HStack(spacing: 10) {
-                                        Image(systemName: showAll ? "chevron.up" : "list.number")
-                                            .font(.subheadline.weight(.semibold))
-                                        Text(showAll ? "Show less" : "See all \(flow.ranked.count) recommendations")
-                                            .font(.headline)
-                                        Spacer()
-                                        if !showAll {
-                                            Image(systemName: "chevron.right")
-                                                .font(.subheadline.weight(.semibold))
-                                        }
-                                    }
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                                    HeroRecommendationCard(game: hero, matchPercent: flow.matchPercent(for: hero))
                                 }
                                 .buttonStyle(.plain)
                             }
+
+                            if !explanationPills.isEmpty || !explanation.isEmpty {
+                                WhyThisMatchCard(explanation: explanation, pills: explanationPills)
+                            }
+
+                            if !alternatives.isEmpty {
+                                alternativesSection
+                            }
+
+                            fullRankingSection(scrollProxy: proxy)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 72)
+                    .padding(.horizontal, Spacing.screen)
+                    // The bottom navigation bar reserves ~120pt; the result scroll
+                    // needs that much breathing room so the last row clears the nav.
+                    .padding(.bottom, Spacing.floatingNavReserved)
                     .offset(y: bounce)
                 }
                 .coordinateSpace(name: "finderScroll")
                 .scrollIndicators(showAll ? .automatic : .hidden)
-                .refreshable { onRestart() }   // native pull-down → start over (now works collapsed too)
+                .refreshable { onRestart() }
                 .overlay(alignment: .topLeading) { backButton }
-                .overlay(alignment: .topTrailing) { menu }
+                .overlay(alignment: .topTrailing) { shareButton }
                 .task {
-                    // One-time tutorial: dip down + reveal the "Start over…" hint, a few times.
+                    // One-time tutorial: dip down + reveal the "Start over…" hint a few times.
                     guard !hintSeen, !top.isEmpty else { return }
                     try? await Task.sleep(for: .seconds(5))
                     for _ in 0..<3 {
@@ -501,9 +365,6 @@ struct FinderResultView: View {
                     }
                     hintSeen = true
                 }
-                // ponytail: toggle already animated via withAnimation in toggleAll; a
-                // blanket .animation here rasterizes the whole expanding list into one
-                // offscreen layer → "RBLayer: unable to create texture".
             }
         }
         .gesture(
@@ -512,51 +373,142 @@ struct FinderResultView: View {
                     if v.translation.width > 80, abs(v.translation.height) < 80 { onBack?() }
                 }
         )
-        .sheet(isPresented: $showRecommendationDetails) {
-            FinderRecommendationDetailsView(text: explanation)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("Tonight")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("Best Match")
+                .font(Typography.screenTitle)
+                .foregroundStyle(.primary)
+            Text(matchCountText)
+                .font(Typography.body)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, Spacing.xxl)
+    }
+
+    // MARK: Alternatives
+
+    private var alternativesSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            SectionTitle("Alternatives")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.md) {
+                    ForEach(alternatives) { game in
+                        NavigationLink(value: game.bggId) {
+                            AlternativeCard(game: game)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, Spacing.xs)
+            }
+        }
+    }
+
+    // MARK: Full ranking
+
+    @ViewBuilder
+    private func fullRankingSection(scrollProxy: ScrollViewProxy) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            SectionTitle("Full Ranking")
+
+            if showAll {
+                Button { toggleAll(proxy: scrollProxy) } label: {
+                    HStack {
+                        Text("Show less")
+                            .font(Typography.bodyEmphasis)
+                            .foregroundStyle(BrandAccent.color)
+                        Spacer()
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(BrandAccent.color)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                    .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
+                }
+                .buttonStyle(.plain)
+                .id("allGames")
+                .padding(.bottom, Spacing.sm)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
+                        NavigationLink(value: game.bggId) {
+                            FullRankingRow(
+                                rank: idx + 1,
+                                game: game,
+                                matchPercent: flow.matchPercent(for: game)
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        if idx < flow.ranked.count - 1 {
+                            Rectangle()
+                                .fill(Surface.separator)
+                                .frame(height: 1)
+                                .padding(.leading, 76)
+                        }
+                    }
+                }
+                .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
+            }
+
+            if hasMore && !showAll {
+                Button { toggleAll(proxy: scrollProxy) } label: {
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: "list.number")
+                            .font(.system(size: 15, weight: .semibold))
+                        Text("See all \(flow.ranked.count) recommendations")
+                            .font(Typography.bodyEmphasis)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.lg)
+                    .frame(maxWidth: .infinity)
+                    .background(Capsule().fill(BrandAccent.color))
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
     @ViewBuilder private var backButton: some View {
         if let onBack {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(.label))
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .accessibilityLabel("Back")
-            .padding(.leading, 16)
-            .padding(.top, 4)
+            ChromeButton(systemName: "chevron.left", action: onBack)
+                .padding(.leading, Spacing.screen)
+                // Clear the Dynamic Island / status bar on every device.
+                .padding(.top, 56)
         }
     }
 
-    @ViewBuilder private var menu: some View {
-        Menu {
-            Button {
-                showRecommendationDetails = true
-            } label: {
-                Label("Recommendation Details", systemImage: "sparkles")
+    @ViewBuilder private var shareButton: some View {
+        if let shareTopPick {
+            ShareLink(item: shareTopPick) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
             }
-            if let shareTopPick {
-                ShareLink(item: shareTopPick) {
-                    Label("Share Top Pick", systemImage: "square.and.arrow.up")
-                }
-            }
-            Button(role: .destructive, action: onRestart) {
-                Label("Start over", systemImage: "arrow.counterclockwise")
-            }
-        } label: {
-            Image(systemName: "ellipsis")
-                .frame(width: 44, height: 44)
-                .background(.regularMaterial, in: Circle())
-                .tint(.primary)
+            .accessibilityLabel("Share top pick")
+            .padding(.trailing, Spacing.screen)
+            .padding(.top, 56)
+        } else {
+            ChromeButton(systemName: "arrow.counterclockwise", action: onRestart)
+                .padding(.trailing, Spacing.screen)
+                .padding(.top, 56)
         }
-        .padding(.trailing, 16)
-        .padding(.top, 4)
     }
 
     private func toggleAll(proxy: ScrollViewProxy) {
@@ -568,196 +520,173 @@ struct FinderResultView: View {
     }
 }
 
-// MARK: - Card Layout Tokens
+// MARK: - Hero Recommendation Card
 
-/// Shared spacing so hero and runner cards stay consistent.
-/// `imageGap` = artwork → title block. `titleGap` = title → metadata row.
-private enum FinderCardLayout {
-    static let heroImageGap: CGFloat = 14
-    static let heroTitleGap: CGFloat = 8
-
-    static let runnerImageGap: CGFloat = 10
-    static let runnerTitleGap: CGFloat = 4
-}
-
-// MARK: - Hero Card
-
-private struct FinderHeroCard: View {
+private struct HeroRecommendationCard: View {
     let game: Game
+    let matchPercent: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FinderCardLayout.heroImageGap) {
-            CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
-                .frame(maxWidth: .infinity)
-                .frame(height: 300)
-                .background(Color(.systemGray5))
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            // Cover image sits inside the card, never as a backdrop.
+            GameCoverImage(
+                url: URL(string: game.image ?? game.thumbnail ?? ""),
+                size: nil,
+                cornerRadius: Radius.large
+            )
+            .aspectRatio(4.0/3.0, contentMode: .fit)
+            .frame(maxWidth: .infinity)
+            .clipped()
 
-            VStack(alignment: .leading, spacing: FinderCardLayout.heroTitleGap) {
-                Text(game.name)
-                    .font(.title2.bold())
-                    .foregroundStyle(.primary)
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(game.name)
+                        .font(Typography.cardTitle)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                    Spacer(minLength: Spacing.sm)
+                    Text("\(matchPercent)% match")
+                        .font(Typography.metadata)
+                        .foregroundStyle(BrandAccent.color)
+                }
 
-                FinderMetadataRow(game: game, style: .prominent)
+                GameMetadataRow(
+                    rating: game.rating,
+                    minPlayers: game.minPlayers,
+                    maxPlayers: game.maxPlayers,
+                    playtime: game.playtime
+                )
             }
-            .padding(.horizontal, 2)
-            .padding(.top, 4)
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+        .padding(Spacing.xl)
+        .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
     }
 }
 
-// MARK: - Runner Card
+// MARK: - Why This Match Card
 
-private struct FinderRunnerCard: View {
-    let game: Game
+private struct WhyThisMatchCard: View {
+    let explanation: String
+    let pills: [String]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FinderCardLayout.runnerImageGap) {
-            CachedAsyncImage(url: URL(string: game.thumbnail ?? game.image ?? ""))
-                .frame(maxWidth: .infinity)
-                .frame(height: 128)
-                .background(Color(.systemGray5))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            Text("Why this match")
+                .font(Typography.cardTitle)
+                .foregroundStyle(.primary)
 
-            VStack(alignment: .leading, spacing: FinderCardLayout.runnerTitleGap) {
-                Text(game.name)
-                    .font(.caption.weight(.semibold))
-                    .lineLimit(2)
-                    .foregroundStyle(Color(.label))
+            Text(explanation)
+                .font(Typography.body)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
-                FinderMetadataRow(game: game, style: .compact)
+            if !pills.isEmpty {
+                // Wrap onto multiple rows automatically via FlowLayout-free alternative:
+                // a simple HStack + flow would need a custom layout; using a tight
+                // horizontal scroll avoids that and stays calm visually.
+                FlowPills(items: pills)
             }
         }
+        .padding(Spacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+        .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
     }
 }
 
-private struct FinderRecommendationDetailsView: View {
-    let text: String
-    @Environment(\.dismiss) private var dismiss
+/// Wraps a list of pill strings onto multiple lines without horizontal scrolling.
+/// Uses a Layout that wraps children onto rows when they exceed the available width.
+private struct FlowPills: View {
+    let items: [String]
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Text(text)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("How scoring works") {
-                    detailRow("Your rating", "Strongest signal when available", "star.fill", Color(.systemOrange))
-                    detailRow("BGG rating", "Community quality signal", "chart.line.uptrend.xyaxis", Color(.systemBlue))
-                    detailRow("Player fit", "Bonus when BGG recommends the selected player count", "person.2.fill", Color(.systemGreen))
-                    detailRow("BGG rank", "Small tiebreaker for widely respected games", "number", Color(.systemPurple))
-                    detailRow("Want to play", "Nudge for games marked want to play", "heart.fill", Color(.systemPink))
-                }
-
-                Section {
-                    Text("The picker first filters your library by your answers, then sorts matching games by the weighted signals above.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+        FlowLayout(spacing: Spacing.sm, runSpacing: Spacing.sm) {
+            ForEach(items, id: \.self) { item in
+                TagPill(text: item)
             }
-            .navigationTitle("Recommendation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func detailRow(_ title: String, _ subtitle: String, _ symbol: String, _ color: Color) -> some View {
-        Label {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        } icon: {
-            Image(systemName: symbol)
-                .foregroundStyle(color)
         }
     }
 }
 
-private struct FinderMetadataRow: View {
-    enum Style { case prominent, compact }
+// MARK: - Alternative Card
 
+private struct AlternativeCard: View {
     let game: Game
-    let style: Style
 
     var body: some View {
-        HStack(spacing: style == .prominent ? 10 : 6) {
-            if let r = game.rating, r > 0 {
-                metadataLabel(String(format: "%.1f", r), systemImage: "star.fill", color: Color(.systemOrange))
-            }
-            if let lo = game.minPlayers, let hi = game.maxPlayers {
-                metadataLabel(lo == hi ? "\(lo)" : "\(lo)-\(hi)", systemImage: "person.2.fill", color: Color(.systemBlue))
-            }
-            if let pt = game.playtime, pt > 0 {
-                metadataLabel("\(pt)m", systemImage: "clock.fill", color: Color(.systemTeal))
-            }
-        }
-    }
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            GameCoverImage(
+                url: URL(string: game.thumbnail ?? game.image ?? ""),
+                size: nil,
+                cornerRadius: Radius.medium
+            )
+            .aspectRatio(1.0, contentMode: .fit)
+            .frame(maxWidth: .infinity)
 
-    private func metadataLabel(_ text: String, systemImage: String, color: Color) -> some View {
-        Label(text, systemImage: systemImage)
-            .font(style == .prominent ? .caption.weight(.semibold) : .caption2.weight(.semibold))
-            .foregroundStyle(color)
-            .labelStyle(.titleAndIcon)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
+            Text(game.name)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            GameMetadataRow(
+                rating: game.rating,
+                minPlayers: game.minPlayers,
+                maxPlayers: game.maxPlayers,
+                playtime: game.playtime
+            )
+        }
+        .padding(Spacing.md)
+        .frame(width: 160, alignment: .leading)
+        .background(Surface.card, in: RoundedRectangle(cornerRadius: Radius.large))
     }
 }
 
-// MARK: - All Matches Sheet
+// MARK: - Full Ranking Row
 
-private struct FinderAllMatchesView: View {
-    let games: [Game]
-    @Environment(\.dismiss) private var dismiss
+private struct FullRankingRow: View {
+    let rank: Int
+    let game: Game
+    let matchPercent: Int
 
     var body: some View {
-        NavigationStack {
-            List(games) { game in
-                NavigationLink(value: game.bggId) {
-                    HStack(spacing: 12) {
-                        CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 8)
+        HStack(spacing: Spacing.md) {
+            Text("\(rank)")
+                .font(Typography.caption)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+                .frame(width: 28, alignment: .trailing)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(game.name).font(.body.weight(.semibold))
-                            if let r = game.rating, r > 0 {
-                                Label(String(format: "%.1f", r), systemImage: "star.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+            GameCoverImage(
+                url: URL(string: game.thumbnail ?? game.image ?? ""),
+                size: 48,
+                cornerRadius: Radius.small
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(game.name)
+                    .font(Typography.bodyEmphasis)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                Text("\(matchPercent)% match")
+                    .font(Typography.caption)
+                    .foregroundStyle(BrandAccent.color)
             }
-            .navigationTitle("All Matches")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: Int.self) { bggId in
-                GameDetailView(gameId: bggId)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
+
+            Spacer(minLength: Spacing.sm)
+
+            GameMetadataRow(
+                rating: game.rating,
+                minPlayers: game.minPlayers,
+                maxPlayers: game.maxPlayers,
+                playtime: game.playtime
+            )
+            .frame(maxWidth: 160, alignment: .trailing)
         }
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.md)
+        .contentShape(Rectangle())
     }
 }
 
