@@ -828,6 +828,10 @@ struct CollectionDetailView: View {
     @State private var showEditCollection = false
     @State private var showEditRule = false
     @State private var showDeleteCollectionConfirm = false
+    // Remembered app-wide so the chosen layout sticks across collections.
+    @AppStorage("collectionUsesGrid") private var useGrid = false
+
+    private let gridColumns = Array(repeating: GridItem(.flexible(), spacing: Spacing.md), count: 3)
 
     /// Membership source: derived rule set for smart lists, hand-curated games otherwise.
     private var effectiveGames: [Game] {
@@ -932,7 +936,16 @@ struct CollectionDetailView: View {
                                 : "Tap ··· to add games from your Library."
                     )
                 )
+            } else if useGrid {
+                gameGrid
             } else {
+                gameList
+            }
+        }
+    }
+
+    private var gameList: some View {
+        Group {
                 List {
                     if !filters.isEmpty {
                         filterPillsBar
@@ -999,6 +1012,78 @@ struct CollectionDetailView: View {
                     }
                 }
                 .listStyle(.plain)
+        }
+    }
+
+    // MARK: Grid layout
+
+    private var gameGrid: some View {
+        ScrollView {
+            if !filters.isEmpty {
+                filterPillsBar
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, Spacing.sm)
+            }
+            if filteredGames.isEmpty {
+                ContentUnavailableView(
+                    "No Matches",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("No games match your current filters.")
+                )
+                .padding(.top, Spacing.section)
+            } else {
+                LazyVGrid(columns: gridColumns, spacing: Spacing.lg) {
+                    ForEach(filteredGames, id: \.bggId) { game in
+                        gridCell(game)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private func gridCell(_ game: Game) -> some View {
+        if isSelecting {
+            Button { toggleSelection(game) } label: { gridCard(game) }
+                .buttonStyle(.plain)
+        } else {
+            NavigationLink(destination: GameDetailView(gameId: game.bggId)
+                .toolbar(.visible, for: .navigationBar)) {
+                gridCard(game)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func gridCard(_ game: Game) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            GameCoverImage(url: URL(string: game.image ?? game.thumbnail ?? ""),
+                           size: nil, cornerRadius: Radius.medium)
+                .aspectRatio(1, contentMode: .fit)
+                .overlay(alignment: .topLeading) {
+                    if collection.isRanked {
+                        rankBadge(game).padding(6)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isSelecting {
+                        Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                            .font(.title3)
+                            .foregroundStyle(selectedIds.contains(game.bggId) ? BrandAccent.color : .white)
+                            .background(Circle().fill(.black.opacity(0.25)))
+                            .padding(6)
+                    }
+                }
+            Text(game.name)
+                .font(Typography.metadata.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+            if let year = game.yearPublished, year > 0 {
+                Text(String(format: "%d", year))
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -1019,6 +1104,7 @@ struct CollectionDetailView: View {
                 }
             }
             if !effectiveGames.isEmpty {
+                toolbarLayoutItem
                 toolbarFilterItem
                 toolbarSortItem
                 toolbarSelectionItem
@@ -1026,6 +1112,17 @@ struct CollectionDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 collectionMenu
             }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarLayoutItem: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            // Icon shows the layout you'd switch to.
+            Button { useGrid.toggle() } label: {
+                Image(systemName: useGrid ? "list.bullet" : "square.grid.2x2")
+            }
+            .accessibilityLabel(useGrid ? "List view" : "Grid view")
         }
     }
 
