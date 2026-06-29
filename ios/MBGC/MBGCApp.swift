@@ -12,6 +12,7 @@ struct MBGCApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .tint(.indigo)
         }
         .modelContainer(for: [Game.self, Collection.self])
     }

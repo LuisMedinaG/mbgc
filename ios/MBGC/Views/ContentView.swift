@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var collectionPath: [Collection] = []
     @State private var finderPath: [Int] = []
     @State private var finderActive = false   // test running → hide pill/search chrome
+    @State private var finderDone = false     // test complete → show pill again
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
@@ -25,17 +26,18 @@ struct ContentView: View {
         }
     }
 
-    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
+    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict.
+    // Also hide during active finder quiz steps.
     private var isInDetailView: Bool {
         (!collectionPath.isEmpty && tab == .collection) ||
-        (!finderPath.isEmpty && tab == .tonight)
+        (finderActive && !finderDone && tab == .tonight)
     }
 
     var body: some View {
         Group {
             switch tab {
             case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
-            case .tonight:    FinderView(path: $finderPath, active: $finderActive)
+            case .tonight:    FinderView(path: $finderPath, active: $finderActive, isDone: $finderDone)
             }
         }
         .overlay {
@@ -137,8 +139,9 @@ struct HomeChromeButton: View {
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(Color(.label))
                 .frame(width: size, height: size)
-                .background(Color(.secondarySystemBackground))
+                .background(.regularMaterial)
                 .clipShape(Circle())
+                .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
         }
     }
 }
@@ -151,10 +154,10 @@ struct HomePillView: View {
             pillButton("Collection", icon: "square.stack.fill", for: .collection)
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
-        .padding(4)
-        .background(Color.white)
+        .padding(DesignSystem.Spacing.s4)
+        .background(.regularMaterial)
         .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
+        .shadow(color: .black.opacity(0.08), radius: 12, y: 4)
         .sensoryFeedback(.selection, trigger: tab)
     }
 
@@ -163,14 +166,13 @@ struct HomePillView: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 0.25, green: 0.35, blue: 0.6))
                 Text(label)
                     .font(.caption2.weight(tab == target ? .semibold : .regular))
-                    .foregroundStyle(tab == target ? Color.primary : .secondary)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .background(tab == target ? Color(.systemGray5) : Color.clear)
+            .padding(.horizontal, DesignSystem.Spacing.s20)
+            .padding(.vertical, DesignSystem.Spacing.s12)
+            .foregroundStyle(tab == target ? Color.accentColor : .secondary)
+            .background(tab == target ? Color.accentColor.opacity(0.1) : Color.clear)
             .clipShape(Capsule())
         }
         .accessibilityLabel(label)

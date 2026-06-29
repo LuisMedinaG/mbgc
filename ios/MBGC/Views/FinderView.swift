@@ -6,6 +6,7 @@ import SwiftUI
 struct FinderView: View {
     @Binding var path: [Int]
     @Binding var active: Bool   // false = intro cover (chrome visible); true = test running (chrome hidden)
+    @Binding var isDone: Bool   // Bind to flow.isDone so ContentView can show/hide nav
     @State private var flow = FinderFlow()
     @State private var hapticTrigger = 0
     @State private var goingBack = false
@@ -15,7 +16,7 @@ struct FinderView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                Color(.systemGroupedBackground).ignoresSafeArea()
 
                 if !flow.hasCollections {
                     FinderEmptyView()
@@ -71,6 +72,7 @@ struct FinderView: View {
         .onAppear { sync() }
         .onChange(of: allGames)    { sync() }
         .onChange(of: collections) { sync() }
+        .onChange(of: flow.isDone) { isDone = flow.isDone }
     }
 
     private func sync() {
@@ -93,7 +95,7 @@ private struct FinderStartView: View {
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color(.systemBackground), Color.orange.opacity(0.12)],
+                colors: [Color(.systemGroupedBackground), Color.accentColor.opacity(0.1)],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -103,11 +105,11 @@ private struct FinderStartView: View {
                 Spacer()
                 Image(systemName: "moon.stars.fill")
                     .font(.system(size: 64))
-                    .foregroundStyle(.orange)
-                    .shadow(color: .orange.opacity(0.5), radius: 24, y: 8)
+                    .foregroundStyle(Color.accentColor)
+                    .shadow(color: Color.accentColor.opacity(0.3), radius: 24, y: 8)
                 VStack(spacing: 12) {
-                    Text("Tonight's Pick")
-                        .font(.largeTitle.bold())
+                    Text("Best Match")
+                        .font(DesignSystem.Typography.screenTitle)
                     Text("Answer a few quick questions and we'll narrow your collection down to the perfect game.")
                         .font(.body)
                         .foregroundStyle(.secondary)
@@ -120,7 +122,7 @@ private struct FinderStartView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color.orange)
+                        .background(Color.accentColor)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
                 .padding(.horizontal, 20)
@@ -179,7 +181,7 @@ private struct FinderStepView: View {
             questionBlock
             optionGrid
         }
-        .padding(.bottom, 110)
+        .padding(.bottom, 140)
         // Swipe right → back, same gesture as FinderResultView. Horizontal-only
         // threshold (width>80, |height|<80) keeps it from firing while the user
         // scrolls the option grid vertically.
@@ -208,60 +210,135 @@ private struct FinderStepView: View {
             }
             Spacer()
             Text("Step \(step + 1) of \(total)")
-                .font(.caption.weight(.medium))
+                .font(DesignSystem.Typography.stepLabel)
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Skip") {
                 onSelect(FinderOption(id: "skip", label: "Skip", count: survivorCount))
             }
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.secondary)
-            .frame(width: 44, height: 44)
+            .font(DesignSystem.Typography.stepLabel)
+            .foregroundStyle(Color.accentColor)
+            .frame(width: 60, height: 44)
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+        .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
+        .padding(.top, DesignSystem.Spacing.s8)
     }
 
     private var questionBlock: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.s8) {
             Text(axis.question)
-                .font(.largeTitle.bold())
+                .font(DesignSystem.Typography.screenTitle)
                 .foregroundStyle(Color(.label))
                 .fixedSize(horizontal: false, vertical: true)
             Text("\(survivorCount) \(survivorCount == 1 ? "game" : "games") available")
-                .font(.subheadline)
+                .font(DesignSystem.Typography.metadata)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 20)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
+        .padding(.top, DesignSystem.Spacing.sectionVerticalSpacing)
+        .padding(.bottom, DesignSystem.Spacing.s24)
     }
 
     @ViewBuilder
     private var optionGrid: some View {
-        if isScrollable {
+        if axis == .vibe {
             ScrollView {
-                LazyVGrid(columns: gridCols, spacing: spacing) {
-                    ForEach(options) { opt in optionButton(opt).frame(height: 90) }
+                VStack(spacing: DesignSystem.Spacing.s16) {
+                    ForEach(options) { opt in
+                        vibeRow(opt)
+                    }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
             }
-            .contentMargins(.bottom, 16, for: .scrollContent)
+        } else if axis == .players {
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.s12) {
+                    ForEach(options) { opt in
+                        playerRow(opt)
+                    }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
+            }
         } else {
-            // GeometryReader fills the remaining VStack height so buttons expand to fill the screen.
-            GeometryReader { geo in
-                let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
-                LazyVGrid(columns: gridCols, spacing: spacing) {
-                    ForEach(options) { opt in optionButton(opt).frame(height: max(rowH, 60)) }
+            if isScrollable {
+                ScrollView {
+                    LazyVGrid(columns: gridCols, spacing: spacing) {
+                        ForEach(options) { opt in optionButton(opt).frame(height: 90) }
+                    }
+                    .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
                 }
+                .contentMargins(.bottom, 16, for: .scrollContent)
+            } else {
+                GeometryReader { geo in
+                    let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
+                    LazyVGrid(columns: gridCols, spacing: spacing) {
+                        ForEach(options) { opt in optionButton(opt).frame(height: max(rowH, 60)) }
+                    }
+                }
+                .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
             }
-            .padding(.horizontal, 16)
         }
     }
 
+    private func vibeRow(_ option: FinderOption) -> some View {
+        Button { onSelect(option) } label: {
+            HStack(spacing: DesignSystem.Spacing.s16) {
+                if let sym = option.symbol {
+                    Image(systemName: sym)
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 48, height: 48)
+                        .background(Color.accentColor.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(option.label)
+                        .font(DesignSystem.Typography.cardTitle)
+                        .foregroundStyle(Color(.label))
+                    Text("\(option.count) \(option.count == 1 ? "game" : "games")")
+                        .font(DesignSystem.Typography.metadata)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(DesignSystem.Spacing.s16)
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+            .shadow(color: .black.opacity(0.03), radius: 8, y: 4)
+        }
+        .buttonStyle(FinderButtonStyle())
+    }
+
+    private func playerRow(_ option: FinderOption) -> some View {
+        Button { onSelect(option) } label: {
+            HStack {
+                Text(option.label)
+                    .font(DesignSystem.Typography.cardTitle)
+                Spacer()
+                Text("\(option.count) \(option.count == 1 ? "game" : "games")")
+                    .font(DesignSystem.Typography.metadata)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, DesignSystem.Spacing.s20)
+            .padding(.vertical, DesignSystem.Spacing.s16)
+            .background(Color.accentColor.opacity(0.05))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.pill)
+                    .stroke(Color.accentColor.opacity(0.1), lineWidth: 1)
+            )
+            .clipShape(Capsule())
+            .foregroundStyle(Color.accentColor)
+        }
+        .buttonStyle(FinderButtonStyle())
+    }
+
     private func optionButton(_ option: FinderOption) -> some View {
-        let bg: Color = option.tint.flatMap { Color(hex: $0) } ?? Color(.secondarySystemBackground)
+        let bg: Color = option.tint.flatMap { Color(hex: $0) } ?? Color(.secondarySystemGroupedBackground)
         let fgPrimary:   Color = option.solidBg ? .white : Color(.label)
         let fgSecondary: Color = option.solidBg ? .white.opacity(0.75) : .secondary
 
@@ -358,11 +435,11 @@ struct FinderResultView: View {
                         }
                         .frame(height: 0)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Tonight's Pick")
-                                .font(.largeTitle.bold())
+                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.s8) {
+                            Text("Best Match")
+                                .font(DesignSystem.Typography.screenTitle)
                             Text("\(flow.survivors.count) \(flow.survivors.count == 1 ? "game" : "games") matched")
-                                .font(.subheadline)
+                                .font(DesignSystem.Typography.metadata)
                                 .foregroundStyle(.secondary)
                         }
                         .padding(.top, 30)
@@ -380,17 +457,18 @@ struct FinderResultView: View {
                                     FinderHeroCard(game: hero)
                                 }
                                 .buttonStyle(.plain)
-                                .padding(.top, -14)
+                                .padding(.top, -DesignSystem.Spacing.s8)
 
+                                FinderWhyCard(explanation: explanation, picks: flow.picks)
                             }
 
                             let runners = Array(top.dropFirst())
                             if !runners.isEmpty {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Also great")
-                                        .font(.headline)
+                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.s12) {
+                                    Text("Alternatives")
+                                        .font(DesignSystem.Typography.sectionTitle)
                                         .foregroundStyle(.secondary)
-                                    HStack(spacing: 12) {
+                                    HStack(spacing: DesignSystem.Spacing.s12) {
                                         ForEach(runners) { game in
                                             NavigationLink(value: game.bggId) {
                                                 FinderRunnerCard(game: game)
@@ -404,57 +482,52 @@ struct FinderResultView: View {
                             if showAll {
                                 Button { toggleAll(proxy: proxy) } label: {
                                     HStack {
-                                        Text("All \(flow.ranked.count) games")
-                                            .font(.headline)
+                                        Text("Full Ranking (\(flow.ranked.count))")
+                                            .font(DesignSystem.Typography.sectionTitle)
                                             .foregroundStyle(.secondary)
                                         Spacer()
                                         Image(systemName: "chevron.up")
                                             .font(.subheadline.weight(.semibold))
                                             .foregroundStyle(.secondary)
                                     }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 12)
-                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                                    .padding(.horizontal, DesignSystem.Spacing.s16)
+                                    .padding(.vertical, DesignSystem.Spacing.s12)
+                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                                 }
                                 .buttonStyle(.plain)
                                 .id("allGames")
+
                                 LazyVStack(spacing: 0) {
                                     ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
                                         NavigationLink(value: game.bggId) {
-                                            HStack(spacing: 12) {
+                                            HStack(spacing: DesignSystem.Spacing.s12) {
                                                 Text("\(idx + 1)")
-                                                    .font(.caption.weight(.bold))
+                                                    .font(DesignSystem.Typography.metadata.weight(.bold))
                                                     .foregroundStyle(.secondary)
-                                                    .frame(width: 24)
-                                                AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                                                    img.resizable().aspectRatio(contentMode: .fill)
-                                                } placeholder: {
-                                                    Color(.systemGray5)
-                                                }
-                                                .frame(width: 44, height: 44)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                    .frame(width: 28)
+
+                                                CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 48, cornerRadius: 8)
+
                                                 VStack(alignment: .leading, spacing: 2) {
-                                                    Text(game.name).font(.body.weight(.semibold))
-                                                    if let r = game.rating, r > 0 {
-                                                        Label(String(format: "%.1f", r), systemImage: "star.fill")
-                                                            .font(.caption)
-                                                            .foregroundStyle(.secondary)
-                                                    }
+                                                    Text(game.name)
+                                                        .font(DesignSystem.Typography.body.weight(.semibold))
+                                                        .lineLimit(1)
+                                                    FinderMetadataRow(game: game, style: .compact)
                                                 }
                                                 Spacer()
                                             }
-                                            .padding(.vertical, 10)
-                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, DesignSystem.Spacing.s8)
+                                            .padding(.horizontal, DesignSystem.Spacing.s16)
                                             .foregroundStyle(.primary)
                                         }
                                         .buttonStyle(.plain)
 
                                         if idx < flow.ranked.count - 1 {
-                                            Divider().padding(.leading, 96)
+                                            Divider().padding(.leading, 88)
                                         }
                                     }
                                 }
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
                             }
 
                             if hasMore {
@@ -480,8 +553,8 @@ struct FinderResultView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 72)
+                    .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
+                    .padding(.bottom, 140)
                     .offset(y: bounce)
                 }
                 .coordinateSpace(name: "finderScroll")
@@ -586,27 +659,63 @@ private struct FinderHeroCard: View {
     let game: Game
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FinderCardLayout.heroImageGap) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.s16) {
             CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
                 .frame(maxWidth: .infinity)
-                .frame(height: 300)
+                .frame(height: 320)
                 .background(Color(.systemGray5))
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+                .padding(.horizontal, DesignSystem.Spacing.s16)
+                .padding(.top, DesignSystem.Spacing.s16)
 
-            VStack(alignment: .leading, spacing: FinderCardLayout.heroTitleGap) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.s8) {
                 Text(game.name)
-                    .font(.title2.bold())
+                    .font(DesignSystem.Typography.cardTitle.bold())
                     .foregroundStyle(.primary)
 
                 FinderMetadataRow(game: game, style: .prominent)
             }
-            .padding(.horizontal, 2)
-            .padding(.top, 4)
+            .padding(.horizontal, DesignSystem.Spacing.s16)
+            .padding(.bottom, DesignSystem.Spacing.s20)
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+        .shadow(color: .black.opacity(0.05), radius: 12, y: 6)
+    }
+}
+
+private struct FinderWhyCard: View {
+    let explanation: String
+    let picks: [FinderOption]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.s12) {
+            Text("Why this match")
+                .font(DesignSystem.Typography.sectionTitle)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.s16) {
+                Text(explanation)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundStyle(.secondary)
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: DesignSystem.Spacing.s8) {
+                        ForEach(picks.filter { $0.id != "skip" }) { pick in
+                            Text(pick.label)
+                                .font(DesignSystem.Typography.metadata.weight(.medium))
+                                .padding(.horizontal, DesignSystem.Spacing.s12)
+                                .padding(.vertical, DesignSystem.Spacing.s6)
+                                .background(Color.accentColor.opacity(0.1), in: Capsule())
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+            .padding(DesignSystem.Spacing.s16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+            .shadow(color: .black.opacity(0.03), radius: 8, y: 4)
+        }
     }
 }
 
@@ -616,28 +725,25 @@ private struct FinderRunnerCard: View {
     let game: Game
 
     var body: some View {
-        VStack(alignment: .leading, spacing: FinderCardLayout.runnerImageGap) {
+        VStack(alignment: .leading, spacing: DesignSystem.Spacing.s12) {
             CachedAsyncImage(url: URL(string: game.thumbnail ?? game.image ?? ""))
-                .frame(maxWidth: .infinity)
-                .frame(height: 128)
+                .frame(width: 140, height: 140)
                 .background(Color(.systemGray5))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
 
-            VStack(alignment: .leading, spacing: FinderCardLayout.runnerTitleGap) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.s4) {
                 Text(game.name)
-                    .font(.caption.weight(.semibold))
+                    .font(DesignSystem.Typography.metadata.weight(.semibold))
                     .lineLimit(2)
                     .foregroundStyle(Color(.label))
+                    .frame(height: 36, alignment: .top)
 
                 FinderMetadataRow(game: game, style: .compact)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.top, 12)
-        .padding(.bottom, 8)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+        .padding(DesignSystem.Spacing.s12)
+        .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.card))
+        .shadow(color: .black.opacity(0.03), radius: 8, y: 4)
     }
 }
 
@@ -700,22 +806,22 @@ private struct FinderMetadataRow: View {
     let style: Style
 
     var body: some View {
-        HStack(spacing: style == .prominent ? 10 : 6) {
+        HStack(spacing: style == .prominent ? 12 : 8) {
             if let r = game.rating, r > 0 {
-                metadataLabel(String(format: "%.1f", r), systemImage: "star.fill", color: Color(.systemOrange))
+                metadataLabel(String(format: "%.1f", r), systemImage: "star.fill", color: Color.accentColor)
             }
             if let lo = game.minPlayers, let hi = game.maxPlayers {
-                metadataLabel(lo == hi ? "\(lo)" : "\(lo)-\(hi)", systemImage: "person.2.fill", color: Color(.systemBlue))
+                metadataLabel(lo == hi ? "\(lo)" : "\(lo)-\(hi)", systemImage: "person.2.fill", color: .secondary)
             }
             if let pt = game.playtime, pt > 0 {
-                metadataLabel("\(pt)m", systemImage: "clock.fill", color: Color(.systemTeal))
+                metadataLabel("\(pt)m", systemImage: "clock.fill", color: .secondary)
             }
         }
     }
 
     private func metadataLabel(_ text: String, systemImage: String, color: Color) -> some View {
         Label(text, systemImage: systemImage)
-            .font(style == .prominent ? .caption.weight(.semibold) : .caption2.weight(.semibold))
+            .font(style == .prominent ? DesignSystem.Typography.metadata.weight(.medium) : .system(size: 13, weight: .medium))
             .foregroundStyle(color)
             .labelStyle(.titleAndIcon)
             .lineLimit(1)

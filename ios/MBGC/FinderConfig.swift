@@ -9,15 +9,15 @@ enum FinderConfig {
     static let playerCap = 5
 
     /// Player-count button tints, lightest (few players) → deepest (many).
+    /// Using indigo tints to match the app's brand accent color.
     static let playerTints = [
-        "#DBEAFE", "#BFDBFE", "#93C5FD", "#60A5FA",
-        "#3B82F6", "#2563EB", "#1D4ED8", "#1E40AF",
+        "#E0E7FF", "#C7D2FE", "#A5B4FC", "#818CF8", "#6366F1",
     ]
 
-    /// Duration bucket button tints.
+    /// Duration bucket button tints. Neutral/Subtle.
     static let durationTints: [DurationBucket: String] = [
-        .quick:  "#DCFCE7", .short:   "#FEF9C3", .medium: "#FED7AA",
-        .long:   "#FECACA", .unknown: "#E2E8F0",
+        .quick:  "#F5F3FF", .short:   "#EDE9FE", .medium: "#DDD6FE",
+        .long:   "#C4B5FD", .unknown: "#F3F4F6",
     ]
 
     // MARK: - Ranking

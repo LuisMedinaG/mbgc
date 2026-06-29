@@ -15,13 +15,14 @@ struct VibesView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(alignment: .leading, spacing: 0) {
-                // Custom title — matches the large header style in design
+            ZStack {
+                Color(.systemGroupedBackground).ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 0) {
                 Text("Collection")
-                    .font(.largeTitle.bold())
-                    .padding(.horizontal, 20)
+                    .font(DesignSystem.Typography.screenTitle)
+                    .padding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin)
                     .padding(.top, 60)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, DesignSystem.Spacing.s8)
 
                 if collections.isEmpty {
                     Spacer()
@@ -36,7 +37,7 @@ struct VibesView: View {
                         NavigationLink(value: col) {
                             collectionRow(col)
                         }
-                        .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                        .listRowInsets(EdgeInsets(top: 12, leading: DesignSystem.Spacing.screenHorizontalMargin, bottom: 12, trailing: DesignSystem.Spacing.screenHorizontalMargin))
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             if !col.isDefault {
                                 Button(role: .destructive) {
@@ -54,6 +55,7 @@ struct VibesView: View {
                         }
                     }
                     .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
             .navigationDestination(for: Collection.self) { col in
@@ -86,19 +88,19 @@ struct VibesView: View {
     }
 
     private func collectionRow(_ col: Collection) -> some View {
-        HStack(spacing: 14) {
+        HStack(spacing: DesignSystem.Spacing.s16) {
             // Icon
             collectionIcon(col)
 
             // Name
             Text(col.name)
-                .font(.headline)
+                .font(DesignSystem.Typography.cardTitle)
 
             Spacer()
 
             // Count — number only, no "games" label
             Text("\(count(for: col))")
-                .font(.title3.weight(.semibold))
+                .font(DesignSystem.Typography.cardTitle.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
@@ -950,7 +952,7 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
-
+        .safeAreaPadding(.horizontal, DesignSystem.Spacing.screenHorizontalMargin - 16) // Adjust for List's default padding
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             if isSelecting {
@@ -1034,7 +1036,7 @@ struct CollectionDetailView: View {
                             selectedIds = Set(filteredGames.map(\.bggId))
                             pendingAction = .copy
                         } label: {
-                            Text("Copy All").pillLabel(.orange)
+                            Text("Copy All").pillLabel(Color.accentColor)
                         }
                         .disabled(filteredGames.isEmpty)
 
@@ -1042,11 +1044,12 @@ struct CollectionDetailView: View {
                             selectedIds = Set(filteredGames.map(\.bggId))
                             pendingAction = .move
                         } label: {
-                            Text("Move All").pillLabel(.orange)
+                            Text("Move All").pillLabel(Color.accentColor)
                         }
                         .disabled(filteredGames.isEmpty || collection.isDefault)
                     }
-                    .background(Color(.secondarySystemBackground), in: Capsule())
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
 
                     Button {
                         selectedIds = Set(filteredGames.map(\.bggId))
@@ -1054,7 +1057,8 @@ struct CollectionDetailView: View {
                     } label: {
                         Text("Delete All").pillLabel(.red)
                     }
-                    .background(Color(.secondarySystemBackground), in: Capsule())
+                    .background(.regularMaterial, in: Capsule())
+                    .shadow(color: .black.opacity(0.05), radius: 8, y: 4)
                     .disabled(filteredGames.isEmpty)
                 }
                 .buttonStyle(.plain)
@@ -1193,13 +1197,19 @@ struct CollectionDetailView: View {
     }
 
     private func gameRow(_ game: Game) -> some View {
-        HStack(spacing: 14) {
-            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
+        HStack(spacing: DesignSystem.Spacing.s16) {
+            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: DesignSystem.CornerRadius.card)
 
-            if let year = game.yearPublished, year > 0 {
-                Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
-            } else {
-                Text(game.name).bold().font(.subheadline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(game.name)
+                    .font(DesignSystem.Typography.cardTitle)
+                    .lineLimit(1)
+
+                if let year = game.yearPublished, year > 0 {
+                    Text("\(String(format: "%d", year))")
+                        .font(DesignSystem.Typography.metadata)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
     }

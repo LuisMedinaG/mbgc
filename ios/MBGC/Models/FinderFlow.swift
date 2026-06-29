@@ -51,7 +51,7 @@ enum FinderAxis: String, CaseIterable {
 
     var question: String {
         switch self {
-        case .vibe:     return "What's the vibe?"
+        case .vibe:     return "Select a Playstyle"
         case .players:  return "How many players tonight?"
         case .duration: return "How much time do you have?"
         }
