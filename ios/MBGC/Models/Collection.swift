@@ -84,7 +84,7 @@ final class Collection {
 /// Rules that derive a smart list's membership. Persisted as JSON in `Collection.ruleData`.
 /// Lists are referenced by `Collection.id` so renames don't break a rule.
 struct SmartRule: Codable, Equatable {
-    var base:      UUID?         // initial list to start from; nil = entire library
+    var base:      [UUID] = []   // "From selected" lists; their union is the starting set ([] = entire library)
     var combine:   [UUID] = []   // union these lists onto the base
     var intersect: [UUID] = []   // keep only games present in ALL of these
     var subtract:  [UUID] = []   // remove games present in ANY of these (A \ B)
@@ -94,12 +94,34 @@ struct SmartRule: Codable, Equatable {
     var filters:   GameFilters = .init()
 
     var isEmpty: Bool {
-        base == nil && combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
+        base.isEmpty && combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
     }
 
     /// Count of every active selection — drives the "Set Filters" badge.
     var activeCount: Int {
-        (base == nil ? 0 : 1) + combine.count + intersect.count + subtract.count + exclude.count + filters.activeCount
+        base.count + combine.count + intersect.count + subtract.count + exclude.count + filters.activeCount
+    }
+}
+
+// Tolerant decoding: `base` was a single `UUID?` before multi-select. Decode either form.
+// In an extension so the memberwise init (`SmartRule()`) is preserved.
+extension SmartRule {
+    enum CodingKeys: String, CodingKey { case base, combine, intersect, subtract, exclude, filters }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decode([UUID].self, forKey: .base) {
+            base = arr
+        } else if let single = try? c.decode(UUID.self, forKey: .base) {
+            base = [single]                                  // legacy single-base rule
+        } else {
+            base = []
+        }
+        combine   = (try? c.decode([UUID].self, forKey: .combine)) ?? []
+        intersect = (try? c.decode([UUID].self, forKey: .intersect)) ?? []
+        subtract  = (try? c.decode([UUID].self, forKey: .subtract)) ?? []
+        exclude   = (try? c.decode([UUID].self, forKey: .exclude)) ?? []
+        filters   = (try? c.decode(GameFilters.self, forKey: .filters)) ?? .init()
     }
 }
 
@@ -123,30 +145,29 @@ extension Collection {
             list.compactMap { byId[$0] }.map { Set($0.games.map(\.bggId)) }
         }
 
-        // Start from the chosen initial list; nil base + no combine = entire library.
-        var base: Set<Int>
-        if let baseId = rule.base, let c = byId[baseId] {
-            base = Set(c.games.map(\.bggId))
-        } else if !rule.combine.isEmpty {
-            base = []                                  // combine lists become the base
+        // Starting set = union of the "From selected" lists. No base + no combine = entire library.
+        var members: Set<Int>
+        if rule.base.isEmpty && rule.combine.isEmpty {
+            members = Set(allGames.map(\.bggId))
         } else {
-            base = Set(allGames.map(\.bggId))
+            members = []
+            for set in ids(rule.base) { members.formUnion(set) }
         }
 
         // Combine: union the combine lists onto the base.
-        for set in ids(rule.combine) { base.formUnion(set) }
+        for set in ids(rule.combine) { members.formUnion(set) }
 
         // Intersect: keep only games present in every intersect list.
-        for set in ids(rule.intersect) { base.formIntersection(set) }
+        for set in ids(rule.intersect) { members.formIntersection(set) }
 
         // Subtract: remove games present in any subtract list.
-        for set in ids(rule.subtract) { base.subtract(set) }
+        for set in ids(rule.subtract) { members.subtract(set) }
 
         // Exclude: symmetric difference against each exclude list.
-        for set in ids(rule.exclude) { base.formSymmetricDifference(set) }
+        for set in ids(rule.exclude) { members.formSymmetricDifference(set) }
 
-        let members = allGames.filter { base.contains($0.bggId) }
-        return rule.filters.apply(members)
+        let result = allGames.filter { members.contains($0.bggId) }
+        return rule.filters.apply(result)
     }
 }
 

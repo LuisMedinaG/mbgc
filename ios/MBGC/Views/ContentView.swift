@@ -36,36 +36,56 @@ struct ContentView: View {
             case .tonight:    FinderView(path: $finderPath)
             }
         }
+        .overlay {
+            // Tap-away to dismiss the create chooser. No dim — sits under the bottom bar/chooser.
+            if showCreate {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { withAnimation(.spring(duration: 0.25)) { showCreate = false } }
+            }
+        }
         .safeAreaInset(edge: .bottom) {
             if !isInDetailView {
-                HStack(alignment: .center) {
-                    HomePillView(tab: $tab)
-                    Spacer()
-                    Button { showSearch = true } label: {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(Color(.label))
-                            .frame(width: 54, height: 54)
-                            .background(Color(.secondarySystemBackground))
-                            .clipShape(Circle())
+                VStack(spacing: 0) {
+                    if showCreate {
+                        CreateTypeChooser { kind in
+                            withAnimation(.spring(duration: 0.25)) { showCreate = false }
+                            createKind = kind
+                        }
+                        .transition(.opacity)
                     }
-                    .overlay(alignment: .top) {
-                        if tab == .collection && collectionPath.isEmpty {
-                            Button { showCreate = true } label: {
-                                Image(systemName: "plus")
-                                    .font(.title2.weight(.semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 52, height: 52)
-                                    .background(Color.orange)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    HStack(alignment: .center) {
+                        HomePillView(tab: $tab)
+                        Spacer()
+                        Button { showSearch = true } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 20, weight: .medium))
+                                .foregroundStyle(Color(.label))
+                                .frame(width: 54, height: 54)
+                                .background(Color(.secondarySystemBackground))
+                                .clipShape(Circle())
+                        }
+                        .overlay(alignment: .top) {
+                            if tab == .collection && collectionPath.isEmpty && !showCreate {
+                                Button {
+                                    withAnimation(.spring(duration: 0.25)) { showCreate = true }
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .font(.title2.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 52, height: 52)
+                                        .background(Color.orange)
+                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                }
+                                .transition(.scale.combined(with: .opacity))
+                                .offset(y: -62)
                             }
-                            .offset(y: -62)
                         }
                     }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 16)
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -86,22 +106,6 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
         // CreateCollectionSheet has its own @Environment(\.modelContext)
         .sheet(item: $createKind) { CreateCollectionSheet(kind: $0).preferredColorScheme(preferredScheme) }
-        .overlay {
-            if showCreate {
-                Color.black.opacity(0.2)
-                    .ignoresSafeArea()
-                    .onTapGesture { withAnimation(.spring(duration: 0.25)) { showCreate = false } }
-                VStack {
-                    Spacer()
-                    CreateTypeChooser { kind in
-                        withAnimation(.spring(duration: 0.25)) { showCreate = false }
-                        createKind = kind
-                    }
-                    .padding(.bottom, 100)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
         .animation(.spring(duration: 0.25), value: showCreate)
         .preferredColorScheme(preferredScheme)
         .id(appearanceMode)
@@ -126,8 +130,10 @@ struct HomePillView: View {
             pillButton("Collection", icon: "square.stack.fill", for: .collection)
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
+        .padding(4)
         .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
         .sensoryFeedback(.selection, trigger: tab)
     }
 
@@ -140,9 +146,9 @@ struct HomePillView: View {
                     .font(.caption2.weight(tab == target ? .semibold : .regular))
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 10)
-            .foregroundStyle(tab == target ? Color(.systemBackground) : .secondary)
-            .background(tab == target ? Color(.label) : Color.clear)
+            .padding(.vertical, 8)
+            .foregroundStyle(tab == target ? Color.orange : .primary)
+            .background(tab == target ? Color.primary.opacity(0.07) : Color.clear)
             .clipShape(Capsule())
         }
     }

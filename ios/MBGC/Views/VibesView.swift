@@ -320,10 +320,11 @@ struct CreateTypeChooser: View {
                     .buttonStyle(.plain)
             }
         }
-        .background(.background)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.12), radius: 20, x: 0, y: 4)
-        .padding(.horizontal, 20)
+        .background(Color(red: 0.99, green: 0.98, blue: 0.96))
+        .clipShape(RoundedRectangle(cornerRadius: 32))
+        .shadow(color: .black.opacity(0.15), radius: 24, x: 0, y: 8)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
     }
 
     private func row(_ kind: CollectionKind) -> some View {
@@ -508,14 +509,17 @@ struct SmartListEditor: View {
     let onSave: (SmartRule) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var activeBucket: Bucket?
-    @State private var showBasePicker = false
+    @State private var showBaseSelect = false
     @State private var baseSelected: Bool
     @State private var showTitlePicker = false
     @State private var activeChecklist: SetFilterField?
 
-    private var baseName: String {
-        guard let id = rule.base else { return "Library" }
-        return lists.first { $0.id == id }?.name ?? "Library"
+    private var baseCollections: [Collection] { lists.filter { rule.base.contains($0.id) } }
+
+    private var baseSummary: String {
+        if rule.base.isEmpty { return "Library" }
+        if rule.base.count == 1 { return baseCollections.first?.name ?? "Library" }
+        return "\(rule.base.count) lists"
     }
 
     init(rule: SmartRule, lists: [Collection], allGames: [Game], onSave: @escaping (SmartRule) -> Void) {
@@ -523,7 +527,7 @@ struct SmartListEditor: View {
         self.lists = lists
         self.allGames = allGames
         self.onSave = onSave
-        _baseSelected = State(initialValue: rule.base != nil || !rule.combine.isEmpty || !rule.intersect.isEmpty || !rule.subtract.isEmpty || !rule.exclude.isEmpty)
+        _baseSelected = State(initialValue: !rule.base.isEmpty || !rule.combine.isEmpty || !rule.intersect.isEmpty || !rule.subtract.isEmpty || !rule.exclude.isEmpty)
     }
 
     enum Bucket: String, CaseIterable, Identifiable {
@@ -535,14 +539,6 @@ struct SmartListEditor: View {
             case .intersect: return "square.on.square.intersection.dashed"
             case .subtract:  return "minus.square"
             case .exclude:   return "xmark.square"
-            }
-        }
-        var subtitle: String {
-            switch self {
-            case .combine:   return "Union — games in any of these lists"
-            case .intersect: return "Only games in all of these lists"
-            case .subtract:  return "Remove games in any of these lists"
-            case .exclude:   return "Games in exactly one side"
             }
         }
     }
@@ -570,9 +566,15 @@ struct SmartListEditor: View {
                 Section("Lists") {
                     baseRow
                     if baseSelected {
+                        fromSelectedGroup
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
                         ForEach(Bucket.allCases) { bucket in
-                            Button { activeBucket = bucket } label: { bucketRow(bucket) }
-                                .buttonStyle(.plain)
+                            operationRow(bucket)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                         }
                     }
                 }
@@ -589,15 +591,22 @@ struct SmartListEditor: View {
             .sheet(item: $activeBucket) { bucket in
                 ListPickerSheet(
                     title: bucket.rawValue,
-                    lists: lists.filter { $0.id != rule.base },
+                    lists: lists.filter { !rule.base.contains($0.id) },
                     selected: Binding(
                         get: { Set(ids(bucket)) },
                         set: { setIds(Array($0), bucket) }
                     )
                 )
             }
-            .sheet(isPresented: $showBasePicker, onDismiss: { baseSelected = true }) {
-                BasePickerSheet(lists: lists, selected: $rule.base)
+            .sheet(isPresented: $showBaseSelect) {
+                ListPickerSheet(
+                    title: "Select Lists",
+                    lists: lists,
+                    selected: Binding(
+                        get: { Set(rule.base) },
+                        set: { rule.base = Array($0) }
+                    )
+                )
             }
             .sheet(item: $activeChecklist) { field in
                 ChecklistPickerSheet(
@@ -617,11 +626,8 @@ struct SmartListEditor: View {
 
     private var baseRow: some View {
         HStack(spacing: 12) {
-            Image(systemName: "square.stack.3d.up").frame(width: 24).foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Initial list").font(.body).foregroundStyle(.primary)
-                Text("Start from this collection").font(.caption).foregroundStyle(.secondary)
-            }
+            Image(systemName: "list.bullet.rectangle").frame(width: 24).foregroundStyle(Color.red)
+            Text("Lists").font(.body).foregroundStyle(.primary)
             Spacer()
             baseMenu
         }
@@ -631,19 +637,19 @@ struct SmartListEditor: View {
         Menu {
             Button {
                 baseSelected = false
-                rule.base = nil
+                rule.base = []
                 rule.combine = []; rule.intersect = []; rule.subtract = []; rule.exclude = []
             } label: {
                 if baseSelected { Text("Off") } else { Label("Off", systemImage: "checkmark") }
             }
             Button {
-                showBasePicker = true
+                baseSelected = true                       // reveal ops panel inline; no sheet
             } label: {
                 if baseSelected { Label("Choose…", systemImage: "checkmark") } else { Text("Choose…") }
             }
         } label: {
             HStack(spacing: 3) {
-                Text(baseSelected ? baseName : "Off")
+                Text(baseSelected ? "Choose…" : "Off")
                     .foregroundStyle(baseSelected ? Color.accentColor : .secondary)
                 Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
             }
@@ -654,19 +660,68 @@ struct SmartListEditor: View {
         }
     }
 
-    private func bucketRow(_ bucket: Bucket) -> some View {
-        let count = ids(bucket).count
-        return HStack(spacing: 12) {
-            Image(systemName: bucket.icon).frame(width: 24).foregroundStyle(Color.accentColor)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(bucket.rawValue).font(.body).foregroundStyle(.primary)
-                Text(bucket.subtitle).font(.caption).foregroundStyle(.secondary)
-            }
+    private var fromSelectedRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checklist").frame(width: 24).foregroundStyle(Color.accentColor)
+            Text("From selected").font(.body).foregroundStyle(.primary)
             Spacer()
-            Text(count == 0 ? "Off" : "\(count)")
-                .foregroundStyle(count == 0 ? .secondary : Color.accentColor)
-                .font(.subheadline.weight(.medium))
-            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.secondary)
+            HStack(spacing: 3) {
+                Text(baseSummary).foregroundStyle(rule.base.isEmpty ? .secondary : Color.accentColor)
+                Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+            }
+            .font(.subheadline.weight(.medium))
+        }
+        .contentShape(Rectangle())
+        .onTapGesture { showBaseSelect = true }
+    }
+
+    private func selectedBaseRow(_ list: Collection) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: list.isDefault ? "square.grid.2x2.fill" : list.effectiveIconName)
+                .foregroundStyle(Color(hex: list.effectiveColorHex) ?? .orange).frame(width: 24)
+            Text(list.name)
+            Spacer()
+            Text("\(list.games.count)").foregroundStyle(.secondary).monospacedDigit()
+        }
+    }
+
+    // "From selected" + the chosen base lists, grouped in one tinted box.
+    private var fromSelectedGroup: some View {
+        VStack(spacing: 0) {
+            fromSelectedRow
+                .padding(.horizontal, 14).padding(.vertical, 12)
+            ForEach(baseCollections) { list in
+                Divider().padding(.leading, 14)
+                selectedBaseRow(list)
+                    .padding(.horizontal, 14).padding(.vertical, 12)
+            }
+        }
+        .background(Color(red: 1.0, green: 0.95, blue: 0.82).opacity(0.9))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // One set operation, indented under the base with a ↳ and its own tinted capsule.
+    private func operationRow(_ bucket: Bucket) -> some View {
+        let count = ids(bucket).count
+        return HStack(spacing: 8) {
+            Image(systemName: "arrow.turn.down.right")
+                .font(.subheadline).foregroundStyle(.secondary).frame(width: 18)
+            Button { activeBucket = bucket } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: bucket.icon).frame(width: 24).foregroundStyle(.primary)
+                    Text(bucket.rawValue).font(.body).foregroundStyle(.primary)
+                    Spacer()
+                    if count > 0 {
+                        Text("\(count)").foregroundStyle(Color.accentColor).font(.subheadline.weight(.medium))
+                    }
+                    Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 14)
+                .background(Color(.systemGray5))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
     }
 }
@@ -701,61 +756,16 @@ struct ListPickerSheet: View {
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear") { selected.removeAll() }
+                        .foregroundStyle(.red).disabled(selected.isEmpty)
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }.fontWeight(.semibold)
                 }
             }
         }
         .presentationDetents([.medium, .large])
-    }
-}
-
-/// Single-select picker for a smart list's initial collection (or the entire library).
-struct BasePickerSheet: View {
-    let lists: [Collection]
-    @Binding var selected: UUID?
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                baseOption(name: "Library", icon: "square.grid.2x2.fill", tint: .blue, isSelected: selected == nil) {
-                    selected = nil
-                }
-                ForEach(lists.filter { !$0.isDefault }) { list in
-                    baseOption(
-                        name: list.name,
-                        icon: list.effectiveIconName,
-                        tint: Color(hex: list.effectiveColorHex) ?? .orange,
-                        isSelected: selected == list.id
-                    ) { selected = list.id }
-                }
-            }
-            .listStyle(.plain)
-            .navigationTitle("Initial List")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.fontWeight(.semibold)
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func baseOption(name: String, icon: String, tint: Color, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon).foregroundStyle(tint).frame(width: 24)
-                Text(name).foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                    .font(.title3)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
 
@@ -958,17 +968,16 @@ struct CollectionDetailView: View {
                     Button("Done") { exitSelection() }
                 }
             } else {
-                // Smart filter always visible so empty smart lists can still be configured.
-                if collection.isSmart {
-                    ToolbarItem(placement: .topBarTrailing) {
+                // First capsule: filter + sort + select
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    // Smart filter always visible so empty smart lists can still be configured.
+                    if collection.isSmart {
                         Button { showEditRule = true } label: {
                             Image(systemName: "line.3.horizontal.decrease.circle")
                         }
                     }
-                }
-                if !effectiveGames.isEmpty {
-                    if !collection.isSmart && !collection.isRanked {
-                        ToolbarItem(placement: .topBarTrailing) {
+                    if !effectiveGames.isEmpty {
+                        if !collection.isSmart {
                             Button { showFilters = true } label: {
                                 Image(systemName: filters.isEmpty
                                     ? "line.3.horizontal.decrease.circle"
@@ -976,10 +985,8 @@ struct CollectionDetailView: View {
                             }
                             .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
                         }
-                    }
-                    // Ranked lists are manually ordered (long-press a row to drag) — no attribute sort.
-                    if !collection.isRanked {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        // Ranked lists are manually ordered (long-press a row to drag) — no attribute sort.
+                        if !collection.isRanked {
                             Menu {
                                 Button { sortAscending.toggle() } label: {
                                     Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
@@ -1004,15 +1011,14 @@ struct CollectionDetailView: View {
                             }
                             .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
                         }
-                    }
-                    if !collection.isSmart {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        if !collection.isSmart {
                             Button { isSelecting = true } label: {
                                 Image(systemName: "checkmark.circle")
                             }
                         }
                     }
                 }
+                // Second capsule: ellipsis
                 ToolbarItem(placement: .topBarTrailing) {
                     collectionMenu
                 }

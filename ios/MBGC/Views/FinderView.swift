@@ -223,85 +223,151 @@ struct FinderResultView: View {
     let flow: FinderFlow
     let onRestart: () -> Void
 
-    @State private var showingAll = false
+    @State private var showAll = false
 
     private var top: [Game] { Array(flow.ranked.prefix(3)) }
+    private var hasMore: Bool { flow.ranked.count > 3 }
+
+    private var shareTopPick: String? {
+        guard let game = top.first else { return nil }
+        return "Tonight's pick: \(game.name)\nhttps://boardgamegeek.com/boardgame/\(game.bggId)"
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Tonight's Pick")
-                        .font(.largeTitle.bold())
-                    Text("\(flow.survivors.count) \(flow.survivors.count == 1 ? "game" : "games") matched")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 24)
-
-                if top.isEmpty {
-                    ContentUnavailableView(
-                        "No Matches",
-                        systemImage: "questionmark.circle",
-                        description: Text("No games match those filters. Try different answers.")
-                    )
-                } else {
-                    if let hero = top.first {
-                        NavigationLink(value: hero.bggId) {
-                            FinderHeroCard(game: hero)
-                        }
-                        .buttonStyle(.plain)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Tonight's Pick")
+                            .font(.largeTitle.bold())
+                        Text("\(flow.survivors.count) \(flow.survivors.count == 1 ? "game" : "games") matched")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    .padding(.top, 24)
+                    .id("topPick")
 
-                    let runners = Array(top.dropFirst())
-                    if !runners.isEmpty {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Also great")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                            HStack(spacing: 12) {
-                                ForEach(runners) { game in
-                                    NavigationLink(value: game.bggId) {
-                                        FinderRunnerCard(game: game)
+                    if top.isEmpty {
+                        ContentUnavailableView(
+                            "No Matches",
+                            systemImage: "questionmark.circle",
+                            description: Text("No games match those filters. Try different answers.")
+                        )
+                    } else {
+                        if let hero = top.first {
+                            NavigationLink(value: hero.bggId) {
+                                FinderHeroCard(game: hero)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        let runners = Array(top.dropFirst())
+                        if !runners.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Also great")
+                                    .font(.headline)
+                                    .foregroundStyle(.secondary)
+                                HStack(spacing: 12) {
+                                    ForEach(runners) { game in
+                                        NavigationLink(value: game.bggId) {
+                                            FinderRunnerCard(game: game)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                    .buttonStyle(.plain)
                                 }
                             }
                         }
+
+                        if showAll {
+                            Text("All \(flow.ranked.count) games")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                                .id("allGames")
+                            LazyVStack(spacing: 0) {
+                                ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
+                                    NavigationLink(value: game.bggId) {
+                                        HStack(spacing: 12) {
+                                            Text("\(idx + 1)")
+                                                .font(.caption.weight(.bold))
+                                                .foregroundStyle(.secondary)
+                                                .frame(width: 24)
+                                            AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
+                                                img.resizable().aspectRatio(contentMode: .fill)
+                                            } placeholder: {
+                                                Color(.systemGray5)
+                                            }
+                                            .frame(width: 44, height: 44)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(game.name).font(.body.weight(.semibold))
+                                                if let r = game.rating, r > 0 {
+                                                    Label(String(format: "%.1f", r), systemImage: "star.fill")
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                            }
+                                            Spacer()
+                                        }
+                                        .padding(.vertical, 10)
+                                        .foregroundStyle(.primary)
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    if idx < flow.ranked.count - 1 {
+                                        Divider().padding(.leading, 80)
+                                    }
+                                }
+                            }
+                        }
+
+                        if hasMore {
+                            Button { toggleAll(proxy: proxy) } label: {
+                                Label(showAll ? "Show less" : "See all \(flow.ranked.count) recommendations",
+                                      systemImage: showAll ? "chevron.up" : "list.number")
+                                    .font(.subheadline.weight(.medium))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.secondary)
+                        }
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 72)
+            }
+            .scrollIndicators(showAll ? .automatic : .hidden)
+            .refreshable { onRestart() }   // ponytail: native pull-down → start over
+            .overlay(alignment: .topTrailing) { menu }
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showAll)
+        }
+    }
 
-                VStack(spacing: 12) {
-                    if flow.survivors.count > 3 {
-                        Button { showingAll = true } label: {
-                            Text("See all \(flow.survivors.count) games")
-                                .font(.body.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 14)
-                                .background(Color(.secondarySystemBackground))
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
-                                .foregroundStyle(Color(.label))
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Button(action: onRestart) {
-                        Text("Start over")
-                            .font(.body.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.orange)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                    .buttonStyle(.plain)
+    @ViewBuilder private var menu: some View {
+        Menu {
+            if let shareTopPick {
+                ShareLink(item: shareTopPick) {
+                    Label("Share Top Pick", systemImage: "square.and.arrow.up")
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 120)
+            Button(role: .destructive, action: onRestart) {
+                Label("Start over", systemImage: "arrow.counterclockwise")
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial, in: Circle())
+                .tint(.primary)
         }
-        .sheet(isPresented: $showingAll) {
-            FinderAllMatchesView(games: flow.ranked)
+        .padding(.trailing, 16)
+        .padding(.top, 4)
+    }
+
+    private func toggleAll(proxy: ScrollViewProxy) {
+        let expanding = !showAll
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showAll = expanding }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation { proxy.scrollTo(expanding ? "allGames" : "topPick", anchor: .top) }
         }
     }
 }
@@ -313,13 +379,17 @@ private struct FinderHeroCard: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 260)
+            Color(.systemGray5)
+                .overlay {
+                    AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        Color(.systemGray5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 260)
+                .clipped()
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.7)],
@@ -363,19 +433,23 @@ private struct FinderRunnerCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            AsyncImage(url: URL(string: game.thumbnail ?? game.image ?? "")) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 110)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            // ponytail: Color.clear + overlay forces fill-to-frame so every thumbnail is identical size
+            Color(.systemGray5)
+                .overlay {
+                    AsyncImage(url: URL(string: game.thumbnail ?? game.image ?? "")) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        Color(.systemGray5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 110)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(game.name)
                 .font(.caption.weight(.semibold))
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
                 .foregroundStyle(Color(.label))
 
             if let r = game.rating, r > 0 {
@@ -393,55 +467,13 @@ private struct FinderRunnerCard: View {
 
 // MARK: - All Matches Sheet
 
-private struct FinderAllMatchesView: View {
-    let games: [Game]
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List(games) { game in
-                NavigationLink(value: game.bggId) {
-                    HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color(.systemGray5)
-                        }
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(game.name).font(.body.weight(.semibold))
-                            if let r = game.rating, r > 0 {
-                                Label(String(format: "%.1f", r), systemImage: "star.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("All Matches")
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: Int.self) { bggId in
-                GameDetailView(gameId: bggId)
-            }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Empty State
 
 private struct FinderEmptyView: View {
     var body: some View {
         ContentUnavailableView(
             "No Vibes Yet",
-            systemImage: "square.stack.badge.plus",
+            systemImage: "rectangle.stack.badge.plus",
             description: Text("Create collections in the Collection tab — add vibes like \"Party\" or \"Euro\" to get started.")
         )
     }
