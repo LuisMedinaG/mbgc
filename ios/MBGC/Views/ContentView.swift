@@ -133,18 +133,20 @@ struct FloatingBottomNav: View {
 
             ChromeButton(systemName: "magnifyingglass", size: 56, action: onSearch)
                 .accessibilityLabel("Search")
+                // "+" floats fully above the search button (clear gap, no
+                // overlap) so it reads as a primary action, not a badge.
                 .overlay(alignment: .top) {
                     if showNewButton {
                         Button(action: onNew) {
                             Image(systemName: "plus")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.system(size: 20, weight: .semibold))
                                 .foregroundStyle(.white)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                                 .background(Circle().fill(BrandAccent.color))
                                 .overlay(Circle().strokeBorder(Surface.elevated, lineWidth: 2))
                         }
                         .accessibilityLabel("New Collection")
-                        .offset(y: -14)
+                        .offset(y: -(44 / 2 + Spacing.md))
                         .transition(.scale.combined(with: .opacity))
                     }
                 }

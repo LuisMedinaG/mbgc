@@ -74,7 +74,7 @@ enum FinderAxis: String, CaseIterable {
     /// User-facing question title for the step header.
     var question: String {
         switch self {
-        case .vibe:     return "Select a Playstyle"
+        case .vibe:     return "Start from a list"
         case .players:  return "Player Count"
         case .duration: return "Duration"
         }

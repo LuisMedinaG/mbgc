@@ -69,9 +69,9 @@ enum Surface {
 // tab indicator. `accentTint` is the soft fill for selected cards/pills.
 
 enum BrandAccent {
-    static let color: Color = .blue
-    static let tint: Color = Color.blue.opacity(0.10)
-    static let border: Color = Color.blue
+    static let color: Color = .indigo
+    static let tint: Color = Color.indigo.opacity(0.10)
+    static let border: Color = Color.indigo
 }
 
 // MARK: - Reusable components

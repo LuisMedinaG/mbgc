@@ -131,7 +131,9 @@ private struct FinderStartView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, Spacing.screen)
-                .padding(.bottom, Spacing.section)
+                // The floating nav bar overlays the bottom on this root screen;
+                // reserve room so the caption clears it instead of sliding under.
+                .padding(.bottom, Spacing.floatingNavReserved + Spacing.section)
             }
 
             HStack {
@@ -264,7 +266,7 @@ struct FinderResultView: View {
     /// Plain-language explanation of why the top match was chosen.
     private var explanation: String {
         var parts: [String] = []
-        if let vibe = flow.chosenVibeLabel { parts.append("your \(vibe.lowercased()) playstyle") }
+        if let vibe = flow.chosenVibeLabel { parts.append("your \(vibe) list") }
         if let players = flow.chosenPlayerLabel { parts.append("\(players.lowercased())") }
         if let duration = flow.chosenDurationLabel, duration != "Any" {
             parts.append("a \(duration.lowercased()) session")
@@ -294,6 +296,18 @@ struct FinderResultView: View {
     var body: some View {
         ZStack(alignment: .top) {
             Surface.background.ignoresSafeArea()
+
+            // Subtle ambient wash from the hero art — keeps the result immersive
+            // without overlaying text on the cover. Surface.background stays
+            // underneath so the empty / no-art state still reads clean.
+            if let hero = top.first {
+                CachedAsyncImage(url: URL(string: hero.image ?? hero.thumbnail ?? ""))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .blur(radius: 80)
+                    .opacity(0.12)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -351,8 +365,6 @@ struct FinderResultView: View {
                 .coordinateSpace(name: "finderScroll")
                 .scrollIndicators(showAll ? .automatic : .hidden)
                 .refreshable { onRestart() }
-                .overlay(alignment: .topLeading) { backButton }
-                .overlay(alignment: .topTrailing) { shareButton }
                 .task {
                     // One-time tutorial: dip down + reveal the "Start over…" hint a few times.
                     guard !hintSeen, !top.isEmpty else { return }
@@ -379,6 +391,15 @@ struct FinderResultView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: Spacing.sm) {
+            // Back / share live in-flow above the title so the chevron can never
+            // overlap the large "Best Match" title (the old floating-overlay bug).
+            HStack {
+                backButton
+                Spacer()
+                shareButton
+            }
+            .padding(.bottom, Spacing.md)
+
             Text("Tonight")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.secondary)
@@ -390,7 +411,8 @@ struct FinderResultView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, Spacing.xxl)
+        // Clear the Dynamic Island / status bar on every device.
+        .padding(.top, 56)
     }
 
     // MARK: Alternatives
@@ -485,9 +507,6 @@ struct FinderResultView: View {
     @ViewBuilder private var backButton: some View {
         if let onBack {
             ChromeButton(systemName: "chevron.left", action: onBack)
-                .padding(.leading, Spacing.screen)
-                // Clear the Dynamic Island / status bar on every device.
-                .padding(.top, 56)
         }
     }
 
@@ -502,12 +521,8 @@ struct FinderResultView: View {
                     .overlay(Circle().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
             }
             .accessibilityLabel("Share top pick")
-            .padding(.trailing, Spacing.screen)
-            .padding(.top, 56)
         } else {
             ChromeButton(systemName: "arrow.counterclockwise", action: onRestart)
-                .padding(.trailing, Spacing.screen)
-                .padding(.top, 56)
         }
     }
 
