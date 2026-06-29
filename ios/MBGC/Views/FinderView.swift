@@ -105,7 +105,7 @@ private struct FinderStartView: View {
                     .font(.system(size: 64))
                     .foregroundStyle(.orange)
                     .shadow(color: .orange.opacity(0.5), radius: 24, y: 8)
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     Text("Tonight's Pick")
                         .font(.largeTitle.bold())
                     Text("Answer a few quick questions and we'll narrow your collection down to the perfect game.")
@@ -306,11 +306,21 @@ struct FinderResultView: View {
     let onRestart: () -> Void
 
     @State private var showAll = false
+    @State private var showRecommendationDetails = false
     @State private var bounce: CGFloat = 0
     @AppStorage("finderStartOverHintSeen") private var hintSeen = false
 
     private var top: [Game] { Array(flow.ranked.prefix(3)) }
     private var hasMore: Bool { flow.ranked.count > 3 }
+    private var explanation: String {
+        let selected = flow.picks
+            .filter { $0.id != "skip" }
+            .map(\.label)
+        guard !selected.isEmpty else {
+            return "This game rose to the top from your collection using ratings, rank, and overall fit."
+        }
+        return "Chosen because it fits \(selected.joined(separator: ", ")) and ranked highest across your ratings, BGG ratings, and overall fit."
+    }
 
     private var shareTopPick: String? {
         guard let game = top.first else { return nil }
@@ -370,6 +380,7 @@ struct FinderResultView: View {
                                     FinderHeroCard(game: hero)
                                 }
                                 .buttonStyle(.plain)
+
                             }
 
                             let runners = Array(top.dropFirst())
@@ -447,13 +458,22 @@ struct FinderResultView: View {
 
                             if hasMore {
                                 Button { toggleAll(proxy: proxy) } label: {
-                                    Label(showAll ? "Show less" : "See all \(flow.ranked.count) recommendations",
-                                          systemImage: showAll ? "chevron.up" : "list.number")
-                                        .font(.subheadline.weight(.medium))
-                                        .foregroundStyle(.secondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 12)
-                                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+                                    HStack(spacing: 10) {
+                                        Image(systemName: showAll ? "chevron.up" : "list.number")
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(showAll ? "Show less" : "See all \(flow.ranked.count) recommendations")
+                                            .font(.headline)
+                                        Spacer()
+                                        if !showAll {
+                                            Image(systemName: "chevron.right")
+                                                .font(.subheadline.weight(.semibold))
+                                        }
+                                    }
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -491,6 +511,11 @@ struct FinderResultView: View {
                     if v.translation.width > 80, abs(v.translation.height) < 80 { onBack?() }
                 }
         )
+        .sheet(isPresented: $showRecommendationDetails) {
+            FinderRecommendationDetailsView(text: explanation)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     @ViewBuilder private var backButton: some View {
@@ -510,6 +535,11 @@ struct FinderResultView: View {
 
     @ViewBuilder private var menu: some View {
         Menu {
+            Button {
+                showRecommendationDetails = true
+            } label: {
+                Label("Recommendation Details", systemImage: "sparkles")
+            }
             if let shareTopPick {
                 ShareLink(item: shareTopPick) {
                     Label("Share Top Pick", systemImage: "square.and.arrow.up")
@@ -543,45 +573,26 @@ private struct FinderHeroCard: View {
     let game: Game
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
+        VStack(alignment: .leading, spacing: 14) {
             CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
                 .frame(maxWidth: .infinity)
-                .frame(height: 280)
+                .frame(height: 300)
                 .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.75)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(game.name)
                     .font(.title2.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
 
-                HStack(spacing: 14) {
-                    if let r = game.rating, r > 0 {
-                        Label(String(format: "%.1f", r), systemImage: "star.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                    if let lo = game.minPlayers, let hi = game.maxPlayers {
-                        Label(lo == hi ? "\(lo)" : "\(lo)–\(hi)", systemImage: "person.2.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                    if let pt = game.playtime, pt > 0 {
-                        Label("\(pt) min", systemImage: "clock.fill")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
-                }
+                FinderMetadataRow(game: game, style: .prominent)
             }
-            .padding(16)
+            .padding(.horizontal, 2)
+            .padding(.top, 4)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: .black.opacity(0.2), radius: 16, y: 8)
+        .padding(12)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
     }
 }
 
@@ -591,28 +602,110 @@ private struct FinderRunnerCard: View {
     let game: Game
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 7) {
             CachedAsyncImage(url: URL(string: game.thumbnail ?? game.image ?? ""))
-            .frame(maxWidth: .infinity)
-            .frame(height: 110)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+                .frame(maxWidth: .infinity)
+                .aspectRatio(0.78, contentMode: .fit)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            Text(game.name)
-                .font(.caption.weight(.semibold))
-                .lineLimit(2, reservesSpace: true)
-                .foregroundStyle(Color(.label))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(game.name)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(2, reservesSpace: true)
+                    .foregroundStyle(Color(.label))
 
-            if let r = game.rating, r > 0 {
-                Label(String(format: "%.1f", r), systemImage: "star.fill")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                FinderMetadataRow(game: game, style: .compact)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+        .padding(.horizontal, 12)
+        .padding(.top, 12)
+        .padding(.bottom, 8)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.08), radius: 14, y: 6)
+    }
+}
+
+private struct FinderRecommendationDetailsView: View {
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text(text)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("How scoring works") {
+                    detailRow("Your rating", "Strongest signal when available", "star.fill", Color(.systemOrange))
+                    detailRow("BGG rating", "Community quality signal", "chart.line.uptrend.xyaxis", Color(.systemBlue))
+                    detailRow("Player fit", "Bonus when BGG recommends the selected player count", "person.2.fill", Color(.systemGreen))
+                    detailRow("BGG rank", "Small tiebreaker for widely respected games", "number", Color(.systemPurple))
+                    detailRow("Want to play", "Nudge for games marked want to play", "heart.fill", Color(.systemPink))
+                }
+
+                Section {
+                    Text("The picker first filters your library by your answers, then sorts matching games by the weighted signals above.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle("Recommendation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func detailRow(_ title: String, _ subtitle: String, _ symbol: String, _ color: Color) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: symbol)
+                .foregroundStyle(color)
+        }
+    }
+}
+
+private struct FinderMetadataRow: View {
+    enum Style { case prominent, compact }
+
+    let game: Game
+    let style: Style
+
+    var body: some View {
+        HStack(spacing: style == .prominent ? 10 : 6) {
+            if let r = game.rating, r > 0 {
+                metadataLabel(String(format: "%.1f", r), systemImage: "star.fill", color: Color(.systemOrange))
+            }
+            if let lo = game.minPlayers, let hi = game.maxPlayers {
+                metadataLabel(lo == hi ? "\(lo)" : "\(lo)-\(hi)", systemImage: "person.2.fill", color: Color(.systemBlue))
+            }
+            if let pt = game.playtime, pt > 0 {
+                metadataLabel("\(pt)m", systemImage: "clock.fill", color: Color(.systemTeal))
+            }
+        }
+    }
+
+    private func metadataLabel(_ text: String, systemImage: String, color: Color) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(style == .prominent ? .caption.weight(.semibold) : .caption2.weight(.semibold))
+            .foregroundStyle(color)
+            .labelStyle(.titleAndIcon)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
     }
 }
 
