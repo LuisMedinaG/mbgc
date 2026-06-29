@@ -12,7 +12,7 @@ import Testing
         f.specs[.rating] = FilterSpec(mode: .minimum, value: 7)
         f.specs[.bggRank] = FilterSpec(mode: .maximum, value: 500)
         f.setFilters[.mechanics] = ["Worker Placement", "Deck Building"]
-        f.titleStartsWith = "C"
+        f.titleContains = "Catan"
         f.languageLevels = [1, 2]
 
         let data = try JSONEncoder().encode(f)
@@ -88,6 +88,38 @@ import Testing
         let s = smart(SmartRule(combine: [a.id], exclude: [b.id])); ctx.insert(s)
         let out = Set(s.smartGames(collections: [a, b, s], allGames: all).map(\.bggId))
         #expect(out == [1, 3]) // A {1,2} △ B {2,3} = {1,3}
+    }
+
+    @Test func baseStartsFromInitialList() throws {
+        let (ctx, a, b, all) = try fixture()
+        // base = A {1,2}, subtract B {2,3} → {1}
+        let s = smart(SmartRule(base: [a.id], subtract: [b.id])); ctx.insert(s)
+        let out = Set(s.smartGames(collections: [a, b, s], allGames: all).map(\.bggId))
+        #expect(out == [1])
+    }
+
+    @Test func baseUnionsMultipleSelectedLists() throws {
+        let (ctx, a, b, all) = try fixture()
+        // "From selected" = A {1,2} + B {2,3} → union {1,2,3}
+        let s = smart(SmartRule(base: [a.id, b.id])); ctx.insert(s)
+        let out = Set(s.smartGames(collections: [a, b, s], allGames: all).map(\.bggId))
+        #expect(out == [1, 2, 3])
+    }
+
+    @Test func legacySingleBaseDecodes() throws {
+        let (_, a, _, _) = try fixture()
+        // Old persisted rules stored `base` as a single UUID, not an array.
+        let json = "{\"base\":\"\(a.id.uuidString)\",\"combine\":[],\"intersect\":[],\"subtract\":[],\"exclude\":[]}"
+        let rule = try JSONDecoder().decode(SmartRule.self, from: Data(json.utf8))
+        #expect(rule.base == [a.id])
+    }
+
+    @Test func baseUnionsCombineLists() throws {
+        let (ctx, a, b, all) = try fixture()
+        // base = A {1,2}, combine B {2,3} → {1,2,3}
+        let s = smart(SmartRule(base: [a.id], combine: [b.id])); ctx.insert(s)
+        let out = Set(s.smartGames(collections: [a, b, s], allGames: all).map(\.bggId))
+        #expect(out == [1, 2, 3])
     }
 
     @Test func filtersNarrowTheSet() throws {

@@ -199,11 +199,11 @@ struct FilterSpec: Equatable, Codable {
 struct GameFilters: Equatable, Codable {
     var specs: [FilterField: FilterSpec] = [:]
     var setFilters: [SetFilterField: Set<String>] = [:]
-    var titleStartsWith: String = ""
+    var titleContains: String = ""
     var languageLevels: Set<Int> = []
 
-    var isEmpty: Bool { specs.isEmpty && setFilters.isEmpty && titleStartsWith.isEmpty && languageLevels.isEmpty }
-    var activeCount: Int { specs.count + setFilters.count + (titleStartsWith.isEmpty ? 0 : 1) + (languageLevels.isEmpty ? 0 : 1) }
+    var isEmpty: Bool { specs.isEmpty && setFilters.isEmpty && titleContains.isEmpty && languageLevels.isEmpty }
+    var activeCount: Int { specs.count + setFilters.count + (titleContains.isEmpty ? 0 : 1) + (languageLevels.isEmpty ? 0 : 1) }
 
     func apply(_ games: [Game]) -> [Game] {
         guard !isEmpty else { return games }
@@ -211,12 +211,9 @@ struct GameFilters: Equatable, Codable {
     }
 
     private func passes(_ game: Game) -> Bool {
-        if !titleStartsWith.isEmpty {
-            if titleStartsWith == "#" {
-                guard let first = game.name.first, !first.isLetter else { return false }
-            } else {
-                if !game.name.lowercased().hasPrefix(titleStartsWith.lowercased()) { return false }
-            }
+        if !titleContains.isEmpty {
+            let query = titleContains.trimmingCharacters(in: .whitespaces)
+            if !query.isEmpty, !game.name.localizedCaseInsensitiveContains(query) { return false }
         }
         if !languageLevels.isEmpty {
             guard let v = game.languageDependence, languageLevels.contains(v) else { return false }
@@ -285,70 +282,42 @@ struct GameFilters: Equatable, Codable {
     }
 }
 
-// MARK: - FilterView
+// MARK: - FilterRows (embeddable sections — used by FilterView and SmartListEditor)
 
-struct FilterView: View {
+/// Renders the enabled + other filter sections inline inside any List.
+/// Parents own showTitlePicker and activeChecklist so sheets anchor outside the List.
+struct FilterRows: View {
     @Binding var filters: GameFilters
     let games: [Game]
-    @Environment(\.dismiss) private var dismiss
+    @Binding var showTitlePicker: Bool
+    @Binding var activeChecklist: SetFilterField?
     @State private var exactInputs: [FilterField: String] = [:]
-    @State private var activeChecklist: SetFilterField?
-    @State private var showTitlePicker = false
     @State private var languageExpanded = false
 
-    private var activeSets: [SetFilterField]   { SetFilterField.allCases.filter { filters.setFilters[$0] != nil } }
-    private var inactiveSets: [SetFilterField]  { SetFilterField.allCases.filter { filters.setFilters[$0] == nil } }
-    private var activeNumeric: [FilterField]    { FilterField.allCases.filter { filters.specs[$0] != nil } }
-    private var inactiveNumeric: [FilterField]  { FilterField.allCases.filter { filters.specs[$0] == nil } }
+    private var activeSets: [SetFilterField]  { SetFilterField.allCases.filter { filters.setFilters[$0] != nil } }
+    private var inactiveSets: [SetFilterField] { SetFilterField.allCases.filter { filters.setFilters[$0] == nil } }
+    private var activeNumeric: [FilterField]   { FilterField.allCases.filter { filters.specs[$0] != nil } }
+    private var inactiveNumeric: [FilterField] { FilterField.allCases.filter { filters.specs[$0] == nil } }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if !filters.isEmpty {
-                    Section("Enabled filters") {
-                        if !filters.titleStartsWith.isEmpty { titleRow }
-                        if !filters.languageLevels.isEmpty { languageDependenceRow }
-                        ForEach(activeSets) { checklistRow($0) }
-                        ForEach(activeNumeric) { filterRow($0) }
-                    }
-                }
-
-                Section(filters.isEmpty ? "Select filters" : "Other filters") {
-                    if filters.titleStartsWith.isEmpty { titleRow }
-                    if filters.languageLevels.isEmpty { languageDependenceRow }
-                    ForEach(inactiveSets) { checklistRow($0) }
-                    ForEach(inactiveNumeric) { filterRow($0) }
+        Group {
+            if !filters.isEmpty {
+                Section("Enabled filters") {
+                    if !filters.titleContains.isEmpty { titleRow }
+                    if !filters.languageLevels.isEmpty { languageDependenceRow }
+                    ForEach(activeSets) { checklistRow($0) }
+                    ForEach(activeNumeric) { filterRow($0) }
                 }
             }
-            .navigationTitle("Filters")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear All") {
-                        filters = GameFilters()
-                        exactInputs.removeAll()
-                        languageExpanded = false
-                    }
-                    .foregroundStyle(.red)
-                    .disabled(filters.isEmpty)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }.fontWeight(.semibold)
-                }
+            Section(filters.isEmpty ? "Select filters" : "Other filters") {
+                if filters.titleContains.isEmpty { titleRow }
+                if filters.languageLevels.isEmpty { languageDependenceRow }
+                ForEach(inactiveSets) { checklistRow($0) }
+                ForEach(inactiveNumeric) { filterRow($0) }
             }
-            .sheet(item: $activeChecklist) { field in
-                ChecklistPickerSheet(
-                    title: field.rawValue,
-                    options: field.values(from: games),
-                    selected: Binding(
-                        get: { filters.setFilters[field] ?? [] },
-                        set: { filters.setFilters[field] = $0.isEmpty ? nil : $0 }
-                    )
-                )
-            }
-            .sheet(isPresented: $showTitlePicker) {
-                TitleFilterSheet(selected: $filters.titleStartsWith)
-            }
+        }
+        .onChange(of: filters.isEmpty) { _, isEmpty in
+            if isEmpty { exactInputs.removeAll(); languageExpanded = false }
         }
     }
 
@@ -357,11 +326,12 @@ struct FilterView: View {
     private var titleRow: some View {
         HStack {
             Image(systemName: "textformat.abc").frame(width: 24).foregroundStyle(Color.red)
-            Text("Title").font(.body)
+            Text("Title contains").font(.body)
             Spacer()
             HStack(spacing: 3) {
-                Text(filters.titleStartsWith.isEmpty ? "Off" : filters.titleStartsWith)
-                    .foregroundStyle(filters.titleStartsWith.isEmpty ? .secondary : Color.orange)
+                Text(filters.titleContains.isEmpty ? "Off" : "\"\(filters.titleContains)\"")
+                    .foregroundStyle(filters.titleContains.isEmpty ? .secondary : Color.orange)
+                    .lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
             }
             .font(.subheadline.weight(.medium))
@@ -370,7 +340,7 @@ struct FilterView: View {
         .onTapGesture { showTitlePicker = true }
     }
 
-    // MARK: - Language Dependence row (inline expansion)
+    // MARK: - Language Dependence row
 
     private var languageDependenceRow: some View {
         let showOptions = languageExpanded || !filters.languageLevels.isEmpty
@@ -392,7 +362,6 @@ struct FilterView: View {
                 }
                 .buttonStyle(.plain)
             }
-
             if showOptions {
                 VStack(spacing: 6) {
                     ForEach(langLevels) { lvl in langLevelCard(lvl) }
@@ -531,6 +500,49 @@ struct FilterView: View {
     }
 }
 
+// MARK: - FilterView (modal wrapper around FilterRows)
+
+struct FilterView: View {
+    @Binding var filters: GameFilters
+    let games: [Game]
+    @Environment(\.dismiss) private var dismiss
+    @State private var showTitlePicker = false
+    @State private var activeChecklist: SetFilterField?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                FilterRows(filters: $filters, games: games, showTitlePicker: $showTitlePicker, activeChecklist: $activeChecklist)
+            }
+            .navigationTitle("Filters")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Clear All") { filters = GameFilters() }
+                        .foregroundStyle(.red)
+                        .disabled(filters.isEmpty)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.fontWeight(.semibold)
+                }
+            }
+            .sheet(item: $activeChecklist) { field in
+                ChecklistPickerSheet(
+                    title: field.rawValue,
+                    options: field.values(from: games),
+                    selected: Binding(
+                        get: { filters.setFilters[field] ?? [] },
+                        set: { filters.setFilters[field] = $0.isEmpty ? nil : $0 }
+                    )
+                )
+            }
+            .sheet(isPresented: $showTitlePicker) {
+                TitleFilterSheet(text: $filters.titleContains)
+            }
+        }
+    }
+}
+
 // MARK: - Checklist picker sheet
 
 struct ChecklistPickerSheet: View {
@@ -586,50 +598,45 @@ struct ChecklistPickerSheet: View {
     }
 }
 
-// MARK: - Title letter picker sheet
-
-private let titleLetters: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ").map(String.init) + ["#"]
+// MARK: - Title contains text sheet
 
 struct TitleFilterSheet: View {
-    @Binding var selected: String
+    @Binding var text: String
     @Environment(\.dismiss) private var dismiss
-    private let columns = Array(repeating: GridItem(.flexible()), count: 5)
+    @FocusState private var focused: Bool
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(titleLetters, id: \.self) { letter in
-                        let isSelected = selected == letter
-                        Button {
-                            selected = isSelected ? "" : letter
-                            dismiss()
-                        } label: {
-                            Text(letter)
-                                .font(.title3.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .aspectRatio(1, contentMode: .fit)
-                                .background(isSelected ? Color.orange : Color(.systemGray6))
-                                .foregroundStyle(isSelected ? .white : .primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
-                    }
+            VStack(spacing: 16) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("Words in the title", text: $text)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .submitLabel(.done)
+                        .focused($focused)
+                        .onSubmit { dismiss() }
                 }
-                .padding(20)
+                .padding(14)
+                .background(Color(.systemGray6))
+                .clipShape(Capsule())
+                .padding(.horizontal, 20)
+                .padding(.top, 24)
+                Spacer()
             }
-            .navigationTitle("Title Starts With")
+            .navigationTitle("Title Contains")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Clear") { selected = ""; dismiss() }
-                        .foregroundStyle(.red).disabled(selected.isEmpty)
+                    Button("Clear") { text = ""; dismiss() }
+                        .foregroundStyle(.red).disabled(text.isEmpty)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }.fontWeight(.semibold)
                 }
             }
+            .onAppear { focused = true }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.height(180), .medium])
     }
 }

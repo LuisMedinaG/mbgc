@@ -51,9 +51,9 @@ func Load() (Config, error) {
 		AllowedOrigins:    getenvList("ALLOWED_ORIGINS", "http://localhost:5173"), // ref: api-layer.CONFIG.4 — comma-separated; defaults to localhost:5173
 		BGGToken:          os.Getenv("BGG_TOKEN"),                                 // ref: api-layer.CONFIG.5 — optional; importer disabled if absent
 		BGGCookie:         os.Getenv("BGG_COOKIE"),                                // ref: api-layer.CONFIG.5
-		SyncLimitBasic: getenvInt("SYNC_LIMIT_BASIC", 1),   // 1 per week for basic users
-		SyncLimitPro:   getenvInt("SYNC_LIMIT_PRO", 24),   // ≈1/hour for pro users
-		SyncLimitAdmin: getenvInt("SYNC_LIMIT_ADMIN", 100), // hard safety cap for admins
+		SyncLimitBasic:    getenvInt("SYNC_LIMIT_BASIC", 1),                       // 1 per week for basic users
+		SyncLimitPro:      getenvInt("SYNC_LIMIT_PRO", 24),                        // ≈1/hour for pro users
+		SyncLimitAdmin:    getenvInt("SYNC_LIMIT_ADMIN", 100),                     // hard safety cap for admins
 		SeedAdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
 		SeedAdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
 		SeedAdminUsername: os.Getenv("SEED_ADMIN_USERNAME"),

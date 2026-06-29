@@ -13,14 +13,24 @@ final class Collection {
     var colorHex: String = ""   // "#RRGGBB"; empty = derive from name hash
     var iconName: String = ""   // SF Symbol name; empty = derive from name hash
 
-    /// Stable handle so smart-list rules can reference other lists across renames.
+    /// Stable identifier used for referencing this collection in smart-list rules.
+    /// This ensures rules remain valid even if the collection is renamed.
     var id: UUID = UUID()
-    /// true = membership is derived from `rule`, not hand-curated. `games` stays empty.
+
+    /// Indicates if this is a "smart" collection whose membership is dynamically
+    /// computed based on rules rather than manual assignment.
     var isSmart: Bool = false
-    /// JSON-encoded SmartRule; nil for normal lists.
+
+    /// Persisted JSON data for the `SmartRule` defining this collection's membership.
     var ruleData: Data?
 
-    /// Games in this collection — populated via the inverse Game.collections relationship.
+    /// Ranked lists keep a manual game order the user drags to arrange.
+    var isRanked: Bool = false
+    /// bggIds in manual rank order (ranked lists only). Games not listed sort last.
+    var rankedOrder: [Int] = []
+
+    /// Manually-curated games in this collection.
+    /// For smart collections, this property remains empty and `smartGames()` should be used.
     @Relationship(deleteRule: .nullify, inverse: \Game.collections)
     var games: [Game] = []
 
@@ -42,12 +52,15 @@ final class Collection {
         "crown.fill", "gamecontroller.fill", "dice.fill", "person.3.fill", "trophy.fill",
     ]
 
-    // Hash-based fallback keeps color/icon stable across launches even if none was explicitly chosen.
+    /// The color hex to use for UI display. If `colorHex` is empty, it returns
+    /// a stable fallback derived from the collection's name.
     var effectiveColorHex: String {
         colorHex.isEmpty
             ? Collection.colorPalette[abs(name.hashValue) % Collection.colorPalette.count]
             : colorHex
     }
+    /// The SF Symbol name to use for UI display. If `iconName` is empty, it returns
+    /// a stable fallback derived from the collection's name.
     var effectiveIconName: String {
         iconName.isEmpty
             ? Collection.iconPalette[abs(name.hashValue) % Collection.iconPalette.count]
@@ -71,7 +84,8 @@ final class Collection {
 /// Rules that derive a smart list's membership. Persisted as JSON in `Collection.ruleData`.
 /// Lists are referenced by `Collection.id` so renames don't break a rule.
 struct SmartRule: Codable, Equatable {
-    var combine:   [UUID] = []   // union of these lists — the base set (empty = all games)
+    var base:      [UUID] = []   // "From selected" lists; their union is the starting set ([] = entire library)
+    var combine:   [UUID] = []   // union these lists onto the base
     var intersect: [UUID] = []   // keep only games present in ALL of these
     var subtract:  [UUID] = []   // remove games present in ANY of these (A \ B)
     // ponytail: exclude = symmetric difference (games in exactly one side), distinct from
@@ -80,7 +94,34 @@ struct SmartRule: Codable, Equatable {
     var filters:   GameFilters = .init()
 
     var isEmpty: Bool {
-        combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
+        base.isEmpty && combine.isEmpty && intersect.isEmpty && subtract.isEmpty && exclude.isEmpty && filters.isEmpty
+    }
+
+    /// Count of every active selection — drives the "Set Filters" badge.
+    var activeCount: Int {
+        base.count + combine.count + intersect.count + subtract.count + exclude.count + filters.activeCount
+    }
+}
+
+// Tolerant decoding: `base` was a single `UUID?` before multi-select. Decode either form.
+// In an extension so the memberwise init (`SmartRule()`) is preserved.
+extension SmartRule {
+    enum CodingKeys: String, CodingKey { case base, combine, intersect, subtract, exclude, filters }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let arr = try? c.decode([UUID].self, forKey: .base) {
+            base = arr
+        } else if let single = try? c.decode(UUID.self, forKey: .base) {
+            base = [single]                                  // legacy single-base rule
+        } else {
+            base = []
+        }
+        combine   = (try? c.decode([UUID].self, forKey: .combine)) ?? []
+        intersect = (try? c.decode([UUID].self, forKey: .intersect)) ?? []
+        subtract  = (try? c.decode([UUID].self, forKey: .subtract)) ?? []
+        exclude   = (try? c.decode([UUID].self, forKey: .exclude)) ?? []
+        filters   = (try? c.decode(GameFilters.self, forKey: .filters)) ?? .init()
     }
 }
 
@@ -104,26 +145,29 @@ extension Collection {
             list.compactMap { byId[$0] }.map { Set($0.games.map(\.bggId)) }
         }
 
-        // Base: union of combine lists; empty combine = every game.
-        var base: Set<Int>
-        let combineSets = ids(rule.combine)
-        if combineSets.isEmpty {
-            base = Set(allGames.map(\.bggId))
+        // Starting set = union of the "From selected" lists. No base + no combine = entire library.
+        var members: Set<Int>
+        if rule.base.isEmpty && rule.combine.isEmpty {
+            members = Set(allGames.map(\.bggId))
         } else {
-            base = combineSets.reduce(into: Set<Int>()) { $0.formUnion($1) }
+            members = []
+            for set in ids(rule.base) { members.formUnion(set) }
         }
 
+        // Combine: union the combine lists onto the base.
+        for set in ids(rule.combine) { members.formUnion(set) }
+
         // Intersect: keep only games present in every intersect list.
-        for set in ids(rule.intersect) { base.formIntersection(set) }
+        for set in ids(rule.intersect) { members.formIntersection(set) }
 
         // Subtract: remove games present in any subtract list.
-        for set in ids(rule.subtract) { base.subtract(set) }
+        for set in ids(rule.subtract) { members.subtract(set) }
 
         // Exclude: symmetric difference against each exclude list.
-        for set in ids(rule.exclude) { base.formSymmetricDifference(set) }
+        for set in ids(rule.exclude) { members.formSymmetricDifference(set) }
 
-        let members = allGames.filter { base.contains($0.bggId) }
-        return rule.filters.apply(members)
+        let result = allGames.filter { members.contains($0.bggId) }
+        return rule.filters.apply(result)
     }
 }
 
