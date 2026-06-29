@@ -365,7 +365,7 @@ struct FinderResultView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        .padding(.top, 24)
+                        .padding(.top, 30)
                         .id("topPick")
 
                         if top.isEmpty {
@@ -380,6 +380,7 @@ struct FinderResultView: View {
                                     FinderHeroCard(game: hero)
                                 }
                                 .buttonStyle(.plain)
+                                .padding(.top, -14)
 
                             }
 
@@ -567,20 +568,33 @@ struct FinderResultView: View {
     }
 }
 
+// MARK: - Card Layout Tokens
+
+/// Shared spacing so hero and runner cards stay consistent.
+/// `imageGap` = artwork → title block. `titleGap` = title → metadata row.
+private enum FinderCardLayout {
+    static let heroImageGap: CGFloat = 14
+    static let heroTitleGap: CGFloat = 8
+
+    static let runnerImageGap: CGFloat = 10
+    static let runnerTitleGap: CGFloat = 4
+}
+
 // MARK: - Hero Card
 
 private struct FinderHeroCard: View {
     let game: Game
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: FinderCardLayout.heroImageGap) {
             CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
                 .frame(maxWidth: .infinity)
                 .frame(height: 300)
+                .background(Color(.systemGray5))
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: FinderCardLayout.heroTitleGap) {
                 Text(game.name)
                     .font(.title2.bold())
                     .foregroundStyle(.primary)
@@ -602,17 +616,17 @@ private struct FinderRunnerCard: View {
     let game: Game
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: FinderCardLayout.runnerImageGap) {
             CachedAsyncImage(url: URL(string: game.thumbnail ?? game.image ?? ""))
                 .frame(maxWidth: .infinity)
-                .aspectRatio(0.78, contentMode: .fit)
-                .clipped()
+                .frame(height: 128)
+                .background(Color(.systemGray5))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: FinderCardLayout.runnerTitleGap) {
                 Text(game.name)
                     .font(.caption.weight(.semibold))
-                    .lineLimit(2, reservesSpace: true)
+                    .lineLimit(2)
                     .foregroundStyle(Color(.label))
 
                 FinderMetadataRow(game: game, style: .compact)
