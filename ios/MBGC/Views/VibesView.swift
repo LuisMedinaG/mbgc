@@ -58,7 +58,8 @@ struct VibesView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .navigationDestination(for: Collection.self) { col in
+        }
+        .navigationDestination(for: Collection.self) { col in
                 CollectionDetailView(collection: col)
                     .toolbar(.visible, for: .navigationBar)
             }
