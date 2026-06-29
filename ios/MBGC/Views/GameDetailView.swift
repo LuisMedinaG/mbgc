@@ -146,9 +146,16 @@ struct GameDetailView: View {
     private func tagsSection(_ game: Game) -> some View {
         let categories = game.categories ?? []
         let mechanics = game.mechanics ?? []
+        let types = game.types ?? []
         return Group {
-            if !categories.isEmpty || !mechanics.isEmpty {
+            if !categories.isEmpty || !mechanics.isEmpty || !types.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
+                    if !types.isEmpty {
+                        Text("Type").font(.headline)
+                        FlowLayout(spacing: 6) {
+                            ForEach(types, id: \.self) { tagChip($0, color: .indigo) }
+                        }
+                    }
                     if !categories.isEmpty {
                         Text("Categories").font(.headline)
                         FlowLayout(spacing: 6) {

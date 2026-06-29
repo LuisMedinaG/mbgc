@@ -16,6 +16,8 @@ private let bggImportCooldown: TimeInterval = 7 * 24 * 60 * 60
 
 struct ImportView: View {
     var dismissAll: (() -> Void)? = nil
+    var showCloseButton: Bool = true       // hidden when embedded in onboarding
+    var autoAddToLibrary: Bool = false     // onboarding: skip picker, drop into Library
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -30,19 +32,21 @@ struct ImportView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(10)
-                        .background(Color(.systemGray5))
-                        .clipShape(Circle())
+            if showCloseButton {
+                HStack {
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(10)
+                            .background(Color(.systemGray5))
+                            .clipShape(Circle())
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 12)
 
             Spacer()
 
@@ -251,8 +255,17 @@ struct ImportView: View {
             // LocalLibrary.add dedups, so adding already-present games is a no-op.
             selectedGames = LocalLibrary.games(matching: bggIds, in: modelContext)
             syncSummary = result.summary
-            showDestinationPicker = !selectedGames.isEmpty
-            appendSyncLog(selectedGames.isEmpty ? "Import finished" : "Choose a destination collection")
+            if autoAddToLibrary {
+                if !selectedGames.isEmpty, let library = try? LocalLibrary.ensureDefaultCollection(in: modelContext) {
+                    LocalLibrary.add(selectedGames, to: library)
+                    try? modelContext.save()
+                }
+                appendSyncLog("Added to Library")
+                dismissAll?()
+            } else {
+                showDestinationPicker = !selectedGames.isEmpty
+                appendSyncLog(selectedGames.isEmpty ? "Import finished" : "Choose a destination collection")
+            }
         } catch {
             syncError = importMessage(for: error)
             appendSyncLog(syncError ?? "Import failed")

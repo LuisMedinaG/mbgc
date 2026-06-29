@@ -22,7 +22,12 @@ struct FinderView: View {
                 } else if !active {
                     FinderStartView { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { active = true } }
                 } else if flow.isDone {
-                    FinderResultView(flow: flow) {
+                    FinderResultView(flow: flow, onBack: {
+                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                            goingBack = true
+                            flow.back()
+                        }
+                    }) {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { exitTest() }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
@@ -83,6 +88,7 @@ struct FinderView: View {
 
 private struct FinderStartView: View {
     let onStart: () -> Void
+    @State private var showSettings = false
 
     var body: some View {
         ZStack {
@@ -108,7 +114,6 @@ private struct FinderStartView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                 }
-                Spacer()
                 Button(action: onStart) {
                     Text("Start")
                         .font(.headline)
@@ -121,6 +126,22 @@ private struct FinderStartView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 120)
             }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    HomeChromeButton(systemName: "gearshape", size: 44) {
+                        showSettings = true
+                    }
+                    .accessibilityLabel("Settings")
+                    .padding(.trailing, 20)
+                }
+                Spacer()
+            }
+            .padding(.top, 8)
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView(isPresented: $showSettings)
         }
     }
 }
@@ -159,10 +180,15 @@ private struct FinderStepView: View {
             optionGrid
         }
         .padding(.bottom, 110)
-        // Note: a custom DragGesture was here for swipe-back, but it fought
-        // the NavigationStack's built-in right-edge swipe and could double-back
-        // or trigger while the user was scrolling the option grid. Removed —
-        // use the explicit Back button or the NavigationStack edge swipe.
+        // Swipe right → back, same gesture as FinderResultView. Horizontal-only
+        // threshold (width>80, |height|<80) keeps it from firing while the user
+        // scrolls the option grid vertically.
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { v in
+                    if v.translation.width > 80, abs(v.translation.height) < 80 { onBack?() }
+                }
+        )
     }
 
     private var header: some View {
@@ -276,6 +302,7 @@ private struct FinderButtonStyle: ButtonStyle {
 
 struct FinderResultView: View {
     let flow: FinderFlow
+    let onBack: (() -> Void)?
     let onRestart: () -> Void
 
     @State private var showAll = false
@@ -439,16 +466,17 @@ struct FinderResultView: View {
                 .coordinateSpace(name: "finderScroll")
                 .scrollIndicators(showAll ? .automatic : .hidden)
                 .refreshable { onRestart() }   // native pull-down → start over (now works collapsed too)
+                .overlay(alignment: .topLeading) { backButton }
                 .overlay(alignment: .topTrailing) { menu }
                 .task {
                     // One-time tutorial: dip down + reveal the "Start over…" hint, a few times.
                     guard !hintSeen, !top.isEmpty else { return }
-                    try? await Task.sleep(for: .seconds(1.4))
+                    try? await Task.sleep(for: .seconds(5))
                     for _ in 0..<3 {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { bounce = 44 }
                         try? await Task.sleep(for: .seconds(0.45))
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) { bounce = 0 }
-                        try? await Task.sleep(for: .seconds(0.35))
+                        try? await Task.sleep(for: .seconds(3))
                     }
                     hintSeen = true
                 }
@@ -456,6 +484,27 @@ struct FinderResultView: View {
                 // blanket .animation here rasterizes the whole expanding list into one
                 // offscreen layer → "RBLayer: unable to create texture".
             }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { v in
+                    if v.translation.width > 80, abs(v.translation.height) < 80 { onBack?() }
+                }
+        )
+    }
+
+    @ViewBuilder private var backButton: some View {
+        if let onBack {
+            Button(action: onBack) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color(.label))
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .accessibilityLabel("Back")
+            .padding(.leading, 16)
+            .padding(.top, 4)
         }
     }
 

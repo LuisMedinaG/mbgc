@@ -6,6 +6,7 @@ enum HomeTab { case collection, tonight }
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var vibesViewModel = VibesViewModel()
     @State private var tab: HomeTab = .tonight
     @State private var collectionPath: [Collection] = []
@@ -46,7 +47,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !isInDetailView && !(tab == .tonight && finderActive) {
+            if !isInDetailView {
                 VStack(spacing: 0) {
                     if showCreate {
                         CreateTypeChooser { kind in
@@ -101,6 +102,12 @@ struct ContentView: View {
         .sheet(isPresented: $showSettings) { SettingsView(isPresented: $showSettings).preferredColorScheme(preferredScheme) }
         // CreateCollectionSheet has its own @Environment(\.modelContext)
         .sheet(item: $createKind) { CreateCollectionSheet(kind: $0).preferredColorScheme(preferredScheme) }
+        .fullScreenCover(isPresented: .init(
+            get: { !hasSeenOnboarding },
+            set: { if !$0 { hasSeenOnboarding = true } })) {
+            OnboardingView { hasSeenOnboarding = true }
+                .preferredColorScheme(preferredScheme)
+        }
         .animation(.spring(duration: 0.25), value: showCreate)
         .preferredColorScheme(preferredScheme)
         // Note: avoid .id(appearanceMode) — it would force SwiftUI to rebuild
@@ -119,7 +126,7 @@ struct ContentView: View {
     }
 }
 
-private struct HomeChromeButton: View {
+struct HomeChromeButton: View {
     let systemName: String
     let size: CGFloat
     let action: () -> Void
@@ -156,12 +163,13 @@ struct HomePillView: View {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
+                    .foregroundStyle(Color(red: 0.25, green: 0.35, blue: 0.6))
                 Text(label)
                     .font(.caption2.weight(tab == target ? .semibold : .regular))
+                    .foregroundStyle(tab == target ? Color.primary : .secondary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .foregroundStyle(tab == target ? Color.primary : .secondary)
             .background(tab == target ? Color(.systemGray5) : Color.clear)
             .clipShape(Capsule())
         }

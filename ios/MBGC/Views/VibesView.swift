@@ -133,6 +133,7 @@ struct CollectionPickerBody<Accessory: View>: View {
     @Binding var selectedColor: String
     @Binding var selectedIcon: String
     @ViewBuilder var accessory: () -> Accessory
+    @FocusState private var focused: Bool
 
     init(
         name: Binding<String>,
@@ -182,6 +183,8 @@ struct CollectionPickerBody<Accessory: View>: View {
                         .foregroundStyle(name.isEmpty ? Color(.placeholderText) : Color(.label))
                         .padding(.horizontal, 24)
                         .padding(.bottom, 24)
+                        .focused($focused)
+                        .onAppear { focused = true }
                 }
 
                 accessory()

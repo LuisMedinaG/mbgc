@@ -196,7 +196,8 @@ import Testing
 
         let games = try ctx.fetch(FetchDescriptor<Game>()).sorted { $0.bggId < $1.bggId }
         let collections = try ctx.fetch(FetchDescriptor<Collection>())
-        let library = try #require(collections.first(where: \.isDefault))
+        let defaultCollection = collections.first(where: \.isDefault)
+        let library = try #require(defaultCollection)
 
         #expect(result.summary.imported == 2)
         #expect(result.summary.skipped == 4)

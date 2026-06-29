@@ -18,6 +18,7 @@
 		4F0987099D966728673D3175 /* BGGGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD671A7394CE1D23B5C50B9B /* BGGGame.swift */; };
 		5AB30FE8725F3ED003DCBB49 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */; };
 		5B702FC979C65059E69AE1B5 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62288FD9B5C3E5AC1E934102 /* Game.swift */; };
+		5E4FD49CAF151CF1BF3744F5 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B96A64CF3883FE552EF008C0 /* OnboardingView.swift */; };
 		79E6A352ED151DA4B01F3C62 /* BGGCSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C70ACC3B90EA828A96A5ABC /* BGGCSVParser.swift */; };
 		7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */; };
 		7D047A0160CEE9F6C121E5F4 /* GameFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */; };
@@ -25,6 +26,7 @@
 		8C7EB56EE0A7BE6797BC0B6B /* FinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2E23AAA250870CACDE4E88 /* FinderView.swift */; };
 		935AA5051C15F2D679F3A2BF /* FinderFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E346F76F771F6D51912B41A4 /* FinderFlow.swift */; };
 		93FC2BC690E736B32C8020F1 /* BGGXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC72A5148F980A8CE0BA6DD /* BGGXMLParser.swift */; };
+		A14CCA273BB6AB6567E82B6A /* FinderFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A42060DB22126F2DE881609 /* FinderFlowTests.swift */; };
 		B4DF7982B73A5EFD2AD0C36D /* LocalImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */; };
 		CA1057DFA68EB6B461FF325B /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */; };
 		CC114164030AA1410BCFD7E6 /* FinderConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B4DF27C4868D325DA92BD2 /* FinderConfig.swift */; };
@@ -56,6 +58,7 @@
 		1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
 		2058E623BD5D079D092889E1 /* CsvImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CsvImportView.swift; sourceTree = "<group>"; };
 		29FB54336829DBBC66ECFAEC /* ImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportView.swift; sourceTree = "<group>"; };
+		2A42060DB22126F2DE881609 /* FinderFlowTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFlowTests.swift; sourceTree = "<group>"; };
 		32B0DA77E2FB126C70333193 /* SmartRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRuleTests.swift; sourceTree = "<group>"; };
 		3E2D1BBCB5BC4075C2C4396C /* CollectionName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionName.swift; sourceTree = "<group>"; };
 		3FDE49F6EB6D9AC345ED03DD /* VibesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibesViewModel.swift; sourceTree = "<group>"; };
@@ -73,6 +76,7 @@
 		A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameFiltersTests.swift; sourceTree = "<group>"; };
 		AF538B299162A6D4819794D5 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B96A64CF3883FE552EF008C0 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		BD2E23AAA250870CACDE4E88 /* FinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderView.swift; sourceTree = "<group>"; };
 		BFC72A5148F980A8CE0BA6DD /* BGGXMLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGXMLParser.swift; sourceTree = "<group>"; };
 		BFF36E1CC65BF3B805532A8B /* BGGXMLParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGXMLParserTests.swift; sourceTree = "<group>"; };
@@ -137,6 +141,7 @@
 			children = (
 				710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */,
 				BFF36E1CC65BF3B805532A8B /* BGGXMLParserTests.swift */,
+				2A42060DB22126F2DE881609 /* FinderFlowTests.swift */,
 				AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */,
 				32B0DA77E2FB126C70333193 /* SmartRuleTests.swift */,
 			);
@@ -163,6 +168,7 @@
 				BD2E23AAA250870CACDE4E88 /* FinderView.swift */,
 				A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */,
 				29FB54336829DBBC66ECFAEC /* ImportView.swift */,
+				B96A64CF3883FE552EF008C0 /* OnboardingView.swift */,
 				53CCB0E019B538D583D338CA /* SearchView.swift */,
 				C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */,
 				1E87CF1FE5164753FD476E2F /* VibesView.swift */,
@@ -306,6 +312,7 @@
 				1AE5F179806A31E8719F84F7 /* ImportView.swift in Sources */,
 				B4DF7982B73A5EFD2AD0C36D /* LocalImportService.swift in Sources */,
 				F69123C72343D01B126F55D0 /* MBGCApp.swift in Sources */,
+				5E4FD49CAF151CF1BF3744F5 /* OnboardingView.swift in Sources */,
 				405F7579E675C4135E9EB978 /* SearchView.swift in Sources */,
 				7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */,
 				80D024F0D11FFF26F68E036F /* VibesView.swift in Sources */,
@@ -319,6 +326,7 @@
 			files = (
 				EB72B79547FCFDBD1BBF01FD /* BGGCSVParserTests.swift in Sources */,
 				4DCA1F0DC2C89D3E4FA49A5B /* BGGXMLParserTests.swift in Sources */,
+				A14CCA273BB6AB6567E82B6A /* FinderFlowTests.swift in Sources */,
 				7D047A0160CEE9F6C121E5F4 /* GameFiltersTests.swift in Sources */,
 				1FCB576CE9671AA87AA86370 /* SmartRuleTests.swift in Sources */,
 			);

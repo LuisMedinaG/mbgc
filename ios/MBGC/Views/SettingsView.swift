@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @Binding var isPresented: Bool
     @AppStorage("appearanceMode") private var appearanceMode = "system"
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @State private var showImportBGG = false
 
     var body: some View {
@@ -27,6 +28,14 @@ struct SettingsView: View {
                     NavigationLink { CsvImportView() } label: {
                         SettingsRow(icon: "doc.text.fill", color: .green, label: "Import from CSV")
                     }
+                }
+
+                Section("Help") {
+                    // Resets the gate flag; ContentView's fullScreenCover reopens on dismiss.
+                    Button { hasSeenOnboarding = false; isPresented = false } label: {
+                        SettingsRow(icon: "sparkles", color: .blue, label: "Restart Intro")
+                    }
+                    .foregroundStyle(.primary)
                 }
             }
             .navigationTitle("Settings")
