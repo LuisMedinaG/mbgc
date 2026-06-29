@@ -5,6 +5,7 @@ import SwiftUI
 
 struct FinderView: View {
     @Binding var path: [Int]
+    @Binding var active: Bool   // false = intro cover (chrome visible); true = test running (chrome hidden)
     @State private var flow = FinderFlow()
     @State private var hapticTrigger = 0
     @Query private var allGames: [Game]
@@ -17,9 +18,11 @@ struct FinderView: View {
 
                 if !flow.hasCollections {
                     FinderEmptyView()
+                } else if !active {
+                    FinderStartView { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { active = true } }
                 } else if flow.isDone {
                     FinderResultView(flow: flow) {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { flow.reset() }
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { exitTest() }
                     }
                     .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 } else if let axis = flow.currentAxis {
@@ -35,11 +38,12 @@ struct FinderView: View {
                                 flow.select(option)
                             }
                         },
-                        onBack: flow.stepIndex > 0 ? {
+                        // Back arrow always present: step >0 goes back a question, step 0 exits the test.
+                        onBack: {
                             withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                                flow.back()
+                                if flow.stepIndex > 0 { flow.back() } else { exitTest() }
                             }
-                        } : nil
+                        }
                     )
                     .id(flow.stepIndex)
                     .transition(.asymmetric(
@@ -64,6 +68,47 @@ struct FinderView: View {
     private func sync() {
         flow.ownedGames = allGames
         flow.allCollections = collections
+    }
+
+    private func exitTest() {
+        flow.reset()
+        active = false
+    }
+}
+
+// MARK: - Start Cover
+
+private struct FinderStartView: View {
+    let onStart: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "moon.stars.fill")
+                .font(.system(size: 56))
+                .foregroundStyle(.orange)
+            VStack(spacing: 8) {
+                Text("Tonight's Pick")
+                    .font(.largeTitle.bold())
+                Text("Answer a few quick questions and we'll narrow your collection down to the perfect game.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+            Spacer()
+            Button(action: onStart) {
+                Text("Start")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(Color.orange)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 120)
+        }
     }
 }
 
@@ -279,10 +324,19 @@ struct FinderResultView: View {
                         }
 
                         if showAll {
-                            Text("All \(flow.ranked.count) games")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                                .id("allGames")
+                            Button { toggleAll(proxy: proxy) } label: {
+                                HStack {
+                                    Text("All \(flow.ranked.count) games")
+                                        .font(.headline)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Image(systemName: "chevron.up")
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .id("allGames")
                             LazyVStack(spacing: 0) {
                                 ForEach(Array(flow.ranked.enumerated()), id: \.element.bggId) { idx, game in
                                     NavigationLink(value: game.bggId) {
@@ -339,7 +393,9 @@ struct FinderResultView: View {
             .scrollIndicators(showAll ? .automatic : .hidden)
             .refreshable { onRestart() }   // ponytail: native pull-down → start over
             .overlay(alignment: .topTrailing) { menu }
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: showAll)
+            // ponytail: toggle already animated via withAnimation in toggleAll; a
+            // blanket .animation here rasterizes the whole expanding list into one
+            // offscreen layer → "RBLayer: unable to create texture".
         }
     }
 

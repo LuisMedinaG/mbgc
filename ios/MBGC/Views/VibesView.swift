@@ -1094,7 +1094,9 @@ struct CollectionDetailView: View {
                 action: action,
                 games: selectedGames,
                 source: collection,
-                destinations: otherCollections
+                // ponytail: smart lists derive membership from rules — games.append is ignored
+                // by smartGames(), so a move would silently lose the game. Exclude them as targets.
+                destinations: otherCollections.filter { !$0.isSmart }
             ) {
                 if action == .move { exitSelection() }
                 else { selectedIds.removeAll() }

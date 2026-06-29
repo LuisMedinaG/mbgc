@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var tab: HomeTab = .tonight
     @State private var collectionPath: [Collection] = []
     @State private var finderPath: [Int] = []
+    @State private var finderActive = false   // test running → hide pill/search chrome
     @State private var showSearch = false
     @State private var showSettings = false
     @State private var showCreate = false
@@ -33,7 +34,7 @@ struct ContentView: View {
         Group {
             switch tab {
             case .collection: VibesView(viewModel: vibesViewModel, path: $collectionPath)
-            case .tonight:    FinderView(path: $finderPath)
+            case .tonight:    FinderView(path: $finderPath, active: $finderActive)
             }
         }
         .overlay {
@@ -45,7 +46,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !isInDetailView {
+            if !isInDetailView && !(tab == .tonight && finderActive) {
                 VStack(spacing: 0) {
                     if showCreate {
                         CreateTypeChooser { kind in
