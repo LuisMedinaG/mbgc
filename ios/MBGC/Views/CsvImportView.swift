@@ -6,27 +6,15 @@ private enum CSVStep {
     case upload, preview, importing, done
 }
 
-private struct ImportResult {
-    let imported: Int
-    let skipped: Int
-    let failed: [Int]
-}
-
-private struct CSVRow: Identifiable {
-    let bggId: Int
-    let name: String
-    var id: Int { bggId }
-}
-
 struct CsvImportView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var step: CSVStep = .upload
     @State private var selectedFile: URL?
-    @State private var previewRows: [CSVRow] = []
+    @State private var previewRows: [BGGCSVRow] = []
     @State private var previewError: String?
     @State private var importProgress: (done: Int, total: Int)?
-    @State private var importResult: ImportResult?
+    @State private var importResult: LocalImportSummary?
     @State private var importError: String?
     @State private var showingPicker = false
     @State private var importedGames: [Game] = []
@@ -188,7 +176,7 @@ struct CsvImportView: View {
             }
             defer { url.stopAccessingSecurityScopedResource() }
             let raw = try String(contentsOf: url, encoding: .utf8)
-            let rows = parseCSV(raw)
+            let rows = BGGCSVParser.parse(raw)
             if rows.isEmpty {
                 previewError = "No BGG game IDs found. Make sure the CSV has an \"objectid\" column."
                 return
@@ -208,13 +196,13 @@ struct CsvImportView: View {
         importedGames = []
 
         do {
-            let allIds = previewRows.map(\.bggId)
+            let allIds = LocalImportService.uniqueIds(previewRows.map(\.bggId))
             let existing = LocalLibrary.existingBggIds(in: modelContext, from: allIds)
             let toFetch = allIds.filter { !existing.contains($0) }
             let skipped = allIds.count - toFetch.count
 
             if toFetch.isEmpty {
-                importResult = ImportResult(imported: 0, skipped: skipped, failed: [])
+                importResult = LocalImportSummary(imported: 0, skipped: skipped, failed: [])
                 step = .done
                 return
             }
@@ -227,27 +215,15 @@ struct CsvImportView: View {
                 }
             }
 
-            var imported = 0
-            var failedIds: [Int] = []
-            let fetchedById = Dictionary(grouping: games, by: \.bggId).compactMapValues(\.first)
-            var newGames: [Game] = []
+            let result = try LocalImportService.saveFetchedGames(
+                games,
+                requestedIds: toFetch,
+                skipped: skipped,
+                in: modelContext
+            )
 
-            for id in toFetch {
-                if let bggGame = fetchedById[id] {
-                    let game = Game(bggGame: bggGame)
-                    modelContext.insert(game)
-                    newGames.append(game)
-                    imported += 1
-                } else {
-                    failedIds.append(id)
-                }
-            }
-            let library = try LocalLibrary.ensureDefaultCollection(in: modelContext)
-            LocalLibrary.add(newGames, to: library)
-            try modelContext.save()
-
-            importedGames = newGames
-            importResult = ImportResult(imported: imported, skipped: skipped, failed: failedIds)
+            importedGames = result.newGames
+            importResult = result.summary
             step = .done
         } catch {
             importError = (error as? BGGError)?.userMessage ?? "Import failed. Try again."
@@ -265,65 +241,4 @@ struct CsvImportView: View {
         importError = nil
         importedGames = []
     }
-}
-
-// MARK: — CSV Parser
-
-private func parseCSV(_ raw: String) -> [CSVRow] {
-    let lines = raw.components(separatedBy: .newlines).filter { !$0.isEmpty }
-    guard !lines.isEmpty else { return [] }
-
-    guard let headerIndex = lines.firstIndex(where: { $0.lowercased().contains("objectid") }) else {
-        return []
-    }
-    let headers = csvFields(lines[headerIndex]).map { $0.lowercased() }
-    guard let idCol = headers.firstIndex(of: "objectid") else { return [] }
-    let nameCol = headers.firstIndex(of: "objectname")
-
-    var rows: [CSVRow] = []
-    for line in lines[(headerIndex + 1)...] {
-        let fields = csvFields(line)
-        guard fields.count > idCol,
-              let id = Int(fields[idCol].trimmingCharacters(in: .whitespaces)),
-              id > 0 else { continue }
-        let name: String
-        if let nc = nameCol, fields.count > nc {
-            name = fields[nc].trimmingCharacters(in: .init(charactersIn: "\" \t"))
-        } else {
-            name = "BGG #\(id)"
-        }
-        rows.append(CSVRow(bggId: id, name: name.isEmpty ? "BGG #\(id)" : name))
-    }
-    return rows
-}
-
-private func csvFields(_ line: String) -> [String] {
-    var fields: [String] = []
-    var current = ""
-    var inQuotes = false
-    var skipNext = false
-
-    let chars = Array(line)
-    for i in 0..<chars.count {
-        if skipNext {
-            skipNext = false
-            continue
-        }
-        let ch = chars[i]
-        if ch == "\"" {
-            if inQuotes && i + 1 < chars.count && chars[i + 1] == "\"" {
-                current.append("\"")
-                skipNext = true
-            } else {
-                inQuotes.toggle()
-            }
-        } else if ch == "," && !inQuotes {
-            fields.append(current)
-            current = ""
-        } else {
-            current.append(ch)
-        }
-    }
-    fields.append(current)
-    return fields
 }

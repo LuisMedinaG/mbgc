@@ -58,7 +58,13 @@ struct ContentView: View {
                     HStack(alignment: .center) {
                         HomePillView(tab: $tab)
                         Spacer()
-                        VStack(spacing: 10) {
+                        HomeChromeButton(systemName: "magnifyingglass", size: 54) {
+                            showSearch = true
+                        }
+                        .accessibilityLabel("Search")
+                        // Plus floats above the search button via overlay so it adds no
+                        // layout height — keeps the search button centered with the pill.
+                        .overlay(alignment: .top) {
                             if tab == .collection && collectionPath.isEmpty && !showCreate {
                                 Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
                                     Image(systemName: "plus")
@@ -69,35 +75,22 @@ struct ContentView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 14))
                                 }
                                 .accessibilityLabel("New Collection")
+                                .offset(y: -(52 + 10))
                                 .transition(.scale.combined(with: .opacity))
                             }
-                            Button { showSearch = true } label: {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 20, weight: .medium))
-                                    .foregroundStyle(Color(.label))
-                                    .frame(width: 54, height: 54)
-                                    .background(Color(.secondarySystemBackground))
-                                    .clipShape(Circle())
-                            }
-                            .accessibilityLabel("Search")
                         }
                     }
                     .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tab)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
-                    .padding(.bottom, 16)
+                    .padding(.bottom, 0)
                 }
             }
         }
         .overlay(alignment: .topTrailing) {
             if !isInDetailView && tab != .tonight {
-                Button { showSettings = true } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(Color(.label))
-                        .frame(width: 44, height: 44)
-                        .background(Color(.secondarySystemBackground))
-                        .clipShape(Circle())
+                HomeChromeButton(systemName: "gearshape", size: 44) {
+                    showSettings = true
                 }
                 .accessibilityLabel("Settings")
                 .padding(.top, 8)
@@ -126,6 +119,23 @@ struct ContentView: View {
     }
 }
 
+private struct HomeChromeButton: View {
+    let systemName: String
+    let size: CGFloat
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(Color(.label))
+                .frame(width: size, height: size)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(Circle())
+        }
+    }
+}
+
 struct HomePillView: View {
     @Binding var tab: HomeTab
 
@@ -135,7 +145,7 @@ struct HomePillView: View {
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
         .padding(4)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.white)
         .clipShape(Capsule())
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
         .sensoryFeedback(.selection, trigger: tab)
@@ -151,8 +161,8 @@ struct HomePillView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .foregroundStyle(tab == target ? Color.white : .secondary)
-            .background(tab == target ? Color.accentColor : Color.clear)
+            .foregroundStyle(tab == target ? Color.primary : .secondary)
+            .background(tab == target ? Color(.systemGray5) : Color.clear)
             .clipShape(Capsule())
         }
         .accessibilityLabel(label)

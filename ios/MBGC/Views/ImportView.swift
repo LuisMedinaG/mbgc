@@ -14,12 +14,6 @@ private let bggRegularImportLimit = 150
 #endif
 private let bggImportCooldown: TimeInterval = 7 * 24 * 60 * 60
 
-private struct BGGImportSummary {
-    let imported: Int
-    let skipped: Int
-    let failed: [Int]
-}
-
 struct ImportView: View {
     var dismissAll: (() -> Void)? = nil
     @Environment(\.modelContext) private var modelContext
@@ -31,7 +25,7 @@ struct ImportView: View {
     @State private var isSyncing = false
     @State private var syncProgress: String?
     @State private var syncError: String?
-    @State private var syncSummary: BGGImportSummary?
+    @State private var syncSummary: LocalImportSummary?
     @State private var syncLog: [String] = []
 
     var body: some View {
@@ -204,7 +198,7 @@ struct ImportView: View {
         do {
             appendSyncLog("Fetching owned BGG IDs")
             let collectionResult = try await BGGClient.shared.fetchCollection(username: username, token: token)
-            let bggIds = collectionResult.ids
+            let bggIds = LocalImportService.uniqueIds(collectionResult.ids)
             UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
             appendSyncLog("Found \(bggIds.count) owned item\(bggIds.count == 1 ? "" : "s")")
 
@@ -217,15 +211,16 @@ struct ImportView: View {
             if overLimit > 0 { appendSyncLog("Limiting this sync to \(bggRegularImportLimit) new games") }
 
             if bggIds.isEmpty {
-                syncSummary = BGGImportSummary(imported: 0, skipped: 0, failed: [])
+                syncSummary = LocalImportSummary(imported: 0, skipped: 0, failed: [])
                 syncError = "No owned games found for this BGG username."
                 appendSyncLog("Nothing to import")
                 return
             }
 
-            // Fetch + insert only the genuinely-new games. Already-local games are reused.
-            var newGames: [Game] = []
-            var failedIds: [Int] = []
+            var result = LocalImportResult(
+                summary: LocalImportSummary(imported: 0, skipped: existing.count + overLimit, failed: []),
+                newGames: []
+            )
             if !toFetch.isEmpty {
                 syncProgress = "Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")..."
                 appendSyncLog("Fetching details for \(toFetch.count) new game\(toFetch.count == 1 ? "" : "s")")
@@ -236,23 +231,18 @@ struct ImportView: View {
                     }
                 }
 
-                let fetchedById = Dictionary(grouping: bggGames, by: \.bggId).compactMapValues(\.first)
-                for id in toFetch {
-                    if let bggGame = fetchedById[id] {
-                        let game = Game(bggGame: bggGame)
-                        modelContext.insert(game)
-                        newGames.append(game)
-                    } else {
-                        failedIds.append(id)
-                    }
-                }
+                result = try LocalImportService.saveFetchedGames(
+                    bggGames,
+                    requestedIds: toFetch,
+                    skipped: existing.count + overLimit,
+                    in: modelContext
+                )
+            } else {
+                try modelContext.save()
             }
 
-            let library = try LocalLibrary.ensureDefaultCollection(in: modelContext)
-            LocalLibrary.add(newGames, to: library)
-            appendSyncLog("Saving \(newGames.count) new game\(newGames.count == 1 ? "" : "s") locally")
-            try modelContext.save()
-            if !newGames.isEmpty {
+            appendSyncLog("Saving \(result.newGames.count) new game\(result.newGames.count == 1 ? "" : "s") locally")
+            if !result.newGames.isEmpty {
                 UserDefaults.standard.set(Date(), forKey: bggLastSyncKey)
                 UserDefaults.standard.set(bggIds, forKey: bggCachedIdsKey)
             }
@@ -260,7 +250,7 @@ struct ImportView: View {
             // Offer the WHOLE collection (new + already-local) to the destination picker.
             // LocalLibrary.add dedups, so adding already-present games is a no-op.
             selectedGames = LocalLibrary.games(matching: bggIds, in: modelContext)
-            syncSummary = BGGImportSummary(imported: newGames.count, skipped: existing.count + overLimit, failed: failedIds)
+            syncSummary = result.summary
             showDestinationPicker = !selectedGames.isEmpty
             appendSyncLog(selectedGames.isEmpty ? "Import finished" : "Choose a destination collection")
         } catch {

@@ -279,6 +279,8 @@ struct FinderResultView: View {
     let onRestart: () -> Void
 
     @State private var showAll = false
+    @State private var bounce: CGFloat = 0
+    @AppStorage("finderStartOverHintSeen") private var hintSeen = false
 
     private var top: [Game] { Array(flow.ranked.prefix(3)) }
     private var hasMore: Bool { flow.ranked.count > 3 }
@@ -303,6 +305,22 @@ struct FinderResultView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
+                        // ponytail: overscroll hint, .refreshable still does the work.
+                        GeometryReader { geo in
+                            // Real pull (scroll minY) OR the one-time tutorial bounce reveals the hint.
+                            let drive = max(geo.frame(in: .named("finderScroll")).minY, bounce)
+                            VStack(spacing: 4) {
+                                Image(systemName: "arrow.down")
+                                Text("Start over…")
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .opacity(min(max(drive / 60, 0), 1))
+                            .offset(y: -40)
+                        }
+                        .frame(height: 0)
+
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Tonight's Pick")
                                 .font(.largeTitle.bold())
@@ -416,15 +434,24 @@ struct FinderResultView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 72)
-                    .gesture(DragGesture(minimumDistance: 40).onEnded { v in
-                        guard !showAll, v.translation.height < -60 else { return }
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showAll = true }
-                    })
+                    .offset(y: bounce)
                 }
-                .scrollDisabled(!showAll)
+                .coordinateSpace(name: "finderScroll")
                 .scrollIndicators(showAll ? .automatic : .hidden)
-                .refreshable { onRestart() }   // ponytail: native pull-down → start over (only fires when showAll)
+                .refreshable { onRestart() }   // native pull-down → start over (now works collapsed too)
                 .overlay(alignment: .topTrailing) { menu }
+                .task {
+                    // One-time tutorial: dip down + reveal the "Start over…" hint, a few times.
+                    guard !hintSeen, !top.isEmpty else { return }
+                    try? await Task.sleep(for: .seconds(1.4))
+                    for _ in 0..<3 {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) { bounce = 44 }
+                        try? await Task.sleep(for: .seconds(0.45))
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.85)) { bounce = 0 }
+                        try? await Task.sleep(for: .seconds(0.35))
+                    }
+                    hintSeen = true
+                }
                 // ponytail: toggle already animated via withAnimation in toggleAll; a
                 // blanket .animation here rasterizes the whole expanding list into one
                 // offscreen layer → "RBLayer: unable to create texture".

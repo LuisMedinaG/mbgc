@@ -18,16 +18,19 @@
 		4F0987099D966728673D3175 /* BGGGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD671A7394CE1D23B5C50B9B /* BGGGame.swift */; };
 		5AB30FE8725F3ED003DCBB49 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */; };
 		5B702FC979C65059E69AE1B5 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62288FD9B5C3E5AC1E934102 /* Game.swift */; };
+		79E6A352ED151DA4B01F3C62 /* BGGCSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C70ACC3B90EA828A96A5ABC /* BGGCSVParser.swift */; };
 		7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */; };
 		7D047A0160CEE9F6C121E5F4 /* GameFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */; };
 		80D024F0D11FFF26F68E036F /* VibesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E87CF1FE5164753FD476E2F /* VibesView.swift */; };
 		8C7EB56EE0A7BE6797BC0B6B /* FinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2E23AAA250870CACDE4E88 /* FinderView.swift */; };
 		935AA5051C15F2D679F3A2BF /* FinderFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E346F76F771F6D51912B41A4 /* FinderFlow.swift */; };
 		93FC2BC690E736B32C8020F1 /* BGGXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC72A5148F980A8CE0BA6DD /* BGGXMLParser.swift */; };
+		B4DF7982B73A5EFD2AD0C36D /* LocalImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */; };
 		CA1057DFA68EB6B461FF325B /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */; };
 		CC114164030AA1410BCFD7E6 /* FinderConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B4DF27C4868D325DA92BD2 /* FinderConfig.swift */; };
 		D8E40F4646E55370D3BF183A /* VibesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDE49F6EB6D9AC345ED03DD /* VibesViewModel.swift */; };
 		E9D751128EE12735DB9AC55D /* CsvImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2058E623BD5D079D092889E1 /* CsvImportView.swift */; };
+		EB72B79547FCFDBD1BBF01FD /* BGGCSVParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */; };
 		ED1F2C2F1CE713E431FD5D38 /* GameDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D54977781EC32711BF85BF6 /* GameDetailViewModel.swift */; };
 		EDF7B4F8DD98E7087FCA9712 /* CollectionName.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2D1BBCB5BC4075C2C4396C /* CollectionName.swift */; };
 		EFCDB466CEB038333191E77D /* FilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46E263A072989194BBFE0959 /* FilterView.swift */; };
@@ -47,6 +50,7 @@
 
 /* Begin PBXFileReference section */
 		0A5D5C010301E549F84FE830 /* Collection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Collection.swift; sourceTree = "<group>"; };
+		0C70ACC3B90EA828A96A5ABC /* BGGCSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGCSVParser.swift; sourceTree = "<group>"; };
 		1D54977781EC32711BF85BF6 /* GameDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailViewModel.swift; sourceTree = "<group>"; };
 		1E87CF1FE5164753FD476E2F /* VibesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibesView.swift; sourceTree = "<group>"; };
 		1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
@@ -59,10 +63,12 @@
 		53CCB0E019B538D583D338CA /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		57A3327FCE88990AF0D527C5 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		62288FD9B5C3E5AC1E934102 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
+		710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGCSVParserTests.swift; sourceTree = "<group>"; };
 		7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8CD293B5E140C89254FC4943 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99C1F0CBB227E63609C23F0A /* MBGCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBGCApp.swift; sourceTree = "<group>"; };
+		9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalImportService.swift; sourceTree = "<group>"; };
 		A0076C98DF51184321766D82 /* BGGClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGClient.swift; sourceTree = "<group>"; };
 		A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailView.swift; sourceTree = "<group>"; };
 		AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameFiltersTests.swift; sourceTree = "<group>"; };
@@ -129,6 +135,7 @@
 		874B1031D51CE2A7F9036D69 /* MBGCTests */ = {
 			isa = PBXGroup;
 			children = (
+				710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */,
 				BFF36E1CC65BF3B805532A8B /* BGGXMLParserTests.swift */,
 				AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */,
 				32B0DA77E2FB126C70333193 /* SmartRuleTests.swift */,
@@ -139,7 +146,9 @@
 		9DB3CD970971E402417799A0 /* Util */ = {
 			isa = PBXGroup;
 			children = (
+				0C70ACC3B90EA828A96A5ABC /* BGGCSVParser.swift */,
 				3E2D1BBCB5BC4075C2C4396C /* CollectionName.swift */,
+				9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */,
 			);
 			path = Util;
 			sourceTree = "<group>";
@@ -234,7 +243,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					FF95678E676736D017659FA2 = {
 						ProvisioningStyle = Automatic;
@@ -277,6 +286,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				79E6A352ED151DA4B01F3C62 /* BGGCSVParser.swift in Sources */,
 				F548192F09542AEF879A48A0 /* BGGClient.swift in Sources */,
 				4F0987099D966728673D3175 /* BGGGame.swift in Sources */,
 				93FC2BC690E736B32C8020F1 /* BGGXMLParser.swift in Sources */,
@@ -294,6 +304,7 @@
 				CA1057DFA68EB6B461FF325B /* GameDetailView.swift in Sources */,
 				ED1F2C2F1CE713E431FD5D38 /* GameDetailViewModel.swift in Sources */,
 				1AE5F179806A31E8719F84F7 /* ImportView.swift in Sources */,
+				B4DF7982B73A5EFD2AD0C36D /* LocalImportService.swift in Sources */,
 				F69123C72343D01B126F55D0 /* MBGCApp.swift in Sources */,
 				405F7579E675C4135E9EB978 /* SearchView.swift in Sources */,
 				7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */,
@@ -306,6 +317,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB72B79547FCFDBD1BBF01FD /* BGGCSVParserTests.swift in Sources */,
 				4DCA1F0DC2C89D3E4FA49A5B /* BGGXMLParserTests.swift in Sources */,
 				7D047A0160CEE9F6C121E5F4 /* GameFiltersTests.swift in Sources */,
 				1FCB576CE9671AA87AA86370 /* SmartRuleTests.swift in Sources */,
@@ -331,14 +343,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = VM6KX236RP;
 				INFOPLIST_FILE = MBGC/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Tonight's pick";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumedina.mbgc;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -398,7 +407,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -483,7 +491,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -516,14 +523,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = VM6KX236RP;
 				INFOPLIST_FILE = MBGC/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Tonight's pick";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = app.lumedina.mbgc;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";

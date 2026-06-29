@@ -75,9 +75,9 @@ enum FinderAxis: String, CaseIterable {
             }
         }
 
-        collections
+        return collections
             .filter { !$0.isDefault }
-            .compactMap { col in
+            .compactMap { col -> FinderOption? in
                 let n = col.isSmart
                     ? col.smartGames(collections: collections, allGames: games).count
                     : manualCounts[col.name, default: 0]
@@ -104,7 +104,7 @@ enum FinderAxis: String, CaseIterable {
             }
         }
 
-        return (1...cap).compactMap { count in
+        return (1...cap).compactMap { count -> FinderOption? in
             let gameCount = gamesPerCount[count]
             guard gameCount > 0 else { return nil }
 
@@ -136,7 +136,7 @@ enum FinderAxis: String, CaseIterable {
             counts[bucket, default: 0] += 1
         }
 
-        DurationBucket.allCases.compactMap { bucket in
+        return DurationBucket.allCases.compactMap { bucket -> FinderOption? in
             let n = counts[bucket, default: 0]
             guard n > 0 else { return nil }
             return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,

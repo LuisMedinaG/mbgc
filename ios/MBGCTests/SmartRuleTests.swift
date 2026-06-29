@@ -143,3 +143,67 @@ import Testing
         #expect(s.smartGames(collections: [s], allGames: all).count == all.count)
     }
 }
+
+@Suite @MainActor struct LocalImportServiceTests {
+    private func makeContext() throws -> ModelContext {
+        let container = try ModelContainer(
+            for: Collection.self, Game.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        return ModelContext(container)
+    }
+
+    private func bggGame(_ id: Int, name: String? = nil) -> BGGGame {
+        BGGGame(
+            bggId: id,
+            name: name ?? "g\(id)",
+            description: "",
+            yearPublished: 0,
+            image: "",
+            thumbnail: "",
+            minPlayers: 0,
+            maxPlayers: 0,
+            playTime: 0,
+            categories: [],
+            mechanics: [],
+            types: [],
+            weight: 0,
+            rating: 0,
+            geekRating: 0,
+            bggRank: 0,
+            userRating: 0,
+            wantToPlay: false,
+            numberOfPlays: 0,
+            languageDependence: 0,
+            recommendedPlayers: [],
+            minAge: 0
+        )
+    }
+
+    @Test func bggImportSync2DedupesRequestedIDsInOrder() {
+        #expect(LocalImportService.uniqueIds([3, 1, 3, 2, 1]) == [3, 1, 2])
+    }
+
+    @Test func bggImportSync2And3SavesFetchedGamesIntoDefaultLibrary() throws {
+        let ctx = try makeContext()
+
+        let result = try LocalImportService.saveFetchedGames(
+            [bggGame(2, name: "Catan"), bggGame(1, name: "Ark Nova")],
+            requestedIds: [1, 2, 3],
+            skipped: 4,
+            in: ctx
+        )
+
+        let games = try ctx.fetch(FetchDescriptor<Game>()).sorted { $0.bggId < $1.bggId }
+        let collections = try ctx.fetch(FetchDescriptor<Collection>())
+        let library = try #require(collections.first(where: \.isDefault))
+
+        #expect(result.summary.imported == 2)
+        #expect(result.summary.skipped == 4)
+        #expect(result.summary.failed == [3])
+        #expect(result.newGames.map(\.bggId) == [1, 2])
+        #expect(games.map(\.name) == ["Ark Nova", "Catan"])
+        #expect(library.name == "Library")
+        #expect(library.games.map(\.bggId).sorted() == [1, 2])
+    }
+}

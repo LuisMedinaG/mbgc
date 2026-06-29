@@ -65,7 +65,12 @@ private struct SquareThumbnail: ViewModifier {
                 .frame(width: size, height: size)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         } else {
-            content
+            // Color.clear owns the layout size (whatever the parent proposes),
+            // so the overlaid scaledToFill image can't propagate its intrinsic
+            // size upward and inflate the surrounding layout wider than screen.
+            Color.clear
+                .overlay { content }
+                .clipped()
         }
     }
 }
