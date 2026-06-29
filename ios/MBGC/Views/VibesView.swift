@@ -873,6 +873,52 @@ struct CollectionDetailView: View {
     private var otherCollections: [Collection] { allCollections.filter { $0.persistentModelID != collection.persistentModelID } }
 
     var body: some View {
+        collectionContent
+            .navigationTitle(collection.name)
+            .navigationBarTitleDisplayMode(.large)
+            .safeAreaPadding(.horizontal, Spacing.screen - 16) // Adjust for List's default padding
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar { collectionToolbar }
+            .safeAreaInset(edge: .bottom) { selectionBar }
+            .sheet(isPresented: $showAddGames) {
+                AddGamesSheet(collection: collection, allGames: allGames)
+            }
+            .sheet(isPresented: $showFilters) {
+                FilterView(filters: $filters, games: effectiveGames)
+            }
+            .sheet(isPresented: $showEditCollection) {
+                RenameCollectionSheet(collection: collection, initialName: collection.name)
+            }
+            .sheet(isPresented: $showEditRule) {
+                SmartListEditor(
+                    rule: collection.decodedRule ?? SmartRule(),
+                    lists: otherCollections,
+                    allGames: allGames
+                ) { newRule in
+                    collection.setRule(newRule)
+                    try? modelContext.save()
+                }
+            }
+            .sheet(item: $pendingAction) { action in
+                CollectionActionSheet(
+                    action: action,
+                    games: selectedGames,
+                    source: collection,
+                    // ponytail: smart lists derive membership from rules — games.append is ignored
+                    // by smartGames(), so a move would silently lose the game. Exclude them as targets.
+                    destinations: otherCollections.filter { !$0.isSmart }
+                ) {
+                    if action == .move { exitSelection() }
+                    else { selectedIds.removeAll() }
+                }
+            }
+            .alert("Delete \"\(collection.name)\"?", isPresented: $showDeleteCollectionConfirm) {
+                Button("Delete", role: .destructive) { deleteCollection() }
+                Button("Cancel", role: .cancel) {}
+            }
+    }
+
+    private var collectionContent: some View {
         Group {
             if effectiveGames.isEmpty {
                 ContentUnavailableView(
@@ -955,155 +1001,132 @@ struct CollectionDetailView: View {
                 .listStyle(.plain)
             }
         }
-        .navigationTitle(collection.name)
-        .navigationBarTitleDisplayMode(.large)
-        .safeAreaPadding(.horizontal, Spacing.screen - 16) // Adjust for List's default padding
+    }
 
-        .toolbar(.visible, for: .navigationBar)
-        .toolbar {
-            if isSelecting {
+    @ToolbarContentBuilder
+    private var collectionToolbar: some ToolbarContent {
+        if isSelecting {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Done") { exitSelection() }
+            }
+        } else {
+            if collection.isSmart {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Done") { exitSelection() }
-                }
-            } else {
-                // Smart list: edit-rule button always visible so empty smart lists can still be configured.
-                if collection.isSmart {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { showEditRule = true } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                        }
-                        .accessibilityLabel("Filters")
+                    Button { showEditRule = true } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
                     }
-                }
-                if !effectiveGames.isEmpty {
-                    if !collection.isSmart {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button { showFilters = true } label: {
-                                Image(systemName: filters.isEmpty
-                                    ? "line.3.horizontal.decrease.circle"
-                                    : "line.3.horizontal.decrease.circle.fill")
-                            }
-                            .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
-                            .accessibilityLabel("Filters")
-                        }
-                    }
-                    // Ranked lists are manually ordered (long-press a row to drag) — no attribute sort.
-                    if !collection.isRanked {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Menu {
-                                Button { sortAscending.toggle() } label: {
-                                    Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
-                                }
-                                Picker("Sort By", selection: $sortOrder) {
-                                    ForEach(GameSort.allCases) { s in
-                                        if s.isCustomImage {
-                                            Label(s.label, image: s.icon).tag(s)
-                                        } else {
-                                            Label(s.label, systemImage: s.icon).tag(s)
-                                        }
-                                    }
-                                }
-                            } label: {
-                                if isDefaultSort {
-                                    Image(systemName: "arrow.up.arrow.down")
-                                } else if sortOrder.isCustomImage {
-                                    Image(sortOrder.icon)
-                                } else {
-                                    Image(systemName: sortOrder.icon)
-                                }
-                            }
-                            .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
-                            .accessibilityLabel("Sort by")
-                        }
-                    }
-                    if !collection.isSmart {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button { isSelecting = true } label: {
-                                Image(systemName: "checklist")
-                            }
-                            .accessibilityLabel("Select games")
-                        }
-                    }
-                }
-                // Gap splits the action group and the ⋯ menu into separate glass capsules (iOS 26).
-                if #available(iOS 26.0, *) {
-                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    collectionMenu
+                    .accessibilityLabel("Filters")
                 }
             }
+            if !effectiveGames.isEmpty {
+                toolbarFilterItem
+                toolbarSortItem
+                toolbarSelectionItem
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                collectionMenu
+            }
         }
-        .safeAreaInset(edge: .bottom) {
-            if isSelecting {
-                HStack(spacing: 16) {
-                    HStack(spacing: 0) {
-                        Button {
-                            selectedIds = Set(filteredGames.map(\.bggId))
-                            pendingAction = .copy
-                        } label: {
-                            Text("Copy All").pillLabel(BrandAccent.color)
-                        }
-                        .disabled(filteredGames.isEmpty)
+    }
 
-                        Button {
-                            selectedIds = Set(filteredGames.map(\.bggId))
-                            pendingAction = .move
-                        } label: {
-                            Text("Move All").pillLabel(BrandAccent.color)
-                        }
-                        .disabled(filteredGames.isEmpty || collection.isDefault)
+    @ToolbarContentBuilder
+    private var toolbarFilterItem: some ToolbarContent {
+        if !collection.isSmart {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { showFilters = true } label: {
+                    Image(systemName: filters.isEmpty
+                        ? "line.3.horizontal.decrease.circle"
+                        : "line.3.horizontal.decrease.circle.fill")
+                }
+                .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
+                .accessibilityLabel("Filters")
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarSortItem: some ToolbarContent {
+        if !collection.isRanked {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { sortAscending.toggle() } label: {
+                        Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
                     }
-                    .background(.regularMaterial, in: Capsule())
+                    Picker("Sort By", selection: $sortOrder) {
+                        ForEach(GameSort.allCases) { s in
+                            if s.isCustomImage {
+                                Label(s.label, image: s.icon).tag(s)
+                            } else {
+                                Label(s.label, systemImage: s.icon).tag(s)
+                            }
+                        }
+                    }
+                } label: {
+                    sortIcon
+                }
+                .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
+                .accessibilityLabel("Sort by")
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var toolbarSelectionItem: some ToolbarContent {
+        if !collection.isSmart {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { isSelecting = true } label: {
+                    Image(systemName: "checklist")
+                }
+                .accessibilityLabel("Select games")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sortIcon: some View {
+        if isDefaultSort {
+            Image(systemName: "arrow.up.arrow.down")
+        } else if sortOrder.isCustomImage {
+            Image(sortOrder.icon)
+        } else {
+            Image(systemName: sortOrder.icon)
+        }
+    }
+
+    @ViewBuilder
+    private var selectionBar: some View {
+        if isSelecting {
+            HStack(spacing: 16) {
+                HStack(spacing: 0) {
+                    Button {
+                        selectedIds = Set(filteredGames.map(\.bggId))
+                        pendingAction = .copy
+                    } label: {
+                        Text("Copy All").pillLabel(BrandAccent.color)
+                    }
+                    .disabled(filteredGames.isEmpty)
 
                     Button {
                         selectedIds = Set(filteredGames.map(\.bggId))
-                        deleteSelected()
+                        pendingAction = .move
                     } label: {
-                        Text("Delete All").pillLabel(.red)
+                        Text("Move All").pillLabel(BrandAccent.color)
                     }
-                    .background(.regularMaterial, in: Capsule())
-                    .disabled(filteredGames.isEmpty)
+                    .disabled(filteredGames.isEmpty || collection.isDefault)
                 }
-                .buttonStyle(.plain)
-                .padding(.vertical, 10)
+                .background(.regularMaterial, in: Capsule())
+
+                Button {
+                    selectedIds = Set(filteredGames.map(\.bggId))
+                    deleteSelected()
+                } label: {
+                    Text("Delete All").pillLabel(.red)
+                }
+                .background(.regularMaterial, in: Capsule())
+                .disabled(filteredGames.isEmpty)
             }
-        }
-        .sheet(isPresented: $showAddGames) {
-            AddGamesSheet(collection: collection, allGames: allGames)
-        }
-        .sheet(isPresented: $showFilters) {
-            FilterView(filters: $filters, games: effectiveGames)
-        }
-        .sheet(isPresented: $showEditCollection) {
-            RenameCollectionSheet(collection: collection, initialName: collection.name)
-        }
-        .sheet(isPresented: $showEditRule) {
-            SmartListEditor(
-                rule: collection.decodedRule ?? SmartRule(),
-                lists: otherCollections,
-                allGames: allGames
-            ) { newRule in
-                collection.setRule(newRule)
-                try? modelContext.save()
-            }
-        }
-        .sheet(item: $pendingAction) { action in
-            CollectionActionSheet(
-                action: action,
-                games: selectedGames,
-                source: collection,
-                // ponytail: smart lists derive membership from rules — games.append is ignored
-                // by smartGames(), so a move would silently lose the game. Exclude them as targets.
-                destinations: otherCollections.filter { !$0.isSmart }
-            ) {
-                if action == .move { exitSelection() }
-                else { selectedIds.removeAll() }
-            }
-        }
-        .alert("Delete \"\(collection.name)\"?", isPresented: $showDeleteCollectionConfirm) {
-            Button("Delete", role: .destructive) { deleteCollection() }
-            Button("Cancel", role: .cancel) {}
+            .buttonStyle(.plain)
+            .padding(.vertical, 10)
         }
     }
 
