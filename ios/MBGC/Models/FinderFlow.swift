@@ -68,12 +68,19 @@ enum FinderAxis: String, CaseIterable {
     }
 
     private func vibeOptions(games: [Game], collections: [Collection]) -> [FinderOption] {
+        var manualCounts: [String: Int] = [:]
+        for game in games {
+            for collection in game.collections where !collection.isSmart {
+                manualCounts[collection.name, default: 0] += 1
+            }
+        }
+
         collections
             .filter { !$0.isDefault }
             .compactMap { col in
                 let n = col.isSmart
                     ? col.smartGames(collections: collections, allGames: games).count
-                    : games.filter { $0.collections.contains(where: { $0.name == col.name }) }.count
+                    : manualCounts[col.name, default: 0]
                 guard n > 0 else { return nil }
                 return FinderOption(
                     id: "vibe:\(col.name)", label: col.name, count: n,
@@ -105,18 +112,32 @@ enum FinderAxis: String, CaseIterable {
             let label = count == 1   ? "Solo"
                       : count >= cap ? "\(cap)+"
                       :                "\(count) players"
-                return FinderOption(
-                    id: "players:\(count)",
-                    label: label,
-                    count: gameCount,
-                    tint: tints[min(index, tints.count - 1)]
-                )
+            return FinderOption(
+                id: "players:\(count)",
+                label: label,
+                count: gameCount,
+                tint: tints[min(index, tints.count - 1)]
+            )
         }
     }
 
     private func durationOptions(games: [Game]) -> [FinderOption] {
+        var counts: [DurationBucket: Int] = [:]
+        for game in games {
+            let bucket: DurationBucket
+            if let playtime = game.playtime {
+                bucket = playtime < 30 ? .quick
+                       : playtime <= 60 ? .short
+                       : playtime <= 120 ? .medium
+                       : .long
+            } else {
+                bucket = .unknown
+            }
+            counts[bucket, default: 0] += 1
+        }
+
         DurationBucket.allCases.compactMap { bucket in
-            let n = games.filter { bucket.matches($0.playtime) }.count
+            let n = counts[bucket, default: 0]
             guard n > 0 else { return nil }
             return FinderOption(id: "duration:\(bucket.rawValue)", label: bucket.rawValue,
                                 count: n, tint: FinderConfig.durationTints[bucket])
