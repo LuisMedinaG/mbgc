@@ -146,14 +146,10 @@ private struct FinderStepView: View {
             optionGrid
         }
         .padding(.bottom, 110)
-        .gesture(
-            DragGesture(minimumDistance: 40)
-                .onEnded { value in
-                    guard value.translation.width > 60,
-                          abs(value.translation.height) < 100 else { return }
-                    onBack?()
-                }
-        )
+        // Note: a custom DragGesture was here for swipe-back, but it fought
+        // the NavigationStack's built-in right-edge swipe and could double-back
+        // or trigger while the user was scrolling the option grid. Removed —
+        // use the explicit Back button or the NavigationStack edge swipe.
     }
 
     private var header: some View {
@@ -167,6 +163,7 @@ private struct FinderStepView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Back")
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }
@@ -435,17 +432,7 @@ private struct FinderHeroCard: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            Color(.systemGray5)
-                .overlay {
-                    AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: {
-                        Color(.systemGray5)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 260)
-                .clipped()
+            CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
 
             LinearGradient(
                 colors: [.clear, .black.opacity(0.7)],
@@ -489,19 +476,11 @@ private struct FinderRunnerCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // ponytail: Color.clear + overlay forces fill-to-frame so every thumbnail is identical size
-            Color(.systemGray5)
-                .overlay {
-                    AsyncImage(url: URL(string: game.thumbnail ?? game.image ?? "")) { img in
-                        img.resizable().scaledToFill()
-                    } placeholder: {
-                        Color(.systemGray5)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 110)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+            CachedAsyncImage(url: URL(string: game.thumbnail ?? game.image ?? ""))
+            .frame(maxWidth: .infinity)
+            .frame(height: 110)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(game.name)
                 .font(.caption.weight(.semibold))
@@ -522,6 +501,42 @@ private struct FinderRunnerCard: View {
 }
 
 // MARK: - All Matches Sheet
+
+private struct FinderAllMatchesView: View {
+    let games: [Game]
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(games) { game in
+                NavigationLink(value: game.bggId) {
+                    HStack(spacing: 12) {
+                        CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 8)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(game.name).font(.body.weight(.semibold))
+                            if let r = game.rating, r > 0 {
+                                Label(String(format: "%.1f", r), systemImage: "star.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("All Matches")
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Int.self) { bggId in
+                GameDetailView(gameId: bggId)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
 
 // MARK: - Empty State
 

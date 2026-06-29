@@ -46,6 +46,9 @@ struct GameDetailView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        // Make the nav bar background visible over the hero image so the menu
+        // button stays legible regardless of the artwork's lightness.
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -53,8 +56,11 @@ struct GameDetailView: View {
                         Label("Delete Game", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
+                    Image(systemName: "ellipsis.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.primary)
                 }
+                .accessibilityLabel("More actions")
             }
         }
         .alert("Delete \"\(viewModel.game?.name ?? "")\"?", isPresented: $showDeleteAlert) {
@@ -67,11 +73,7 @@ struct GameDetailView: View {
     }
 
     private func heroImage(_ game: Game) -> some View {
-        AsyncImage(url: URL(string: game.image ?? game.thumbnail ?? "")) { image in
-            image.resizable().aspectRatio(contentMode: .fill)
-        } placeholder: {
-            Rectangle().fill(Color(.systemGray5))
-        }
+        CachedAsyncImage(url: URL(string: game.image ?? game.thumbnail ?? ""))
         .frame(maxWidth: .infinity)
         .frame(height: 320)
         .clipped()
@@ -101,23 +103,23 @@ struct GameDetailView: View {
     private func statsRow(_ game: Game) -> some View {
         HStack {
             VStack(spacing: 2) {
-                Text("PLAYERS").font(.caption2).foregroundStyle(.secondary)
-                Text(playersStr(game)).font(.title3).fontWeight(.bold)
                 Text("Players").font(.caption2).foregroundStyle(.secondary)
+                Text(playersStr(game)).font(.title3).fontWeight(.bold)
+                Text("count").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
             VStack(spacing: 2) {
-                Text("PLAYTIME").font(.caption2).foregroundStyle(.secondary)
-                Text("\(game.playtime ?? 0)").font(.title3).fontWeight(.bold)
-                Text("Minutes").font(.caption2).foregroundStyle(.secondary)
+                Text("Playtime").font(.caption2).foregroundStyle(.secondary)
+                Text(playtimeStr(game)).font(.title3).fontWeight(.bold)
+                Text("minutes").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
             Divider()
             VStack(spacing: 2) {
-                Text("WEIGHT").font(.caption2).foregroundStyle(.secondary)
+                Text("Weight").font(.caption2).foregroundStyle(.secondary)
                 Text(game.weight.map { String(format: "%.1f", $0) } ?? "—").font(.title3).fontWeight(.bold)
-                Text("Complexity").font(.caption2).foregroundStyle(.secondary)
+                Text("complexity").font(.caption2).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)
         }
@@ -134,9 +136,9 @@ struct GameDetailView: View {
                         .font(.subheadline)
                         .lineLimit(isDescExpanded ? nil : 4)
                     if !isDescExpanded {
-                        Button("More...") { isDescExpanded = true }
+                        Button("Show more") { isDescExpanded = true }
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(Color.accentColor)
                     }
                 }
             }
@@ -205,12 +207,16 @@ struct GameDetailView: View {
     }
 
     private func bottomBar(_ game: Game) -> some View {
-        let count = game.collections.filter { !$0.isDefault }.count
+        let nonDefaultCollections = game.collections.filter { !$0.isDefault }
+        let label = nonDefaultCollections.isEmpty
+            ? "Add to collection"
+            : "In \(nonDefaultCollections.count) collection\(nonDefaultCollections.count == 1 ? "" : "s")"
         return Button { showAddToCollection = true } label: {
-            Text(count > 0 ? "Add to...  \(count)" : "Add to...")
+            Label(label, systemImage: nonDefaultCollections.isEmpty ? "plus" : "folder.fill")
                 .font(.body.weight(.semibold))
-                .frame(maxWidth: 200)
+                .padding(.horizontal, 20)
                 .padding(.vertical, 14)
+                .frame(maxWidth: 320)
                 .background(Color.accentColor)
                 .foregroundStyle(.white)
                 .clipShape(Capsule())
@@ -224,6 +230,11 @@ struct GameDetailView: View {
             return min == max ? "\(min)" : "\(min)–\(max)"
         }
         return "—"
+    }
+
+    /// "—" when BGG didn't publish a playtime — never "0" (would imply an instant game).
+    private func playtimeStr(_ game: Game) -> String {
+        game.playtime.map { "\($0)" } ?? "—"
     }
 }
 
@@ -251,11 +262,18 @@ struct AddToCollectionSheet: View {
                 } label: {
                     HStack {
                         Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(col.isDefault ? Color.secondary : Color.accentColor)
-                        Text(col.name).foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
+                            .foregroundStyle(col.isDefault ? Color.secondary.opacity(0.6) : Color.accentColor)
+                        Text(col.name)
+                            .foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
+                        if col.isDefault {
+                            Text("Always included")
+                                .font(.caption)
+                                .foregroundStyle(Color.secondary)
+                        }
                     }
                 }
                 .disabled(col.isDefault)
+                .accessibilityHint(col.isDefault ? "Library always contains every imported game" : "")
             }
             .listStyle(.plain)
             .navigationTitle("Collections")

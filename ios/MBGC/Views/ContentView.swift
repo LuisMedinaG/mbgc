@@ -58,31 +58,31 @@ struct ContentView: View {
                     HStack(alignment: .center) {
                         HomePillView(tab: $tab)
                         Spacer()
-                        Button { showSearch = true } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(Color(.label))
-                                .frame(width: 54, height: 54)
-                                .background(Color(.secondarySystemBackground))
-                                .clipShape(Circle())
-                        }
-                        .overlay(alignment: .top) {
+                        VStack(spacing: 10) {
                             if tab == .collection && collectionPath.isEmpty && !showCreate {
-                                Button {
-                                    withAnimation(.spring(duration: 0.25)) { showCreate = true }
-                                } label: {
+                                Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
                                     Image(systemName: "plus")
                                         .font(.title2.weight(.semibold))
                                         .foregroundStyle(.white)
                                         .frame(width: 52, height: 52)
-                                        .background(Color.orange)
+                                        .background(Color.accentColor)
                                         .clipShape(RoundedRectangle(cornerRadius: 14))
                                 }
+                                .accessibilityLabel("New Collection")
                                 .transition(.scale.combined(with: .opacity))
-                                .offset(y: -62)
                             }
+                            Button { showSearch = true } label: {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 20, weight: .medium))
+                                    .foregroundStyle(Color(.label))
+                                    .frame(width: 54, height: 54)
+                                    .background(Color(.secondarySystemBackground))
+                                    .clipShape(Circle())
+                            }
+                            .accessibilityLabel("Search")
                         }
                     }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.85), value: tab)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                     .padding(.bottom, 16)
@@ -99,6 +99,7 @@ struct ContentView: View {
                         .background(Color(.secondarySystemBackground))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Settings")
                 .padding(.top, 8)
                 .padding(.trailing, 20)
             }
@@ -109,7 +110,9 @@ struct ContentView: View {
         .sheet(item: $createKind) { CreateCollectionSheet(kind: $0).preferredColorScheme(preferredScheme) }
         .animation(.spring(duration: 0.25), value: showCreate)
         .preferredColorScheme(preferredScheme)
-        .id(appearanceMode)
+        // Note: avoid .id(appearanceMode) — it would force SwiftUI to rebuild
+        // the entire view tree on theme change, wiping navigation stacks and
+        // sheet state. preferredColorScheme alone is enough.
         .sensoryFeedback(.impact(weight: .medium), trigger: showCreate)
         .sensoryFeedback(.impact(weight: .light), trigger: collectionPath.count)
         .task { seedLibraryIfNeeded() }
@@ -147,10 +150,11 @@ struct HomePillView: View {
                     .font(.caption2.weight(tab == target ? .semibold : .regular))
             }
             .padding(.horizontal, 20)
-            .padding(.vertical, 8)
-            .foregroundStyle(tab == target ? Color.orange : .primary)
-            .background(tab == target ? Color.primary.opacity(0.07) : Color.clear)
+            .padding(.vertical, 10)
+            .foregroundStyle(tab == target ? Color.white : .secondary)
+            .background(tab == target ? Color.accentColor : Color.clear)
             .clipShape(Capsule())
         }
+        .accessibilityLabel(label)
     }
 }

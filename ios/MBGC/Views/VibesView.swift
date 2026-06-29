@@ -3,17 +3,6 @@ import SwiftUI
 
 // MARK: — Collections list
 
-/// Sanitizes a collection name by trimming length and removing illegal characters.
-private func sanitizeName(_ name: String) -> String {
-    let maxLength = 50
-    let sanitized = name
-        .filter { $0 != "[" && $0 != "]" }
-        .prefix(maxLength)
-    return String(sanitized)
-}
-
-/// The primary view for displaying and managing a user's game collections.
-/// In the UI, this is often labeled as "Collection".
 struct VibesView: View {
     /// Legacy name for the view model handling collection CRUD.
     let viewModel: VibesViewModel
@@ -260,10 +249,6 @@ struct CollectionPickerBody<Accessory: View>: View {
     }
 }
 
-private func trimmed(_ s: String) -> String {
-    s.trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
 // MARK: — Collection type chooser (Standard / Ranked / Smart)
 
 /// The three kinds of list a user can create. Mirrors Overboard's create sheet.
@@ -373,7 +358,7 @@ struct CreateCollectionSheet: View {
             CollectionPickerBody(name: $name, selectedColor: $selectedColor, selectedIcon: $selectedIcon) {
                 if kind == .smart { setFiltersPill }
             }
-                .navigationTitle(kind.title)
+                .navigationTitle(CollectionName.trimmed(name).isEmpty ? "New Collection" : CollectionName.trimmed(name))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -381,7 +366,7 @@ struct CreateCollectionSheet: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Create") { save() }
-                            .disabled(trimmed(name).isEmpty)
+                            .disabled(CollectionName.trimmed(name).isEmpty)
                     }
                 }
                 .collectionSaveAlert($errorMessage)
@@ -415,7 +400,7 @@ struct CreateCollectionSheet: View {
     }
 
     private func save() {
-        let col = Collection(name: sanitizeName(trimmed(name)), desc: "")
+        let col = Collection(name: CollectionName.prepareForSave(name), desc: "")
         col.colorHex = selectedColor
         col.iconName = selectedIcon
         switch kind {
@@ -454,7 +439,7 @@ struct RenameCollectionSheet: View {
     var body: some View {
         NavigationStack {
             CollectionPickerBody(name: $name, selectedColor: $selectedColor, selectedIcon: $selectedIcon)
-                .navigationTitle(trimmed(name).isEmpty ? "Edit Collection" : trimmed(name))
+                .navigationTitle(CollectionName.trimmed(name).isEmpty ? "Edit Collection" : CollectionName.trimmed(name))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
@@ -462,7 +447,7 @@ struct RenameCollectionSheet: View {
                     }
                     ToolbarItem(placement: .confirmationAction) {
                         Button("Save") { save() }
-                            .disabled(trimmed(name).isEmpty)
+                            .disabled(CollectionName.trimmed(name).isEmpty)
                     }
                 }
                 .collectionSaveAlert($errorMessage)
@@ -472,7 +457,7 @@ struct RenameCollectionSheet: View {
 
     private func save() {
         guard !collection.isDefault else { return }
-        collection.name = sanitizeName(trimmed(name))
+        collection.name = CollectionName.prepareForSave(name)
         collection.colorHex = selectedColor
         collection.iconName = selectedIcon
         do {
@@ -968,25 +953,37 @@ struct CollectionDetailView: View {
                     Button("Done") { exitSelection() }
                 }
             } else {
-                // First capsule: filter + sort + select
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    // Smart filter always visible so empty smart lists can still be configured.
-                    if collection.isSmart {
+                // Smart list: edit-rule button always visible so empty smart lists can still be configured.
+                if collection.isSmart {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Button { showEditRule = true } label: {
                             Image(systemName: "line.3.horizontal.decrease.circle")
                         }
+                        .accessibilityLabel("Filters")
                     }
-                    if !effectiveGames.isEmpty {
-                        if !collection.isSmart {
+                }
+                if !effectiveGames.isEmpty {
+                    // Select on leading to keep trailing at 3 items — prevents "More" overflow on iPhone.
+                    if !collection.isSmart {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button { isSelecting = true } label: {
+                                Image(systemName: "checkmark.circle")
+                            }
+                            .accessibilityLabel("Select games")
+                        }
+                        ToolbarItem(placement: .topBarTrailing) {
                             Button { showFilters = true } label: {
                                 Image(systemName: filters.isEmpty
                                     ? "line.3.horizontal.decrease.circle"
                                     : "line.3.horizontal.decrease.circle.fill")
                             }
                             .foregroundStyle(filters.isEmpty ? Color.primary : Color.orange)
+                            .accessibilityLabel("Filters")
                         }
-                        // Ranked lists are manually ordered (long-press a row to drag) — no attribute sort.
-                        if !collection.isRanked {
+                    }
+                    // Ranked lists are manually ordered (long-press a row to drag) — no attribute sort.
+                    if !collection.isRanked {
+                        ToolbarItem(placement: .topBarTrailing) {
                             Menu {
                                 Button { sortAscending.toggle() } label: {
                                     Label(sortDirectionLabel, systemImage: sortAscending ? "arrow.up" : "arrow.down")
@@ -1010,15 +1007,10 @@ struct CollectionDetailView: View {
                                 }
                             }
                             .foregroundStyle(isDefaultSort ? Color.primary : Color.orange)
-                        }
-                        if !collection.isSmart {
-                            Button { isSelecting = true } label: {
-                                Image(systemName: "checkmark.circle")
-                            }
+                            .accessibilityLabel("Sort by")
                         }
                     }
                 }
-                // Second capsule: ellipsis
                 ToolbarItem(placement: .topBarTrailing) {
                     collectionMenu
                 }
@@ -1026,48 +1018,38 @@ struct CollectionDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isSelecting {
-                HStack {
-                    HStack(spacing: 0) {
-                        Button("Copy All") {
-                            selectedIds = Set(filteredGames.map(\.bggId))
-                            pendingAction = .copy
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-
-                        Rectangle()
-                            .fill(Color(.separator))
-                            .frame(width: 0.5, height: 20)
-
-                        Button("Move All") {
-                            selectedIds = Set(filteredGames.map(\.bggId))
-                            pendingAction = .move
-                        }
-                        .buttonStyle(.plain)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
+                HStack(spacing: 12) {
+                    Button {
+                        selectedIds = Set(filteredGames.map(\.bggId))
+                        pendingAction = .copy
+                    } label: {
+                        Label("Copy", systemImage: "doc.on.doc")
+                            .labelStyle(.titleAndIcon)
                     }
-                    .font(.body.weight(.medium))
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
+                    .buttonStyle(.bordered)
+                    .disabled(filteredGames.isEmpty)
 
-                    Spacer()
-
-                    Button { deleteSelected() } label: {
-                        Text("Delete All")
-                            .font(.body.weight(.medium))
-                            .foregroundStyle(selectedIds.isEmpty ? Color.secondary : Color.red)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
+                    Button {
+                        selectedIds = Set(filteredGames.map(\.bggId))
+                        pendingAction = .move
+                    } label: {
+                        Label("Move", systemImage: "arrow.right.square")
                     }
-                    .buttonStyle(.plain)
-                    .background(.regularMaterial)
-                    .clipShape(Capsule())
+                    .buttonStyle(.bordered)
+                    .disabled(filteredGames.isEmpty || collection.isDefault)
+
+                    Spacer(minLength: 8)
+
+                    Button(role: .destructive, action: deleteSelected) {
+                        Label("Delete", systemImage: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                     .disabled(selectedIds.isEmpty)
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
             }
         }
         .sheet(isPresented: $showAddGames) {
@@ -1136,6 +1118,7 @@ struct CollectionDetailView: View {
         } label: {
             Image(systemName: "ellipsis")
         }
+        .accessibilityLabel("Collection actions")
     }
 
     /// Persists the dragged order. Only valid when unfiltered (the displayed order is the full order).
@@ -1202,13 +1185,7 @@ struct CollectionDetailView: View {
 
     private func gameRow(_ game: Game) -> some View {
         HStack(spacing: 14) {
-            AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                img.resizable().aspectRatio(contentMode: .fill)
-            } placeholder: {
-                Color(.systemGray5)
-            }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
 
             if let year = game.yearPublished, year > 0 {
                 Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
@@ -1359,11 +1336,7 @@ struct AddGamesSheet: View {
                     HStack(spacing: 14) {
                         Image(systemName: selected.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
                             .foregroundStyle(selected.contains(game.bggId) ? Color.orange : .secondary)
-                        AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: { Color(.systemGray5) }
-                        .frame(width: 44, height: 44)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 6)
                         VStack(alignment: .leading, spacing: 0) {
                             if let year = game.yearPublished, year > 0 {
                                 Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
