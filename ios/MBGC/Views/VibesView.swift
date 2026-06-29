@@ -957,6 +957,7 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
+        .safeAreaPadding(.horizontal, Spacing.screen - 16) // Adjust for List's default padding
 
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
@@ -1041,7 +1042,7 @@ struct CollectionDetailView: View {
                             selectedIds = Set(filteredGames.map(\.bggId))
                             pendingAction = .copy
                         } label: {
-                            Text("Copy All").pillLabel(.orange)
+                            Text("Copy All").pillLabel(BrandAccent.color)
                         }
                         .disabled(filteredGames.isEmpty)
 
@@ -1049,11 +1050,11 @@ struct CollectionDetailView: View {
                             selectedIds = Set(filteredGames.map(\.bggId))
                             pendingAction = .move
                         } label: {
-                            Text("Move All").pillLabel(.orange)
+                            Text("Move All").pillLabel(BrandAccent.color)
                         }
                         .disabled(filteredGames.isEmpty || collection.isDefault)
                     }
-                    .background(Color(.secondarySystemBackground), in: Capsule())
+                    .background(.regularMaterial, in: Capsule())
 
                     Button {
                         selectedIds = Set(filteredGames.map(\.bggId))
@@ -1061,7 +1062,7 @@ struct CollectionDetailView: View {
                     } label: {
                         Text("Delete All").pillLabel(.red)
                     }
-                    .background(Color(.secondarySystemBackground), in: Capsule())
+                    .background(.regularMaterial, in: Capsule())
                     .disabled(filteredGames.isEmpty)
                 }
                 .buttonStyle(.plain)
