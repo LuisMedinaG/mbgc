@@ -15,6 +15,7 @@ struct CachedAsyncImage: View {
     /// responsible for sizing and clipping (used by hero / full-bleed images).
     var size: CGFloat?
     var cornerRadius: CGFloat = 8
+    var contentMode: ContentMode = .fill
 
     @State private var phase: Phase = .empty
 
@@ -27,7 +28,7 @@ struct CachedAsyncImage: View {
             switch phase {
             case .success(let image):
                 image.resizable()
-                    .aspectRatio(contentMode: .fill)
+                    .aspectRatio(contentMode: contentMode)
             case .empty, .loading, .failure:
                 Color(.systemGray5)
             }
