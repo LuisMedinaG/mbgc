@@ -15,7 +15,7 @@ struct FinderView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                Color(.systemBackground).ignoresSafeArea()
+                Color(hex: "F5F5F5").ignoresSafeArea()
 
                 if !flow.hasCollections {
                     FinderEmptyView()
@@ -92,12 +92,7 @@ private struct FinderStartView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(.systemBackground), Color.orange.opacity(0.12)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            Color(hex: "F5F5F5").ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Spacer()
@@ -157,11 +152,26 @@ private struct FinderStepView: View {
     let onSelect: (FinderOption) -> Void
     let onBack: (() -> Void)?
 
+    // Grid geometry — only used for the vibe step.
+    private var cols: Int {
+        switch options.count {
+        case ...4:  return 2
+        case 5...9: return 3
+        default:    return 4
+        }
+    }
+    private var isScrollable: Bool { options.count > 9 }
+    private var rows: Int { (options.count + cols - 1) / cols }
+    private let gridSpacing: CGFloat = 10
+    private var gridCols: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: gridSpacing), count: cols)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
             questionBlock
-            optionList
+            if axis == .vibe { optionGrid } else { optionList }
         }
         .padding(.bottom, Spacing.floatingNavReserved)
         // Swipe right → back, same gesture as FinderResultView. Horizontal-only
@@ -222,38 +232,70 @@ private struct FinderStepView: View {
         .padding(.bottom, 12)
     }
 
+    @ViewBuilder
+    private var optionGrid: some View {
+        if isScrollable {
+            ScrollView {
+                LazyVGrid(columns: gridCols, spacing: gridSpacing) {
+                    ForEach(options) { opt in optionButton(opt, fillsCell: true).frame(height: 90) }
+                }
+                .padding(.horizontal, 16)
+            }
+            .contentMargins(.bottom, 16, for: .scrollContent)
+        } else {
+            GeometryReader { geo in
+                let rowH = (geo.size.height - CGFloat(rows - 1) * gridSpacing) / CGFloat(rows)
+                LazyVGrid(columns: gridCols, spacing: gridSpacing) {
+                    ForEach(options) { opt in optionButton(opt, fillsCell: true).frame(height: max(rowH, 60)) }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
     private var optionList: some View {
         ScrollView {
             LazyVStack(spacing: 10) {
-                ForEach(options) { opt in optionButton(opt) }
+                ForEach(options) { opt in optionButton(opt, fillsCell: false) }
             }
             .padding(.horizontal, 16)
         }
         .scrollIndicators(.hidden)
     }
 
-    private func optionButton(_ option: FinderOption) -> some View {
+    // fillsCell: grid steps impose a fixed cell height → fill it. Row steps give no
+    // height → vertical padding sets the breathing room so rows aren't cramped.
+    private func optionButton(_ option: FinderOption, fillsCell: Bool) -> some View {
         let bg: Color = option.tint.flatMap { Color(hex: $0) } ?? Color(.secondarySystemBackground)
         let fgPrimary:   Color = option.solidBg ? .white : Color(.label)
         let fgSecondary: Color = option.solidBg ? .white.opacity(0.75) : .secondary
 
-        return Button { onSelect(option) } label: {
-            VStack(spacing: 6) {
-                if let sym = option.symbol {
-                    Image(systemName: sym)
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(fgPrimary)
-                }
-                Text(option.label)
-                    .font(.title2.bold())
+        let content = VStack(spacing: 6) {
+            if let sym = option.symbol {
+                Image(systemName: sym)
+                    .font(.system(size: 24, weight: .medium))
                     .foregroundStyle(fgPrimary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                Text("\(option.count) \(option.count == 1 ? "game" : "games")")
-                    .font(.subheadline)
-                    .foregroundStyle(fgSecondary)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            Text(option.label)
+                .font(.title2.bold())
+                .foregroundStyle(fgPrimary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            Text("\(option.count) \(option.count == 1 ? "game" : "games")")
+                .font(.subheadline)
+                .foregroundStyle(fgSecondary)
+        }
+
+        return Button { onSelect(option) } label: {
+            Group {
+                if fillsCell {
+                    content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    content
+                        .padding(.vertical, Spacing.lg)
+                        .frame(maxWidth: .infinity, minHeight: 64)
+                }
+            }
             .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 18))
         }
@@ -528,7 +570,6 @@ struct FinderResultView: View {
             Image(systemName: "ellipsis")
                 .frame(width: 44, height: 44)
                 .background(.regularMaterial, in: Circle())
-                .tint(.primary)
         }
         .padding(.trailing, 16)
         .padding(.top, 4)
