@@ -261,6 +261,19 @@ final class FinderFlow {
         allCollections.contains(where: { !$0.isDefault })
     }
 
+    /// 0–100 match score for a single game against the current picks.
+    func matchPercent(for game: Game) -> Int {
+        let w = FinderConfig.rankingWeights
+        let axisContribution = funnel.enumerated().reduce(0.0) { sum, item in
+            let pick = item.offset < picks.count ? picks[item.offset] : nil
+            return sum + item.element.scoreContribution(pick: pick, game: game, weights: w)
+        }
+        let raw = FinderConfig.score(game) + axisContribution
+        let ceiling = w.userRating + w.geekRating + w.wantToPlay + w.recommendedPlayers + w.bggRank
+        let pct = ceiling > 0 ? min(max(raw / ceiling, 0), 1) : 0
+        return Int((pct * 100).rounded())
+    }
+
     // MARK: Actions
 
     func select(_ option: FinderOption) { picks.append(option) }

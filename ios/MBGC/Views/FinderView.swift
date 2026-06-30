@@ -157,29 +157,13 @@ private struct FinderStepView: View {
     let onSelect: (FinderOption) -> Void
     let onBack: (() -> Void)?
 
-    // ponytail: thresholds match user spec — 2-col ≤4, 3-col 5-9, 4-col scrollable 10+
-    private var cols: Int {
-        switch options.count {
-        case ...4:  return 2
-        case 5...9: return 3
-        default:    return 4
-        }
-    }
-    private var isScrollable: Bool { options.count > 9 }
-    private var rows: Int { (options.count + cols - 1) / cols }
-    private let spacing: CGFloat = 10
-
-    private var gridCols: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: spacing), count: cols)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             header
             questionBlock
-            optionGrid
+            optionList
         }
-        .padding(.bottom, 110)
+        .padding(.bottom, Spacing.floatingNavReserved)
         // Swipe right → back, same gesture as FinderResultView. Horizontal-only
         // threshold (width>80, |height|<80) keeps it from firing while the user
         // scrolls the option grid vertically.
@@ -238,26 +222,14 @@ private struct FinderStepView: View {
         .padding(.bottom, 12)
     }
 
-    @ViewBuilder
-    private var optionGrid: some View {
-        if isScrollable {
-            ScrollView {
-                LazyVGrid(columns: gridCols, spacing: spacing) {
-                    ForEach(options) { opt in optionButton(opt).frame(height: 90) }
-                }
-                .padding(.horizontal, 16)
-            }
-            .contentMargins(.bottom, 16, for: .scrollContent)
-        } else {
-            // GeometryReader fills the remaining VStack height so buttons expand to fill the screen.
-            GeometryReader { geo in
-                let rowH = (geo.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows)
-                LazyVGrid(columns: gridCols, spacing: spacing) {
-                    ForEach(options) { opt in optionButton(opt).frame(height: max(rowH, 60)) }
-                }
+    private var optionList: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                ForEach(options) { opt in optionButton(opt) }
             }
             .padding(.horizontal, 16)
         }
+        .scrollIndicators(.hidden)
     }
 
     private func optionButton(_ option: FinderOption) -> some View {
@@ -377,7 +349,7 @@ struct FinderResultView: View {
                         } else {
                             if let hero = top.first {
                                 NavigationLink(value: hero.bggId) {
-                                    FinderHeroCard(game: hero)
+                                    FinderHeroCard(game: hero, matchPercent: flow.matchPercent(for: hero))
                                 }
                                 .buttonStyle(.plain)
                                 .padding(.top, -14)
@@ -440,6 +412,9 @@ struct FinderResultView: View {
                                                             .font(.caption)
                                                             .foregroundStyle(.secondary)
                                                     }
+                                                    Text("\(flow.matchPercent(for: game))% match")
+                                                        .font(.caption)
+                                                        .foregroundStyle(Color.accentColor)
                                                 }
                                                 Spacer()
                                             }
@@ -584,6 +559,7 @@ private enum FinderCardLayout {
 
 private struct FinderHeroCard: View {
     let game: Game
+    var matchPercent: Int? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: FinderCardLayout.heroImageGap) {
@@ -595,9 +571,17 @@ private struct FinderHeroCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
 
             VStack(alignment: .leading, spacing: FinderCardLayout.heroTitleGap) {
-                Text(game.name)
-                    .font(.title2.bold())
-                    .foregroundStyle(.primary)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(game.name)
+                        .font(.title2.bold())
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    if let pct = matchPercent {
+                        Text("\(pct)% match")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                    }
+                }
 
                 FinderMetadataRow(game: game, style: .prominent)
             }
