@@ -170,18 +170,19 @@ struct HomePillView: View {
     }
 
     private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {
-        Button { tab = target } label: {
+        let isActive = tab == target
+        return Button { tab = target } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 0.25, green: 0.35, blue: 0.6))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
                 Text(label)
-                    .font(.caption2.weight(tab == target ? .semibold : .regular))
-                    .foregroundStyle(tab == target ? Color.primary : .secondary)
+                    .font(.caption2.weight(isActive ? .semibold : .regular))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .background(tab == target ? Color(.systemGray5) : Color.clear)
+            .background(isActive ? Color.accentColor.opacity(0.10) : Color.clear)
             .clipShape(Capsule())
         }
         .accessibilityLabel(label)
