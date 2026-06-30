@@ -7,8 +7,8 @@ import SwiftUI
 /// Avoids mutating the global `URLCache.shared` (which would affect every
 /// URLSession in the app — including future telemetry / crash reporters).
 ///
-/// ponytail: non-generic on purpose. Every call site wants the same square
-/// thumbnail. Add a custom-content/placeholder init only when a screen needs one.
+/// Non-generic on purpose. Every call site wants the same square thumbnail.
+/// Add a custom-content/placeholder init only when a screen needs one.
 struct CachedAsyncImage: View {
     let url: URL?
     /// Square side length. When nil the image fills its parent — the caller is

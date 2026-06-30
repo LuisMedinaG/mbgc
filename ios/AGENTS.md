@@ -132,6 +132,24 @@ xcodebuild -scheme MBGC \
 
 ---
 
+## Design tokens
+
+All visual constants live in `Views/DesignTokens.swift`. Use them for every UI change. No magic numbers in views.
+
+| Token enum | What it covers |
+|---|---|
+| `Spacing` | `xs(4) sm(8) md(12) lg(16) xl(20) xxl(24) section(32) screen(24)` |
+| `Radius` | `small(12) medium(16) large(24) xlarge(32) pill(999)` |
+| `Typography` | `screenTitle sectionTitle cardTitle body bodyEmphasis metadata caption step tab` |
+| `Surface` | `background card elevated separator metadataText` |
+| `BrandAccent` | `color(.indigo) tint(.indigo @ 0.10)` |
+
+Reusable components also in `DesignTokens.swift`: `GameMetadataRow`, `ChromeButton`, `SectionTitle`, `ScreenTitle`, `TagPill`, `SelectableCard`, `GameCoverImage`.
+
+**Rule:** if you're hardcoding a `CGFloat`, `Color`, or `Font` that matches an existing token, use the token. Add new tokens rather than mutating existing ones — names are referenced by call sites.
+
+---
+
 ## Critical rules
 
 **NEVER modify `.pbxproj` or `.xcodeproj/` directory contents.**
@@ -148,8 +166,10 @@ view properties used as sheet content).
 **Do NOT add or call a backend API client.** Any new iOS data feature must go
 through `BGGClient` or SwiftData directly.
 
-**BGG rate limiting.** `BGGClient` paces requests at ~5s via `Task.sleep`. Do not add
-parallel fetches without updating the rate-limit budget — BGG will 429/5xx the IP.
+**BGG rate limiting.** `BGGClient` paces requests at ~5s via `Task.sleep` (`requestDelay`).
+Do not add parallel fetches without updating the rate-limit budget — BGG will 429/5xx the IP.
+Import time is rate-limit-bound; benchmark it before tuning `requestDelay`. See DESIGN.md §3.1
+for the timing model and the DEBUG per-request `Logger` / `Finished in X.Xs` instrumentation.
 
 ---
 

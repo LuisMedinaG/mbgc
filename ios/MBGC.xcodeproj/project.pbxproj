@@ -70,7 +70,7 @@
 		710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGCSVParserTests.swift; sourceTree = "<group>"; };
 		7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8CD293B5E140C89254FC4943 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99C1F0CBB227E63609C23F0A /* MBGCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBGCApp.swift; sourceTree = "<group>"; };
 		9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalImportService.swift; sourceTree = "<group>"; };
 		A0076C98DF51184321766D82 /* BGGClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGClient.swift; sourceTree = "<group>"; };
@@ -85,7 +85,7 @@
 		C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		CD671A7394CE1D23B5C50B9B /* BGGGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGGame.swift; sourceTree = "<group>"; };
 		E346F76F771F6D51912B41A4 /* FinderFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFlow.swift; sourceTree = "<group>"; };
-		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8B1B3026AF2474E8CCBCEDA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F2B4DF27C4868D325DA92BD2 /* FinderConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderConfig.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -252,7 +252,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 1430;
+				LastUpgradeCheck = 2650;
 				TargetAttributes = {
 					FF95678E676736D017659FA2 = {
 						DevelopmentTeam = T9YNQ73MS3;
@@ -420,6 +420,7 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -504,6 +505,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";

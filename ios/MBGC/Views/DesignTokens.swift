@@ -5,8 +5,8 @@ import SwiftUI
 // One source of truth for spacing, radii, typography, and surfaces across the app.
 // Anything visual that would otherwise live as a magic number belongs here.
 //
-// ponytail: append-only. Token names are referenced by call sites — renaming
-// breaks every screen. Add new tokens instead of mutating existing ones.
+// Append-only. Token names are referenced by call sites, so add new tokens
+// instead of mutating existing ones.
 
 // MARK: - Spacing
 
@@ -50,7 +50,7 @@ enum Typography {
     static let metadata: Font = .system(size: 15, weight: .regular)
     static let caption: Font = .system(size: 13, weight: .regular)
     static let step: Font = .system(size: 15, weight: .medium)
-    static let tab: Font = .system(size: 12, weight: .medium) // ponytail: used by FloatingTabBar (batch 3)
+    static let tab: Font = .system(size: 12, weight: .medium)
 }
 
 // MARK: - Surfaces
@@ -312,5 +312,4 @@ private struct CoverFrame: ViewModifier {
     }
 }
 
-// ponytail: FlowLayout intentionally not defined here yet — dev already has one
-// in GameDetailView.swift. It moves here when the GameDetailView batch lands.
+// FlowLayout stays in GameDetailView.swift until another screen needs it.

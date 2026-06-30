@@ -356,7 +356,7 @@ struct FinderResultView: View {
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
-                        // ponytail: overscroll hint, .refreshable still does the work.
+                        // Overscroll hint; .refreshable still does the work.
                         GeometryReader { geo in
                             // Real pull (scroll minY) OR the one-time tutorial bounce reveals the hint.
                             let drive = max(geo.frame(in: .named("finderScroll")).minY, bounce)
@@ -518,9 +518,8 @@ struct FinderResultView: View {
                     }
                     hintSeen = true
                 }
-                // ponytail: toggle already animated via withAnimation in toggleAll; a
-                // blanket .animation here rasterizes the whole expanding list into one
-                // offscreen layer → "RBLayer: unable to create texture".
+                // toggleAll owns the animation. A blanket .animation here rasterizes
+                // the expanding list into one offscreen layer and can fail texture creation.
             }
         }
         .gesture(

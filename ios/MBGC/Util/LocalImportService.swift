@@ -12,11 +12,39 @@ struct LocalImportResult {
     let newGames: [Game]
 }
 
+struct LocalImportPlan {
+    let allIds: [Int]
+    let existingIds: Set<Int>
+    let idsToFetch: [Int]
+    let skipped: Int
+    let overLimit: Int
+}
+
 @MainActor
 enum LocalImportService {
     static func uniqueIds(_ ids: [Int]) -> [Int] {
         var seen: Set<Int> = []
         return ids.filter { seen.insert($0).inserted }
+    }
+
+    static func planImport(
+        ids: [Int],
+        limit: Int? = nil,
+        in modelContext: ModelContext
+    ) -> LocalImportPlan {
+        let allIds = uniqueIds(ids)
+        let existingIds = LocalLibrary.existingBggIds(in: modelContext, from: allIds)
+        let newIds = allIds.filter { !existingIds.contains($0) }
+        let idsToFetch = limit.map { Array(newIds.prefix($0)) } ?? newIds
+        let overLimit = max(0, newIds.count - idsToFetch.count)
+
+        return LocalImportPlan(
+            allIds: allIds,
+            existingIds: existingIds,
+            idsToFetch: idsToFetch,
+            skipped: existingIds.count + overLimit,
+            overLimit: overLimit
+        )
     }
 
     static func saveFetchedGames(

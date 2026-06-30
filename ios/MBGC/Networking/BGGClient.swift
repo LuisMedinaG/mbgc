@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 enum BGGError: Error, LocalizedError {
     case badURL
@@ -57,6 +58,8 @@ actor BGGClient {
     private let maxAttempts = 4
     private let requestDelay: UInt64 = 5_000_000_000 // 5s between requests; BGG throttles hard on burst requests
     private var lastRequestTime: Date?
+    // .debug lines surface in Console/Xcode when debugging; release builds drop them. No #if needed.
+    private let log = Logger(subsystem: "app.lumedina.mbgc", category: "BGGClient")
 
     private init() {
         let config = URLSessionConfiguration.default
@@ -83,15 +86,18 @@ actor BGGClient {
 
         var delay = requestDelay
         for attempt in 1...maxAttempts {
-            await waitForRateLimit()
+            try await waitForRateLimit()
 
             let request = request(for: url, token: token)
 
             let data: Data
             let response: URLResponse
             do {
-                (data, response) = try await session.data(for: request)
+                (data, response) = try await perform(request, label: "collection \(username)")
+            } catch let error as CancellationError {
+                throw error
             } catch {
+                log.debug("collection \(username, privacy: .public): transport error: \(error.localizedDescription, privacy: .public)")
                 if attempt == maxAttempts { throw BGGError.transport(error) }
                 try await Task.sleep(nanoseconds: delay)
                 delay *= 2
@@ -117,7 +123,7 @@ actor BGGClient {
                 throw BGGError.xmlParse(error)
             }
         }
-        return CollectionResult(ids: [], userRatings: [:], wantToPlay: [:], numberOfPlays: [:])
+        throw BGGError.http(status: 0)
     }
 
     /// Fetches detailed game data ("things") for a list of BGG IDs.
@@ -162,15 +168,18 @@ actor BGGClient {
 
         var delay: UInt64 = 500_000_000
         for attempt in 1...maxAttempts {
-            await waitForRateLimit()
+            try await waitForRateLimit()
 
             let request = request(for: url, token: token)
 
             let data: Data
             let response: URLResponse
             do {
-                (data, response) = try await session.data(for: request)
+                (data, response) = try await perform(request, label: "thing batch (\(ids.count) ids)")
+            } catch let error as CancellationError {
+                throw error
             } catch {
+                log.debug("thing batch (\(ids.count) ids): transport error: \(error.localizedDescription, privacy: .public)")
                 if attempt == maxAttempts { throw BGGError.transport(error) }
                 try await Task.sleep(nanoseconds: delay)
                 delay *= 2
@@ -215,6 +224,17 @@ actor BGGClient {
         return UInt64(seconds * 1_000_000_000)
     }
 
+    // Wraps session.data with per-request DEBUG logging: status, latency, payload size — the data needed to benchmark an import.
+    private func perform(_ request: URLRequest, label: String) async throws -> (Data, URLResponse) {
+        let start = ContinuousClock().now
+        let (data, response) = try await session.data(for: request)
+        let d = ContinuousClock().now - start
+        let ms = d.components.seconds * 1000 + d.components.attoseconds / 1_000_000_000_000_000
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        log.debug("\(label, privacy: .public): HTTP \(status) in \(ms)ms, \(data.count) bytes")
+        return (data, response)
+    }
+
     private func request(for url: URL, token: String?) -> URLRequest {
         var request = URLRequest(url: url)
         request.setValue("app.lumedina.mbgc/1.0", forHTTPHeaderField: "User-Agent")
@@ -224,17 +244,12 @@ actor BGGClient {
         return request
     }
 
-    private func waitForRateLimit() async {
+    private func waitForRateLimit() async throws {
         if let lastRequestTime {
             let elapsed = Date().timeIntervalSince(lastRequestTime)
             let waitSeconds = Double(requestDelay) / 1_000_000_000.0 - elapsed
             if waitSeconds > 0 {
-                do {
-                    try await Task.sleep(nanoseconds: UInt64(waitSeconds * 1_000_000_000))
-                } catch {
-                    // Task was cancelled, don't update lastRequestTime and just return
-                    return
-                }
+                try await Task.sleep(nanoseconds: UInt64(waitSeconds * 1_000_000_000))
             }
         }
         lastRequestTime = Date()

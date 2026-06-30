@@ -196,20 +196,17 @@ struct CsvImportView: View {
         importedGames = []
 
         do {
-            let allIds = LocalImportService.uniqueIds(previewRows.map(\.bggId))
-            let existing = LocalLibrary.existingBggIds(in: modelContext, from: allIds)
-            let toFetch = allIds.filter { !existing.contains($0) }
-            let skipped = allIds.count - toFetch.count
+            let plan = LocalImportService.planImport(ids: previewRows.map(\.bggId), in: modelContext)
 
-            if toFetch.isEmpty {
-                importResult = LocalImportSummary(imported: 0, skipped: skipped, failed: [])
+            if plan.idsToFetch.isEmpty {
+                importResult = LocalImportSummary(imported: 0, skipped: plan.skipped, failed: [])
                 step = .done
                 return
             }
 
-            importProgress = (done: 0, total: toFetch.count)
+            importProgress = (done: 0, total: plan.idsToFetch.count)
 
-            let games = try await BGGClient.shared.fetchThings(ids: toFetch) { done, total in
+            let games = try await BGGClient.shared.fetchThings(ids: plan.idsToFetch) { done, total in
                 Task { @MainActor in
                     importProgress = (done: done, total: total)
                 }
@@ -217,8 +214,8 @@ struct CsvImportView: View {
 
             let result = try LocalImportService.saveFetchedGames(
                 games,
-                requestedIds: toFetch,
-                skipped: skipped,
+                requestedIds: plan.idsToFetch,
+                skipped: plan.skipped,
                 in: modelContext
             )
 

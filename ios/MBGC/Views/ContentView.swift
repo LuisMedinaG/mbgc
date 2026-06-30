@@ -31,11 +31,15 @@ struct ContentView: View {
         }
     }
 
-    // Hide home chrome while a pushed detail or the Finder flow owns the screen.
-    private var hidesHomeChrome: Bool {
+    // Pill hides only when a detail view is pushed on top.
+    private var hidesPill: Bool {
         (!collectionPath.isEmpty && tab == .collection) ||
-        (!finderPath.isEmpty && tab == .tonight) ||
-        (finderActive && tab == .tonight)
+        (!finderPath.isEmpty && tab == .tonight)
+    }
+
+    // Search/gear/create also hide while the finder flow is running.
+    private var hidesHomeChrome: Bool {
+        hidesPill || (finderActive && tab == .tonight)
     }
 
     var body: some View {
@@ -54,7 +58,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !hidesHomeChrome {
+            if !hidesPill {
                 VStack(spacing: 0) {
                     if showCreate {
                         CreateTypeChooser { kind in
@@ -66,25 +70,27 @@ struct ContentView: View {
                     HStack(alignment: .center) {
                         HomePillView(tab: $tab)
                         Spacer()
-                        HomeChromeButton(systemName: "magnifyingglass", size: 54) {
-                            showSearch = true
-                        }
-                        .accessibilityLabel("Search")
-                        // Plus floats above the search button via overlay so it adds no
-                        // layout height — keeps the search button centered with the pill.
-                        .overlay(alignment: .top) {
-                            if tab == .collection && collectionPath.isEmpty && !showCreate {
-                                Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
-                                    Image(systemName: "plus")
-                                        .font(.title2.weight(.semibold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 52, height: 52)
-                                        .background(Color.accentColor)
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        if !hidesHomeChrome {
+                            HomeChromeButton(systemName: "magnifyingglass", size: 54) {
+                                showSearch = true
+                            }
+                            .accessibilityLabel("Search")
+                            // Plus floats above the search button via overlay so it adds no
+                            // layout height — keeps the search button centered with the pill.
+                            .overlay(alignment: .top) {
+                                if tab == .collection && collectionPath.isEmpty && !showCreate {
+                                    Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
+                                        Image(systemName: "plus")
+                                            .font(.title2.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 52, height: 52)
+                                            .background(Color.accentColor)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                    .accessibilityLabel("New Collection")
+                                    .offset(y: -(52 + 10))
+                                    .transition(.scale.combined(with: .opacity))
                                 }
-                                .accessibilityLabel("New Collection")
-                                .offset(y: -(52 + 10))
-                                .transition(.scale.combined(with: .opacity))
                             }
                         }
                     }

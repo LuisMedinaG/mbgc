@@ -44,7 +44,7 @@ final class Game {
     var numberOfPlays: Int?
 
     /// Local-only timestamp of the last recorded play.
-    var lastLogPlayed: Date?  // ponytail: local-only, nil until play logging is built
+    var lastLogPlayed: Date?
 
     /// Community-voted language dependence level (1-5).
     var languageDependence: Int?

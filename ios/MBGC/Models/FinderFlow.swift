@@ -45,7 +45,7 @@ enum DurationBucket: String, CaseIterable {
 
 // MARK: - Axis
 
-// ponytail: funnel is [FinderAxis] array — reorder/toggle becomes a settings screen later, not a rewrite
+// FinderAxis stays data-driven so reorder/toggle can become settings later.
 enum FinderAxis: String, CaseIterable {
     case vibe, players, duration
 

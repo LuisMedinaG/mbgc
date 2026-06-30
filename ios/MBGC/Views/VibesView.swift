@@ -160,7 +160,7 @@ struct CollectionPickerBody<Accessory: View>: View {
         "gift.fill",          "hand.raised.fill",   "trophy.fill",          "dice.fill",    "gamecontroller.fill",
     ] }
 
-    // ponytail: 6 cols + 18pt gaps = smaller, airier cells than 5 cols/10pt
+    // 6 columns with wider gaps keeps the icon grid airy.
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 18), count: 6)
 
     var body: some View {
@@ -901,6 +901,7 @@ struct CollectionDetailView: View {
                                         Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
                                             .foregroundStyle(selectedIds.contains(game.bggId) ? Color.accentColor : .secondary)
                                             .font(.title3)
+                                        if collection.isRanked { rankBadge(game) }
                                         gameRow(game)
                                     }
                                     .foregroundStyle(.primary)
@@ -1085,8 +1086,8 @@ struct CollectionDetailView: View {
                 action: action,
                 games: selectedGames,
                 source: collection,
-                // ponytail: smart lists derive membership from rules — games.append is ignored
-                // by smartGames(), so a move would silently lose the game. Exclude them as targets.
+                // Smart lists derive membership from rules. games.append is ignored
+                // by smartGames(), so a move would silently lose the game.
                 destinations: otherCollections.filter { !$0.isSmart }
             ) {
                 if action == .move { exitSelection() }

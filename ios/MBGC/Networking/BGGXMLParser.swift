@@ -223,9 +223,13 @@ enum BGGXMLParser {
         private var currentRecommended: Int = 0
         private var currentNotRec: Int = 0
 
-        func parser(_ parser: XMLParser, didStartElement elementName: String,
-                     namespaceURI: String?, qualifiedName qName: String?,
-                     attributes attributeDict: [String: String] = [:]) {
+        func parser(
+            _ parser: XMLParser,
+            didStartElement elementName: String,
+            namespaceURI: String?,
+            qualifiedName qName: String?,
+            attributes attributeDict: [String: String] = [:]
+        ) {
             currentElement = elementName
             textBuffer = ""
 
@@ -326,8 +330,12 @@ enum BGGXMLParser {
             textBuffer += string
         }
 
-        func parser(_ parser: XMLParser, didEndElement elementName: String,
-                     namespaceURI: String?, qualifiedName qName: String?) {
+        func parser(
+            _ parser: XMLParser,
+            didEndElement elementName: String,
+            namespaceURI: String?,
+            qualifiedName qName: String?
+        ) {
             switch elementName {
             case "thumbnail" where inItem:
                 thumbnail = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -335,12 +343,10 @@ enum BGGXMLParser {
                 image = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             case "description" where inItem:
                 desc = BGGXMLParser.unescapeHTML(textBuffer.trimmingCharacters(in: .whitespacesAndNewlines))
-
             case "statistics":
                 inStatistics = false
             case "ratings":
                 inRatings = false
-
             case "results" where currentPollName == "suggested_numplayers":
                 playerGroups.append((
                     numPlayers: currentPlayerCount,
@@ -348,7 +354,6 @@ enum BGGXMLParser {
                     recommended: currentRecommended,
                     notRec: currentNotRec
                 ))
-
             case "poll":
                 if currentPollName == "language_dependence" {
                     languageDependence = computeLanguageDependence()
@@ -356,7 +361,6 @@ enum BGGXMLParser {
                     recommendedPlayers = computeRecommendedPlayers()
                 }
                 currentPollName = ""
-
             case "item":
                 // Skip items with malformed/missing id — a zero bggId would
                 // collide with the @Attribute(.unique) Game row in SwiftData.
