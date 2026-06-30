@@ -57,6 +57,14 @@ enum FinderAxis: String, CaseIterable {
         }
     }
 
+    var usesGrid: Bool {
+        switch self {
+        case .vibe:     return true
+        case .players:  return false
+        case .duration: return true
+        }
+    }
+
     // MARK: - Options
 
     func options(from games: [Game], collections: [Collection]) -> [FinderOption] {

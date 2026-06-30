@@ -171,7 +171,7 @@ private struct FinderStepView: View {
         VStack(spacing: 0) {
             header
             questionBlock
-            if axis == .vibe { optionGrid } else { optionList }
+            if axis.usesGrid { optionGrid } else { optionList }
         }
         .padding(.bottom, Spacing.floatingNavReserved)
         // Swipe right → back, same gesture as FinderResultView. Horizontal-only
