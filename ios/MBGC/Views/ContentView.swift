@@ -1,3 +1,4 @@
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -17,6 +18,11 @@ struct ContentView: View {
     @State private var showCreate = false
     @State private var createKind: CollectionKind?
 
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "MBGC",
+        category: "ContentView"
+    )
+
     private var preferredScheme: ColorScheme? {
         switch appearanceMode {
         case "light": return .light
@@ -25,10 +31,11 @@ struct ContentView: View {
         }
     }
 
-    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
-    private var isInDetailView: Bool {
+    // Hide home chrome while a pushed detail or the Finder flow owns the screen.
+    private var hidesHomeChrome: Bool {
         (!collectionPath.isEmpty && tab == .collection) ||
-        (!finderPath.isEmpty && tab == .tonight)
+        (!finderPath.isEmpty && tab == .tonight) ||
+        (finderActive && tab == .tonight)
     }
 
     var body: some View {
@@ -47,7 +54,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !isInDetailView {
+            if !hidesHomeChrome {
                 VStack(spacing: 0) {
                     if showCreate {
                         CreateTypeChooser { kind in
@@ -89,7 +96,7 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !isInDetailView && tab != .tonight {
+            if !hidesHomeChrome && tab != .tonight {
                 HomeChromeButton(systemName: "gearshape", size: 44) {
                     showSettings = true
                 }
@@ -121,8 +128,12 @@ struct ContentView: View {
     // MARK: — Library seed
 
     private func seedLibraryIfNeeded() {
-        guard (try? LocalLibrary.ensureDefaultCollection(in: modelContext)) != nil else { return }
-        try? modelContext.save()
+        do {
+            _ = try LocalLibrary.ensureDefaultCollection(in: modelContext)
+            try modelContext.save()
+        } catch {
+            Self.logger.error("Failed to seed Library collection: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -152,7 +163,7 @@ struct HomePillView: View {
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
         .padding(4)
-        .background(Color.white)
+        .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
         .sensoryFeedback(.selection, trigger: tab)
