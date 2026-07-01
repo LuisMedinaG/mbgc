@@ -172,7 +172,9 @@ private struct FinderStepView: View {
         VStack(spacing: 0) {
             header
             questionBlock
-            if axis.usesGrid { optionGrid } else { optionList }
+            if options.isEmpty {
+                emptyState
+            } else if axis.usesGrid { optionGrid } else { optionList }
         }
         .padding(.bottom, Spacing.floatingNavReserved)
         // Swipe right → back, same gesture as FinderResultView. Horizontal-only
@@ -252,6 +254,19 @@ private struct FinderStepView: View {
             }
             .padding(.horizontal, 16)
         }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Text("Nothing to choose from here")
+                .font(.headline)
+            Text("You don't have any options for this yet. Tap Skip to continue.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
     }
 
     private var optionList: some View {
