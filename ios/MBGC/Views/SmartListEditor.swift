@@ -97,7 +97,13 @@ struct SmartListEditor: View {
                         }
                     }
                 }
-                FilterRows(filters: $rule.filters, games: resolvedGames, showTitlePicker: $showTitlePicker, activeChecklist: $activeChecklist)
+                if !rule.base.isEmpty {
+                    FilterRows(filters: $rule.filters, games: resolvedGames, showTitlePicker: $showTitlePicker, activeChecklist: $activeChecklist)
+                } else {
+                    Section {
+                        Text("Choose collections first").foregroundStyle(.secondary)
+                    }
+                }
             }
             .navigationTitle("Smart Filter")
             .navigationBarTitleDisplayMode(.inline)
