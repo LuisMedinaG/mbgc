@@ -62,6 +62,13 @@ At the end of every task, report one of:
 Once done:
 1. **Commit and push** — stage the work, write a clear commit message, push to GitHub. Imperative present tense, 50-char subject max. No Co-Authored-By footers.
 2. **Report what to restart** — exactly which service needs restarting and the full command. If nothing needs restarting, say so.
+3. **Compound** — make the next task easier. Before closing out, ask: did this teach something the system should keep? If yes, write it back so it survives the session:
+   - A convention, boundary, or gotcha that will bite again → update the nearest `AGENTS.md` / `DESIGN.md` / runbook.
+   - A manual flow run for the second time → skillify it (see "Skillify repeated work"). One-offs stay one-offs.
+   - A non-obvious root cause or decision → record it (`add-runbook` skill for fixes, claude-mem for context).
+   - Nothing to keep → say "nothing to compound" and move on. Not every task compounds; forcing it is noise.
+
+   The rule: a fix that isn't written back gets rediscovered from scratch next time. Cheap to capture now, expensive to relearn later.
 
 ## Confusion protocol
 
