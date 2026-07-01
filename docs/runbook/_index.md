@@ -14,6 +14,7 @@ Common issues and their fixes for the mbgc infrastructure.
 
 - [Cloudflare](cloudflare/) — DNS, Pages, token management, setup
 - [Cloud Run](cloud-run/)
+- [Codex](codex/)
 - [Terraform](terraform/)
 - [Supabase](supabase/)
 - [CI/CD](ci-cd/)
