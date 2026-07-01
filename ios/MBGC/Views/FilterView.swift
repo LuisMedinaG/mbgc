@@ -18,11 +18,11 @@ enum FilterMode: String, CaseIterable, Identifiable, Codable {
 }
 
 enum FilterField: String, CaseIterable, Identifiable, Codable {
+    case players       = "Players"
+    case playtime      = "Playtime"
     case rating        = "Rating"
     case userRating    = "My Rating"
     case weight        = "Complexity"
-    case playtime      = "Playtime"
-    case players       = "Players"
     case bestFor       = "Best For"
     case bggRank       = "BGG Rank"
     case yearPublished = "Year Published"
@@ -32,7 +32,7 @@ enum FilterField: String, CaseIterable, Identifiable, Codable {
 
     var icon: String {
         switch self {
-        case .rating:        return "star"
+        case .rating:        return "bgg-icon"
         case .userRating:    return "star.fill"
         case .weight:        return "scalemass"
         case .playtime:      return "clock"
@@ -87,6 +87,8 @@ enum FilterField: String, CaseIterable, Identifiable, Codable {
         default:        return nil
         }
     }
+
+    var isCustomImage: Bool { self == .rating }
 
     var isInteger: Bool {
         switch self {
@@ -425,7 +427,7 @@ struct FilterRows: View {
         let spec = filters.specs[field]
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: field.icon).frame(width: 24).foregroundStyle(field.color)
+                fieldIcon(field).frame(width: 24).foregroundStyle(field.color)
                 Text(field.rawValue).font(.body)
                 Spacer()
                 modeMenu(field, spec: spec)
@@ -437,6 +439,11 @@ struct FilterRows: View {
         }
         .padding(.vertical, spec != nil ? 4 : 0)
         .animation(.easeInOut(duration: 0.2), value: spec != nil)
+    }
+
+    @ViewBuilder
+    private func fieldIcon(_ field: FilterField) -> some View {
+        if field.isCustomImage { Image(field.icon) } else { Image(systemName: field.icon) }
     }
 
     private func modeMenu(_ field: FilterField, spec: FilterSpec?) -> some View {
