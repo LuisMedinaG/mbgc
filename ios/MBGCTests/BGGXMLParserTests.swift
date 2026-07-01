@@ -73,7 +73,6 @@ import Testing
                 <minage value="14" />
                 <link type="boardgamecategory" value="Adventure" />
                 <link type="boardgamemechanic" value="Campaign / Battle Card Driven" />
-                <link type="boardgamesubdomain" value="Strategy Games" />
                 <link type="boardgamedesigner" value="Isaac Childres" />
                 <link type="boardgameartist" value="Alexandr Elichev" />
                 <link type="boardgamepublisher" value="Cephalofair Games" />
@@ -81,7 +80,10 @@ import Testing
                   <ratings>
                     <average value="8.6" />
                     <bayesaverage value="8.2" />
-                    <rank type="subtype" name="boardgame" value="3" />
+                    <rank type="subtype" name="boardgame" friendlyname="Board Game Rank" value="3" />
+                    <rank type="family" name="strategygames" friendlyname="Strategy Game Rank" value="40" />
+                    <rank type="family" name="thematic" friendlyname="Thematic Rank" value="12" />
+                    <rank type="family" name="familygames" friendlyname="Family Game Rank" value="Not Ranked" />
                     <averageweight value="3.9" />
                   </ratings>
                 </statistics>
@@ -126,7 +128,7 @@ import Testing
         #expect(game.minAge == 14)
         #expect(game.categories == ["Adventure"])
         #expect(game.mechanics == ["Campaign / Battle Card Driven"])
-        #expect(game.types == ["Strategy Games"])
+        #expect(game.types == ["Strategy Games", "Thematic Games"])
         #expect(game.designers == ["Isaac Childres"])
         #expect(game.artists == ["Alexandr Elichev"])
         #expect(game.publishers == ["Cephalofair Games"])
