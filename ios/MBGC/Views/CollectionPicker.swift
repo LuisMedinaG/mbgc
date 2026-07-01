@@ -1,4 +1,3 @@
-import SwiftData
 import SwiftUI
 
 /// Shared UI for picking a collection's name, color, and icon — used by Create

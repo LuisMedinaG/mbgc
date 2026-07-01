@@ -128,13 +128,7 @@ struct FinderResultView: View {
                                                     .font(.caption.weight(.bold))
                                                     .foregroundStyle(.secondary)
                                                     .frame(width: 24)
-                                                AsyncImage(url: URL(string: game.thumbnail ?? "")) { img in
-                                                    img.resizable().aspectRatio(contentMode: .fill)
-                                                } placeholder: {
-                                                    Color(.systemGray5)
-                                                }
-                                                .frame(width: 44, height: 44)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 8)
                                                 VStack(alignment: .leading, spacing: 2) {
                                                     Text(game.name).font(.body.weight(.semibold))
                                                     if let r = game.rating, r > 0 {
@@ -260,7 +254,8 @@ struct FinderResultView: View {
     private func toggleAll(proxy: ScrollViewProxy) {
         let expanding = !showAll
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) { showAll = expanding }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        Task {
+            try? await Task.sleep(for: .seconds(0.15))
             withAnimation { proxy.scrollTo(expanding ? "allGames" : "topPick", anchor: .top) }
         }
     }
