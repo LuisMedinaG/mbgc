@@ -1038,9 +1038,13 @@ struct CollectionDetailView: View {
                     }
                 }
                 // Gap splits the action group and the ⋯ menu into separate glass capsules (iOS 26).
+                // compiler(>=6.2) guard: ToolbarSpacer is an Xcode 26 SDK symbol — #available alone
+                // isn't enough because older toolchains (e.g. CI's Xcode) don't declare the type at all.
+                #if compiler(>=6.2)
                 if #available(iOS 26.0, *) {
                     ToolbarSpacer(.fixed, placement: .topBarTrailing)
                 }
+                #endif
                 ToolbarItem(placement: .topBarTrailing) {
                     collectionMenu
                 }
