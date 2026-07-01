@@ -31,7 +31,7 @@ Effort: XS (<30min) · S (~1-2hr) · M (half-day) · L (multi-day) · XL (needs 
 |---|------|--------|
 | 3 | **Search games by filters (stated main goal)** | L |
 | 11 | Add filter to search view — simpler, own UI (not reused FilterView) | M |
-| 2 | Search inside a collection (ref: overboard-collections.PNG) | S–M |
+| 2 | ~~Search inside a collection~~ | S–M — ✅ Done, `.searchable` bound directly to existing `GameFilters.titleContains` on `CollectionDetailView` |
 | 30 | Recent search results in search view | S–M |
 | 13 | Clickable game attributes → auto temp filter/collection | L — build after #3, reuses its filter engine |
 

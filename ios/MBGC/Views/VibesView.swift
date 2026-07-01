@@ -965,6 +965,7 @@ struct CollectionDetailView: View {
                     }
                 }
                 .listStyle(.plain)
+                .searchable(text: $filters.titleContains, prompt: "Search \(collection.name)")
             }
         }
         .navigationTitle(collection.name)
