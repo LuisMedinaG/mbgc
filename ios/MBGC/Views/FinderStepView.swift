@@ -1,16 +1,14 @@
 import SwiftUI
 
-/// A single quiz step: header (back / step counter / Skip), question, options.
-/// `onBack` is always supplied; `nil` callers get a placeholder so the layout
-/// stays symmetric.
+/// A single quiz step inside the Finder carousel.
 struct FinderStepView: View {
     let axis: FinderAxis
     let options: [FinderOption]
     let survivorCount: Int
     let step: Int
     let total: Int
+    let selectedOption: FinderOption?
     let onSelect: (FinderOption) -> Void
-    let onBack: (() -> Void)?
 
     // Grid geometry — only used for the vibe step.
     private var cols: Int {
@@ -31,48 +29,21 @@ struct FinderStepView: View {
         VStack(spacing: 0) {
             header
             questionBlock
-            if options.isEmpty {
-                emptyState
-            } else if axis.usesGrid { optionGrid } else { optionList }
+            if axis.usesGrid { optionGrid } else { optionList }
         }
+        // finder.FLOW.9
         .padding(.bottom, Spacing.floatingNavReserved)
-        .swipeBack { onBack?() }
-        .gesture(
-            DragGesture(minimumDistance: 20)
-                .onEnded { v in
-                    if v.translation.width < -80, abs(v.translation.height) < 80 {
-                        onSelect(FinderOption(id: "skip", label: "Skip", count: survivorCount))
-                    }
-                }
-        )
     }
 
     private var header: some View {
         HStack {
-            if let onBack {
-                Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color(.label))
-                        .frame(width: 44, height: 44)
-                        .background(.regularMaterial)
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("Back")
-            } else {
-                Color.clear.frame(width: 44, height: 44)
-            }
+            Color.clear.frame(width: 44, height: 44)
             Spacer()
             Text("Step \(step + 1) of \(total)")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Skip") {
-                onSelect(FinderOption(id: "skip", label: "Skip", count: survivorCount))
-            }
-            .font(.subheadline.weight(.medium))
-            .foregroundStyle(.secondary)
-            .frame(width: 44, height: 44)
+            Color.clear.frame(width: 44, height: 44)
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
@@ -115,19 +86,6 @@ struct FinderStepView: View {
         }
     }
 
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Text("Nothing to choose from here")
-                .font(.headline)
-            Text("You don't have any options for this yet. Tap Skip to continue.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 32)
-    }
-
     private var optionList: some View {
         ScrollView {
             LazyVStack(spacing: 10) {
@@ -144,6 +102,8 @@ struct FinderStepView: View {
         let bg: Color = option.tint.flatMap { Color(hex: $0) } ?? Color(.secondarySystemBackground)
         let fgPrimary:   Color = option.solidBg ? .white : Color(.label)
         let fgSecondary: Color = option.solidBg ? .white.opacity(0.75) : .secondary
+        let isSelected = selectedOption?.id == option.id
+        let isDimmed = selectedOption != nil && !isSelected
 
         let content = VStack(spacing: 6) {
             if let sym = option.symbol {
@@ -164,16 +124,52 @@ struct FinderStepView: View {
         return Button { onSelect(option) } label: {
             Group {
                 if fillsCell {
-                    content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    ZStack {
+                        selectionBackground(bg: bg, isSelected: isSelected)
+                        content.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 } else {
-                    content
-                        .padding(.vertical, Spacing.lg)
-                        .frame(maxWidth: .infinity, minHeight: 64)
+                    ZStack {
+                        selectionBackground(bg: bg, isSelected: isSelected)
+                        content
+                            .padding(.vertical, Spacing.lg)
+                            .frame(maxWidth: .infinity, minHeight: 64)
+                    }
                 }
             }
-            .background(bg)
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(isSelected ? Color.primary.opacity(0.72) : .clear, lineWidth: 2)
+            }
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(Color.accentColor)
+                        .background(.background, in: Circle())
+                        .padding(8)
+                }
+            }
             .clipShape(RoundedRectangle(cornerRadius: 18))
+            .scaleEffect(isSelected ? 1.025 : 1)
+            .opacity(isDimmed ? 0.48 : 1)
+            .saturation(isDimmed ? 0.55 : 1)
+            .shadow(color: .black.opacity(isSelected ? 0.16 : 0), radius: 14, y: 8)
+            .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedOption?.id)
         }
         .buttonStyle(FinderButtonStyle())
+    }
+
+    // finder.FLOW.8
+    private func selectionBackground(bg: Color, isSelected: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 18)
+            .fill(bg)
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 18)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.55)
+                }
+            }
     }
 }

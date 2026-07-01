@@ -6,66 +6,36 @@ import SwiftUI
 struct FinderView: View {
     @Binding var path: [Int]
     @Binding var active: Bool   // false = intro cover (chrome visible); true = test running (chrome hidden)
+    @AppStorage("finderCarouselHintSeen") private var carouselHintSeen = false
     @State private var flow = FinderFlow()
     @State private var hapticTrigger = 0
-    @State private var goingBack = false
+    @State private var carouselHintOffset: CGFloat = 0
     @Query private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
 
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                Color(hex: "F5F5F5").ignoresSafeArea()
+                Surface.background.ignoresSafeArea()
 
                 if !flow.hasCollections {
                     FinderEmptyView()
                 } else if !active {
                     FinderStartView { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { active = true } }
-                } else if flow.isDone {
-                    FinderResultView(flow: flow, onBack: {
-                        withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                            goingBack = true
-                            flow.back()
-                        }
-                    }) {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { exitTest() }
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
-                } else if let axis = flow.currentAxis {
-                    FinderStepView(
-                        axis: axis,
-                        options: flow.currentOptions,
-                        survivorCount: flow.survivors.count,
-                        step: flow.stepIndex,
-                        total: flow.funnel.count,
-                        onSelect: { option in
-                            hapticTrigger += 1
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                                goingBack = false
-                                flow.select(option)
-                            }
-                        },
-                        // Back arrow always present: step >0 goes back a question, step 0 exits the test.
-                        onBack: {
-                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
-                                goingBack = true
-                                if flow.stepIndex > 0 { flow.back() } else { exitTest() }
-                            }
-                        }
-                    )
-                    .id(flow.stepIndex)
-                    .transition(
-                        .asymmetric(
-                            insertion: .move(edge: goingBack ? .leading : .trailing)
-                                .combined(with: .opacity),
-                            removal:   .move(edge: goingBack ? .trailing : .leading)
-                                .combined(with: .opacity)
-                        )
-                    )
+                } else {
+                    finderCarousel
                 }
             }
-            .animation(.spring(response: 0.32, dampingFraction: 0.82), value: flow.stepIndex)
-            .animation(.spring(response: 0.4),  value: flow.isDone)
+            .overlay(alignment: .topLeading) {
+                if active {
+                    // finder.FLOW.11
+                    ChromeButton(systemName: "chevron.left", label: "Back") {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { exitTest() }
+                    }
+                    .padding(.leading, 20)
+                    .padding(.top, 8)
+                }
+            }
             .sensoryFeedback(.impact(weight: .medium), trigger: hapticTrigger)
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: Int.self) { bggId in
@@ -75,6 +45,57 @@ struct FinderView: View {
         .onAppear { sync() }
         .onChange(of: allGames)    { sync() }
         .onChange(of: collections) { sync() }
+    }
+
+    private var finderCarousel: some View {
+        let questionIndices = flow.availableQuestionIndices
+        let pageCount = questionIndices.count + 1
+
+        return ZStack(alignment: .bottom) {
+            TabView(selection: $flow.visiblePage) {
+                ForEach(Array(questionIndices.enumerated()), id: \.element) { page, axisIndex in
+                    FinderStepView(
+                        axis: flow.funnel[axisIndex],
+                        options: flow.options(at: axisIndex),
+                        survivorCount: flow.survivors.count,
+                        step: page,
+                        total: questionIndices.count,
+                        selectedOption: flow.picks[axisIndex],
+                        onSelect: { option in
+                            let isClearingSelection = flow.picks[axisIndex]?.id == option.id
+                            hapticTrigger += 1
+                            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) {
+                                flow.select(at: axisIndex, option: option)
+                                // finder.FLOW.10
+                                if !isClearingSelection {
+                                    flow.visiblePage = min(page + 1, flow.availableQuestionIndices.count)
+                                }
+                            }
+                        }
+                    )
+                    .tag(page)
+                }
+
+                FinderResultView(flow: flow) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { exitTest() }
+                }
+                .tag(questionIndices.count)
+            }
+            .offset(x: carouselHintOffset)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+
+            // finder.FLOW.7
+            pageIndicator(pageCount: pageCount)
+                .padding(.bottom, 0)
+        }
+        .task(id: active) {
+            await playCarouselHintIfNeeded(questionCount: questionIndices.count)
+        }
+        .onChange(of: questionIndices) { _, indices in
+            if flow.visiblePage > indices.count {
+                flow.visiblePage = indices.count
+            }
+        }
     }
 
     private func sync() {
@@ -87,6 +108,43 @@ struct FinderView: View {
         flow.reset()
         active = false
     }
+
+    private func pageIndicator(pageCount: Int) -> some View {
+        HStack(spacing: 8) {
+            ForEach(0..<pageCount, id: \.self) { index in
+                Capsule()
+                    .fill(index == flow.visiblePage ? Color.primary : Color(.systemGray3))
+                    .frame(width: index == flow.visiblePage ? 18 : 8, height: 8)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.primary.opacity(0.08), lineWidth: 1))
+        .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: flow.visiblePage)
+        .accessibilityLabel("Page \(flow.visiblePage + 1) of \(pageCount)")
+    }
+
+    @MainActor
+    private func playCarouselHintIfNeeded(questionCount: Int) async {
+        guard active, !carouselHintSeen, questionCount > 1, flow.visiblePage == 0 else { return }
+        try? await Task.sleep(for: .seconds(0.8))
+        guard active, flow.visiblePage == 0 else { return }
+
+        // finder.FLOW.7
+        for _ in 0..<2 {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.65)) {
+                carouselHintOffset = -32
+            }
+            try? await Task.sleep(for: .seconds(0.35))
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                carouselHintOffset = 0
+            }
+            try? await Task.sleep(for: .seconds(0.7))
+        }
+        carouselHintSeen = true
+    }
 }
 
 // MARK: - Start cover
@@ -97,7 +155,7 @@ private struct FinderStartView: View {
 
     var body: some View {
         ZStack {
-            Color(hex: "F5F5F5").ignoresSafeArea()
+            Surface.background.ignoresSafeArea()
 
             VStack(spacing: 20) {
                 Spacer()

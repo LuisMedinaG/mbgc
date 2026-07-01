@@ -31,10 +31,12 @@ struct ContentView: View {
         }
     }
 
-    // Pill hides only when a detail view is pushed on top.
+    // Pill hides when a detail view is pushed on top or Finder is running.
     private var hidesPill: Bool {
         (!collectionPath.isEmpty && tab == .collection) ||
-        (!finderPath.isEmpty && tab == .tonight)
+        (!finderPath.isEmpty && tab == .tonight) ||
+        // finder.FLOW.12
+        (finderActive && tab == .tonight)
     }
 
     // Search/gear/create also hide while the finder flow is running.
@@ -49,6 +51,7 @@ struct ContentView: View {
             case .tonight:    FinderView(path: $finderPath, active: $finderActive)
             }
         }
+        .background(Surface.background.ignoresSafeArea())
         .overlay {
             // Tap-away to dismiss the create chooser. No dim — sits under the bottom bar/chooser.
             if showCreate {

@@ -4,7 +4,6 @@ import SwiftUI
 /// share link. Pull-to-restart kicks the funnel back to step 0.
 struct FinderResultView: View {
     let flow: FinderFlow
-    let onBack: (() -> Void)?
     let onRestart: () -> Void
 
     @State private var showAll = false
@@ -16,8 +15,7 @@ struct FinderResultView: View {
     private var hasMore: Bool { flow.ranked.count > 3 }
     private var explanation: String {
         let selected = flow.picks
-            .filter { $0.id != "skip" }
-            .map(\.label)
+            .compactMap { $0?.label }
         guard !selected.isEmpty else {
             return "This game rose to the top from your collection using ratings, rank, and overall fit."
         }
@@ -31,15 +29,7 @@ struct FinderResultView: View {
 
     var body: some View {
         ZStack {
-            // Ambient background pulled from hero game art
-            if let hero = top.first {
-                CachedAsyncImage(url: URL(string: hero.image ?? hero.thumbnail ?? ""))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .blur(radius: 80)
-                    .opacity(0.25)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
+            Surface.background.ignoresSafeArea()
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -180,13 +170,12 @@ struct FinderResultView: View {
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 72)
+                    .padding(.bottom, Spacing.floatingNavReserved)
                     .offset(y: bounce)
                 }
                 .coordinateSpace(name: "finderScroll")
                 .scrollIndicators(showAll ? .automatic : .hidden)
                 .refreshable { onRestart() }   // native pull-down → start over (now works collapsed too)
-                .overlay(alignment: .topLeading) { backButton }
                 .overlay(alignment: .topTrailing) { menu }
                 .task {
                     // One-time tutorial: dip down + reveal the "Start over…" hint, a few times.
@@ -204,26 +193,10 @@ struct FinderResultView: View {
                 // the expanding list into one offscreen layer and can fail texture creation.
             }
         }
-        .swipeBack { onBack?() }
         .sheet(isPresented: $showRecommendationDetails) {
             FinderRecommendationDetailsView(text: explanation)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-        }
-    }
-
-    @ViewBuilder private var backButton: some View {
-        if let onBack {
-            Button(action: onBack) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Color(.label))
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .accessibilityLabel("Back")
-            .padding(.leading, 16)
-            .padding(.top, 4)
         }
     }
 

@@ -332,7 +332,8 @@ enum FinderAxis: String, CaseIterable {
 @Observable
 final class FinderFlow {
     let funnel = FinderConfig.funnel
-    private(set) var picks: [FinderOption] = []
+    private(set) var picks = Array<FinderOption?>(repeating: nil, count: FinderConfig.funnel.count)
+    var visiblePage = 0
 
     var ownedGames: [Game] = []
     var allCollections: [Collection] = []
@@ -341,28 +342,37 @@ final class FinderFlow {
 
     var survivors: [Game] {
         var result = ownedGames
-        for (i, pick) in picks.enumerated() {
+        for (i, maybePick) in picks.enumerated() {
+            guard let pick = maybePick else { continue }
             result = funnel[i].apply(pick, to: result, collections: allCollections)
         }
         return result
     }
 
-    var stepIndex: Int { picks.count }
-    var currentAxis: FinderAxis? { stepIndex < funnel.count ? funnel[stepIndex] : nil }
+    var availableQuestionIndices: [Int] {
+        funnel.indices.filter { !options(at: $0).isEmpty }
+    }
+
+    var stepIndex: Int { visiblePage }
+    var currentAxis: FinderAxis? {
+        guard visiblePage < availableQuestionIndices.count else { return nil }
+        return funnel[availableQuestionIndices[visiblePage]]
+    }
 
     var currentOptions: [FinderOption] {
-        currentAxis?.options(from: survivors, collections: allCollections) ?? []
+        guard visiblePage < availableQuestionIndices.count else { return [] }
+        return options(at: availableQuestionIndices[visiblePage])
     }
 
     // Runs every axis. Stops when the funnel is exhausted OR the next axis produces no options
     // (e.g. all survivors share the same duration bucket — asking wouldn't split anything).
     var isDone: Bool {
-        guard !ownedGames.isEmpty, stepIndex > 0 else { return false }
-        return currentAxis == nil || currentOptions.isEmpty
+        guard !ownedGames.isEmpty else { return false }
+        return visiblePage >= availableQuestionIndices.count
     }
 
     var chosenPlayerCount: Int? {
-        picks.first { $0.id.hasPrefix("players:") }
+        picks.compactMap { $0 }.first { $0.id.hasPrefix("players:") }
             .flatMap { FinderAxis.playerCount(from: $0.id) }
     }
 
@@ -401,19 +411,70 @@ final class FinderFlow {
 
     // MARK: Actions
 
-    func select(_ option: FinderOption) {
-        picks.append(option)
-        skipEmptySteps()
+    func options(at index: Int) -> [FinderOption] {
+        guard funnel.indices.contains(index) else { return [] }
+        return funnel[index].options(from: survivors(before: index), collections: allCollections)
     }
-    func back() { if !picks.isEmpty { picks.removeLast() } }
-    func reset() { picks = [] }
 
-    // A question with no options can't split anything — treat it as "select all"
-    // (skip) and move straight to the next axis instead of stalling on an empty screen.
-    // Called after ownedGames/allCollections are both in sync, and after each select().
-    func skipEmptySteps() {
-        while currentAxis != nil, currentOptions.isEmpty {
-            picks.append(FinderOption(id: "skip", label: "Skip", count: survivors.count))
+    func isPageAnswered(at index: Int) -> Bool {
+        guard picks.indices.contains(index) else { return false }
+        return picks[index] != nil
+    }
+
+    // finder.FLOW.6
+    func select(at index: Int, option: FinderOption) {
+        guard picks.indices.contains(index) else { return }
+        if picks[index]?.id == option.id {
+            clearPick(at: index)
+            return
         }
+        picks[index] = option
+        validatePicks(after: index)
+        clampVisiblePage()
+    }
+
+    func clearPick(at index: Int) {
+        guard picks.indices.contains(index) else { return }
+        picks[index] = nil
+        validatePicks(after: index)
+        clampVisiblePage()
+    }
+
+    func select(_ option: FinderOption) {
+        guard visiblePage < availableQuestionIndices.count else { return }
+        select(at: availableQuestionIndices[visiblePage], option: option)
+    }
+    func back() { if visiblePage > 0 { visiblePage -= 1 } }
+    func reset() {
+        picks = Array<FinderOption?>(repeating: nil, count: funnel.count)
+        visiblePage = 0
+    }
+
+    // finder.FLOW.3
+    func skipEmptySteps() {
+        validatePicks(after: -1)
+        clampVisiblePage()
+    }
+
+    private func survivors(before index: Int) -> [Game] {
+        var result = ownedGames
+        for i in funnel.indices where i < index {
+            guard let pick = picks[i] else { continue }
+            result = funnel[i].apply(pick, to: result, collections: allCollections)
+        }
+        return result
+    }
+
+    private func validatePicks(after index: Int) {
+        for i in funnel.indices where i > index {
+            guard let pick = picks[i] else { continue }
+            if !options(at: i).contains(where: { $0.id == pick.id }) {
+                picks[i] = nil
+            }
+        }
+    }
+
+    private func clampVisiblePage() {
+        visiblePage = min(visiblePage, availableQuestionIndices.count)
     }
 }

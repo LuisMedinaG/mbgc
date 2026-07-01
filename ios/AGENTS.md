@@ -78,6 +78,7 @@ ios/MBGC/
 - Library is sorted first via `createdAt = Date.distantPast`
 - **Never delete or rename Library** — check `!collection.isDefault` before any destructive op
 - Games are added to collections via `CollectionPickerView` after import — user picks the destination
+- Smart collections (`isSmart == true`): `games` relationship stays empty — always resolve membership via `Collection.smartGames(collections:allGames:)`, never read `.games` directly (it silently reads as 0)
 
 ### BGG username
 - Stored in `UserDefaults.standard` under key `"profile.bggUsername"`
@@ -105,6 +106,7 @@ ios/MBGC/
 | Search | ✅ Working (local-first @Query filter) |
 | BGG username sync (full) | ✅ Working (local-first via BGG public API) |
 | Vibes/Collections editing on game detail | ✅ Working (local-first via SwiftData) |
+| Smart Filter editor (`SmartListEditor`) — base lists + combine/intersect/subtract/exclude, filters scoped to resolved set | ✅ Working (local-first) |
 
 ---
 

@@ -29,3 +29,6 @@ constraints:
       1: Library and collection features do not call the MBGC backend.
       2: User-owned library data remains available after app relaunch.
       3: SwiftData persistence is the source of truth for local library state.
+  VISUAL:
+    requirements:
+      1: Local library screens use the app's shared plain background surface.

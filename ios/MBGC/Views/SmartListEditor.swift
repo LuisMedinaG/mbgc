@@ -117,6 +117,7 @@ struct SmartListEditor: View {
                 ListPickerSheet(
                     title: bucket.rawValue,
                     lists: lists.filter { !rule.base.contains($0.id) },
+                    allGames: allGames,
                     selected: Binding(
                         get: { Set(ids(bucket)) },
                         set: { setIds(Array($0), bucket) }
@@ -127,6 +128,7 @@ struct SmartListEditor: View {
                 ListPickerSheet(
                     title: "Select Lists",
                     lists: lists,
+                    allGames: allGames,
                     selected: Binding(
                         get: { Set(rule.base) },
                         set: { rule.base = Array($0) }
@@ -251,8 +253,13 @@ struct SmartListEditor: View {
 struct ListPickerSheet: View {
     let title: String
     let lists: [Collection]
+    let allGames: [Game]
     @Binding var selected: Set<UUID>
     @Environment(\.dismiss) private var dismiss
+
+    private func gameCount(_ list: Collection) -> Int {
+        list.isSmart ? list.smartGames(collections: lists, allGames: allGames).count : list.games.count
+    }
 
     var body: some View {
         NavigationStack {
@@ -262,6 +269,7 @@ struct ListPickerSheet: View {
                         .foregroundStyle(Color(hex: list.effectiveColorHex) ?? .orange)
                         .frame(width: 24)
                     Text(list.name)
+                    Text("(\(gameCount(list)))").foregroundStyle(.secondary)
                     Spacer()
                     Image(systemName: selected.contains(list.id) ? "checkmark.square.fill" : "square")
                         .foregroundStyle(selected.contains(list.id) ? Color.accentColor : .secondary)

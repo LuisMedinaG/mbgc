@@ -19,10 +19,8 @@ enum Spacing {
     static let xxl: CGFloat = 24
     static let section: CGFloat = 32
     static let screen: CGFloat = 24
-    /// Reserved breathing room above the home indicator on screens where the
-    /// floating nav is hidden (quiz, result). 60pt clears the indicator on
-    /// every iPhone without padding past the screen edge.
-    static let floatingNavReserved: CGFloat = 60
+    /// Minimal bottom reserve for active Finder pages, where home navigation is hidden.
+    static let floatingNavReserved: CGFloat = 40
 }
 
 // MARK: - Radius
@@ -56,7 +54,7 @@ enum Typography {
 // MARK: - Surfaces
 
 enum Surface {
-    static let background = Color(.systemGroupedBackground)
+    static let background = Color(.systemBackground)
     static let card = Color(.secondarySystemGroupedBackground)
     static let elevated = Color(.systemBackground)
     static let separator = Color(.separator).opacity(0.35)
