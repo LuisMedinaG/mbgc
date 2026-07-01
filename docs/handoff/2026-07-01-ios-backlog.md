@@ -12,18 +12,18 @@ Effort: XS (<30min) · S (~1-2hr) · M (half-day) · L (multi-day) · XL (needs 
 
 ## Tier 1 — Quick wins (trivial, ship today)
 
-| # | Item | Effort |
-|---|------|--------|
-| 6 | "Rename" → "Edit" swipe action text | XS |
-| 10 | Rating filter icon → BGG svg | XS |
-| 4 | iOS haptics (UIFeedbackGenerator on key actions) | XS |
-| 20 | Add-to-collection: move checkbox to right | XS |
-| 17 | Game detail view: slight semitransparency | XS |
-| 22 | Ellipsis menu: share/copy BGG link | S |
-| 5 | Reorder filters, custom most-important-first | S |
-| 15 | Background gradient colors | S |
-| 21 | Collection icon corner badge (smart vs ranked) | S |
-| 27 | Clean up import log (no blank lines, iOS feel) | S |
+| # | Item | Effort | Status |
+|---|------|--------|--------|
+| 6 | "Rename" → "Edit" swipe action text | XS | ✅ Done |
+| 10 | Rating filter icon → BGG svg Boardgamegeek-Simple-Icon.svg | XS | ✅ Done — reused existing `bgg-icon` asset (same one GameSort.bggRating uses) |
+| 4 | iOS haptics (UIFeedbackGenerator on key actions) | XS | ✅ Done — used `.sensoryFeedback`, not raw `UIFeedbackGenerator` (matches existing ContentView/FinderView pattern). Covers selection toggle, delete, copy/move, collection delete, delete game. |
+| 20 | Add-to-collection: move checkbox to right | XS | ✅ Done — both AddGamesSheet (VibesView) and AddToCollectionSheet (GameDetailView) |
+| 17 | Game detail view: slight semitransparency | XS | ✅ Done — stats/links boxes now `Color(.systemGray6).opacity(0.7)` |
+| 22 | Ellipsis menu: share/copy BGG link | S | ✅ Done |
+| 5 | Reorder filters, custom most-important-first | S | ✅ Done — Players, Playtime, Rating, My Rating, Complexity, Best For, BGG Rank, Year, Times Played |
+| 15 | Background gradient colors | S | ⏸️ Skipped — FinderView/FinderStartView bg was deliberately flattened from a gradient to flat #F5F5F5 on Jun 29 as part of design-token cleanup. Re-adding contradicts that decision; needs a concrete spec before touching. |
+| 21 | Collection icon corner badge (smart vs ranked) | S | ✅ Done — purple bolt for smart, pink star for ranked |
+| 27 | Clean up import log (no blank lines, iOS feel) | S | ✅ Done — guards against blank/whitespace log lines, per-status icons (check/warning/x) instead of uniform dot, capped in a 160pt scroll view so a large import doesn't blow out the layout |
 
 ## Tier 2 — Main goal + direct enablers
 

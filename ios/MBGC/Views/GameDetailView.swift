@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct GameDetailView: View {
     let gameId: Int
@@ -10,6 +11,7 @@ struct GameDetailView: View {
     @State private var showDeleteAlert = false
     @State private var showAddToCollection = false
     @State private var isDescExpanded = false
+    @State private var didDelete = false
 
     var body: some View {
         Group {
@@ -52,6 +54,17 @@ struct GameDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    if viewModel.game?.bggId ?? 0 > 0 {
+                        ShareLink(item: bggURL) {
+                            Label("Share BGG Link", systemImage: "square.and.arrow.up")
+                        }
+                        Button {
+                            UIPasteboard.general.string = bggURL.absoluteString
+                        } label: {
+                            Label("Copy BGG Link", systemImage: "doc.on.doc")
+                        }
+                        Divider()
+                    }
                     Button(role: .destructive) { showDeleteAlert = true } label: {
                         Label("Delete Game", systemImage: "trash")
                     }
@@ -61,8 +74,10 @@ struct GameDetailView: View {
                 .accessibilityLabel("More actions")
             }
         }
+        .sensoryFeedback(.warning, trigger: didDelete)
         .alert("Delete \"\(viewModel.game?.name ?? "")\"?", isPresented: $showDeleteAlert) {
             Button("Delete", role: .destructive) {
+                didDelete.toggle()
                 if viewModel.deleteGame(modelContext: modelContext) { dismiss() }
             }
             Button("Cancel", role: .cancel) {}
@@ -122,7 +137,7 @@ struct GameDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.systemGray6).opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
@@ -207,7 +222,7 @@ struct GameDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.systemGray6).opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
@@ -228,6 +243,10 @@ struct GameDetailView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
+    }
+
+    private var bggURL: URL {
+        URL(string: "https://boardgamegeek.com/boardgame/\(viewModel.game?.bggId ?? 0)")!
     }
 
     private func playersStr(_ game: Game) -> String {
@@ -266,8 +285,6 @@ struct AddToCollectionSheet: View {
                     else { selectedIds.insert(col.persistentModelID) }
                 } label: {
                     HStack {
-                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(col.isDefault ? Color.secondary.opacity(0.6) : Color.accentColor)
                         Text(col.name)
                             .foregroundStyle(col.isDefault ? Color.secondary : Color.primary)
                         if col.isDefault {
@@ -275,6 +292,9 @@ struct AddToCollectionSheet: View {
                                 .font(.caption)
                                 .foregroundStyle(Color.secondary)
                         }
+                        Spacer()
+                        Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                            .foregroundStyle(col.isDefault ? Color.secondary.opacity(0.6) : Color.accentColor)
                     }
                 }
                 .disabled(col.isDefault)
@@ -288,6 +308,7 @@ struct AddToCollectionSheet: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() } }
             }
         }
+        .sensoryFeedback(.selection, trigger: selectedIds)
         .presentationDetents([.medium, .large])
     }
 

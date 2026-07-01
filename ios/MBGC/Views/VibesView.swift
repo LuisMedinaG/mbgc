@@ -47,7 +47,7 @@ struct VibesView: View {
                                 Button {
                                     editingCollection = col
                                 } label: {
-                                    Label("Rename", systemImage: "pencil")
+                                    Label("Edit", systemImage: "pencil")
                                 }
                                 .tint(.blue)
                             }
@@ -121,6 +121,22 @@ struct VibesView: View {
             .frame(width: 48, height: 48)
             .background(bg)
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(alignment: .bottomTrailing) { cornerBadge(col) }
+    }
+
+    /// Small corner badge marking smart (bolt) vs ranked (star) lists — omitted for standard lists.
+    @ViewBuilder
+    private func cornerBadge(_ col: Collection) -> some View {
+        if col.isSmart || col.isRanked {
+            Image(systemName: col.isSmart ? "bolt.fill" : "star.fill")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 18, height: 18)
+                .background(col.isSmart ? Color.purple : Color.pink)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1.5))
+                .offset(x: 6, y: 6)
+        }
     }
 }
 
@@ -821,6 +837,7 @@ struct CollectionDetailView: View {
     @State private var showEditCollection = false
     @State private var showEditRule = false
     @State private var showDeleteCollectionConfirm = false
+    @State private var haptic = 0
 
     /// Membership source: derived rule set for smart lists, hand-curated games otherwise.
     private var effectiveGames: [Game] {
@@ -920,6 +937,7 @@ struct CollectionDetailView: View {
                                         Button(role: .destructive) {
                                             collection.games.removeAll { $0.bggId == game.bggId }
                                             try? modelContext.save()
+                                            haptic += 1
                                         } label: {
                                             Label("Delete", systemImage: "trash")
                                         }
@@ -951,7 +969,8 @@ struct CollectionDetailView: View {
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
-
+        .sensoryFeedback(.selection, trigger: selectedIds)
+        .sensoryFeedback(.impact(weight: .medium), trigger: haptic)
         .toolbar(.visible, for: .navigationBar)
         .toolbar {
             if isSelecting {
@@ -1090,6 +1109,7 @@ struct CollectionDetailView: View {
                 // by smartGames(), so a move would silently lose the game.
                 destinations: otherCollections.filter { !$0.isSmart }
             ) {
+                haptic += 1
                 if action == .move { exitSelection() }
                 else { selectedIds.removeAll() }
             }
@@ -1175,6 +1195,7 @@ struct CollectionDetailView: View {
         collection.games.removeAll { selectedIds.contains($0.bggId) }
         try? modelContext.save()
         selectedIds.removeAll()
+        haptic += 1
     }
 
     private func exitSelection() {
@@ -1264,8 +1285,11 @@ struct CollectionDetailView: View {
         let value = field.formatValue(spec.value) + (field.unit.map { " \($0)" } ?? "")
         return Button { filters.specs[field] = nil } label: {
             HStack(spacing: 4) {
-                Image(systemName: field.icon)
-                    .font(.caption2)
+                if field.isCustomImage {
+                    Image(field.icon).font(.caption2)
+                } else {
+                    Image(systemName: field.icon).font(.caption2)
+                }
                 Text("\(symbol) \(value)")
                     .font(.caption.monospacedDigit())
             }
@@ -1344,8 +1368,6 @@ struct AddGamesSheet: View {
                     else { selected.insert(game.bggId) }
                 } label: {
                     HStack(spacing: 14) {
-                        Image(systemName: selected.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(selected.contains(game.bggId) ? Color.orange : .secondary)
                         CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 6)
                         VStack(alignment: .leading, spacing: 0) {
                             if let year = game.yearPublished, year > 0 {
@@ -1354,6 +1376,9 @@ struct AddGamesSheet: View {
                                 Text(game.name).bold().font(.subheadline)
                             }
                         }
+                        Spacer()
+                        Image(systemName: selected.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(selected.contains(game.bggId) ? Color.orange : .secondary)
                     }
                     .foregroundStyle(.primary)
                 }

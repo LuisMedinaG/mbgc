@@ -82,14 +82,17 @@ struct ImportView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 if !syncLog.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
-                            Label(message, systemImage: "circle.fill")
-                                .font(.caption).foregroundStyle(statusColor(for: message))
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(Array(syncLog.enumerated()), id: \.offset) { _, message in
+                                Label(message, systemImage: statusIcon(for: message))
+                                    .font(.caption).foregroundStyle(statusColor(for: message))
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                    .frame(maxHeight: 160)
                     .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
@@ -323,7 +326,7 @@ struct ImportView: View {
     #endif
 
     private func appendSyncLog(_ message: String) {
-        guard syncLog.last != message else { return }
+        guard !message.trimmingCharacters(in: .whitespaces).isEmpty, syncLog.last != message else { return }
         syncLog.append(message)
     }
 
@@ -339,6 +342,17 @@ struct ImportView: View {
         let nextSync = lastSync.addingTimeInterval(bggImportCooldown)
         guard nextSync > now else { return nil }
         return "BGG import is available again \(nextSync.formatted(date: .abbreviated, time: .shortened))."
+    }
+
+    private func statusIcon(for message: String) -> String {
+        if message.contains("Failed") || message.contains("Couldn't") || message.contains("error") {
+            return "xmark.circle.fill"
+        } else if message.contains("Skipping") || message.contains("Limiting") {
+            return "exclamationmark.triangle.fill"
+        } else if message.contains("Finished") || message.contains("Added") {
+            return "checkmark.circle.fill"
+        }
+        return "circle.fill"
     }
 
     private func statusColor(for message: String) -> Color {
