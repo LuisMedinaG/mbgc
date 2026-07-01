@@ -1,0 +1,31 @@
+feature:
+  name: local-library
+  product: ios
+  description: Store, browse, and manage the user's board game library locally on device.
+
+components:
+  LIBRARY:
+    requirements:
+      1: The app creates exactly one default Library collection on first launch.
+      2: The app stores imported games locally with BGG ID as the unique identifier.
+      3: The app opens a locally stored game detail view without requiring network access.
+      4: The app prevents duplicate local game records for the same BGG ID.
+  COLLECTIONS:
+    requirements:
+      1: The app lets the user create custom local collections.
+      2: The app lets the user rename custom local collections.
+      3: The app lets the user delete custom local collections without deleting the games they contain.
+      4: The app prevents the default Library collection from being renamed or deleted.
+      5: The app lets the user add and remove games from custom local collections.
+  SMART_COLLECTIONS:
+    requirements:
+      1: The app lets the user define a smart collection from local game metadata filters.
+      2: The app resolves smart collection membership from current local game data.
+      3: The app distinguishes smart collections from manually managed collections.
+
+constraints:
+  LOCAL_FIRST:
+    requirements:
+      1: Library and collection features do not call the MBGC backend.
+      2: User-owned library data remains available after app relaunch.
+      3: SwiftData persistence is the source of truth for local library state.

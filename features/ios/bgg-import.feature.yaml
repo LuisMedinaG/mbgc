@@ -1,7 +1,7 @@
 feature:
   name: bgg-import
   product: ios
-  description: Import a user's owned BoardGameGeek games into the local iOS library.
+  description: Import board games from BoardGameGeek sources into the local iOS library.
 
 components:
   SYNC:
@@ -11,6 +11,12 @@ components:
       3: The app adds only newly imported games to the selected local collection.
       4: The app defaults to local-first behavior and does not call the MBGC backend.
       5: The app shows user-visible progress for each major import step.
+  CSV:
+    requirements:
+      1: The app extracts BGG IDs from an imported BGG CSV file.
+      2: The app ignores duplicate BGG IDs from the same CSV import.
+      3: The app saves CSV-imported games to the default Library collection.
+      4: The app offers collection selection for newly CSV-imported games.
   LIMITS:
     requirements:
       1: A regular local BGG sync imports at most 100 new games.

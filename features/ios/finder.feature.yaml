@@ -1,0 +1,30 @@
+feature:
+  name: finder
+  product: ios
+  description: Guide the user through lightweight questions to recommend games from the local library.
+
+components:
+  FLOW:
+    requirements:
+      1: The finder starts from the user's locally stored games.
+      2: The finder asks one decision question at a time.
+      3: The finder skips a question automatically when it has no available options.
+      4: The finder keeps enough state to move through the flow without losing prior answers.
+  QUESTIONS:
+    requirements:
+      1: The finder can narrow games by collection or vibe.
+      2: The finder can narrow games by supported player count.
+      3: The finder can narrow games by playtime bucket.
+      4: The finder can narrow games by game type when type metadata exists.
+  RESULTS:
+    requirements:
+      1: The finder shows only games that match the selected answers.
+      2: The finder ranks matching games with deterministic local signals.
+      3: Finder results open the matching local game detail view.
+      4: The finder explains when no local games match the selected answers.
+
+constraints:
+  LOCAL_FIRST:
+    requirements:
+      1: Finder behavior uses only local SwiftData state.
+      2: Finder ranking rules are covered by unit tests.

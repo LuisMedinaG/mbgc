@@ -1,0 +1,37 @@
+feature:
+  name: search-and-filter
+  product: ios
+  description: Find locally stored games by text search and structured filters.
+
+components:
+  TEXT_SEARCH:
+    requirements:
+      1: The app searches local games by title.
+      2: The app searches local games by imported metadata keywords.
+      3: Search results open the matching local game detail view.
+      4: Empty search text shows no game results.
+  FILTER_SEARCH:
+    requirements:
+      1: The app lets the user filter local games by player count.
+      2: The app lets the user filter local games by playtime.
+      3: The app lets the user filter local games by category.
+      4: The app lets the user filter local games by mechanic.
+      5: The app lets the user filter local games by complexity.
+      6: The app lets the user filter local games by BGG rating or rank.
+      7: The app lets the user combine multiple active filters.
+      8: The app makes active filters visible and removable.
+  COLLECTION_SCOPE:
+    requirements:
+      1: The app can restrict search and filter results to a selected collection.
+      2: Collection-scoped results include both manual and smart collection membership.
+  HISTORY:
+    requirements:
+      1: The app records recent local searches.
+      2: The app lets the user rerun a recent local search.
+
+constraints:
+  LOCAL_FIRST:
+    requirements:
+      1: Search and filter features use only local SwiftData state.
+      2: Search and filter features do not call the MBGC backend.
+      3: Filter semantics are deterministic enough to be covered by unit tests.
