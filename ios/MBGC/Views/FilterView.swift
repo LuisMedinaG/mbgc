@@ -189,6 +189,17 @@ let langLevels: [LangLevel] = [
     LangLevel(level: 5, title: "All in-game text necessary",  subtitle: "Unplayable in another language.",                     color: .red,                                 symbol: "hexagon"),
 ]
 
+// MARK: - Unified row ordering (FilterRows)
+
+enum FilterRowKind: Hashable, Identifiable {
+    case title
+    case language
+    case set(SetFilterField)
+    case numeric(FilterField)
+
+    var id: Self { self }
+}
+
 // MARK: - Filter spec
 
 struct FilterSpec: Equatable, Codable {
@@ -296,30 +307,52 @@ struct FilterRows: View {
     @State private var exactInputs: [FilterField: String] = [:]
     @State private var languageExpanded = false
 
-    private var activeSets: [SetFilterField]  { SetFilterField.allCases.filter { filters.setFilters[$0] != nil } }
-    private var inactiveSets: [SetFilterField] { SetFilterField.allCases.filter { filters.setFilters[$0] == nil } }
-    private var activeNumeric: [FilterField]   { FilterField.allCases.filter { filters.specs[$0] != nil } }
-    private var inactiveNumeric: [FilterField] { FilterField.allCases.filter { filters.specs[$0] == nil } }
+    // BGG-familiar order: classification → players/time → ratings → credits/dates.
+    // Single unified list so set filters, numeric filters, title, and language can be
+    // interleaved instead of always rendering as separate blocks.
+    private static let rowOrder: [FilterRowKind] = [
+        .set(.types), .set(.categories), .set(.mechanics),
+        .numeric(.players), .numeric(.playtime),
+        .numeric(.weight), .numeric(.bestFor),
+        .numeric(.rating), .numeric(.bggRank), .numeric(.userRating),
+        .language,
+        .set(.designers), .set(.artists), .set(.publishers),
+        .numeric(.yearPublished), .numeric(.timesPlayed),
+        .title,
+    ]
+
+    private func isActive(_ row: FilterRowKind) -> Bool {
+        switch row {
+        case .title:          return !filters.titleContains.isEmpty
+        case .language:       return !filters.languageLevels.isEmpty
+        case .set(let field): return filters.setFilters[field] != nil
+        case .numeric(let field): return filters.specs[field] != nil
+        }
+    }
 
     var body: some View {
         Group {
             if !filters.isEmpty {
                 Section("Enabled filters") {
-                    if !filters.titleContains.isEmpty { titleRow }
-                    if !filters.languageLevels.isEmpty { languageDependenceRow }
-                    ForEach(activeSets) { checklistRow($0) }
-                    ForEach(activeNumeric) { filterRow($0) }
+                    ForEach(Self.rowOrder.filter(isActive)) { rowView($0) }
                 }
             }
             Section(filters.isEmpty ? "Select filters" : "Other filters") {
-                if filters.titleContains.isEmpty { titleRow }
-                if filters.languageLevels.isEmpty { languageDependenceRow }
-                ForEach(inactiveSets) { checklistRow($0) }
-                ForEach(inactiveNumeric) { filterRow($0) }
+                ForEach(Self.rowOrder.filter { !isActive($0) }) { rowView($0) }
             }
         }
         .onChange(of: filters.isEmpty) { _, isEmpty in
             if isEmpty { exactInputs.removeAll(); languageExpanded = false }
+        }
+    }
+
+    @ViewBuilder
+    private func rowView(_ row: FilterRowKind) -> some View {
+        switch row {
+        case .title:              titleRow
+        case .language:           languageDependenceRow
+        case .set(let field):     checklistRow(field)
+        case .numeric(let field): filterRow(field)
         }
     }
 

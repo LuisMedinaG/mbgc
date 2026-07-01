@@ -6,9 +6,9 @@ Effort: XS (<30min) · S (~1-2hr) · M (half-day) · L (multi-day) · XL (needs 
 
 | # | Item | Effort | Notes |
 |---|------|--------|-------|
-| 1 | Move/copy after click doesn't close select view | XS | selection-mode state leak, VibesView.swift |
-| 7 | Question w/ 0 options should auto-skip (select all) | S | FinderView.swift flow logic bug |
-| 18 | Fix language dependence filter | S | need repro first — filter logic bug |
+| 1 | Move/copy after click doesn't close select view | XS | ✅ Done — Copy only cleared `selectedIds`, leaving `isSelecting` true; both actions now call `exitSelection()` (VibesView.swift) |
+| 7 | Question w/ 0 options should auto-skip (select all) | S | ✅ Done — `FinderFlow.skipEmptySteps()` auto-appends a "skip" pick and advances when an axis has zero options, instead of stalling on an empty screen or ending the flow early. Regression test: `FinderFlowTests.emptyAxisAutoSkips` |
+| 18 | Fix language dependence filter | S | ⏸️ No repro found — `GameFilters.passes()` already does exact-level `Set.contains` matching (not "greater than"), confirmed by new test `GameFiltersTests.languageLevelsMatchExactlyNotGreaterThan`. Reopen with a specific game if wrong results recur after rebuilding. |
 
 ## Tier 1 — Quick wins (trivial, ship today)
 
@@ -20,7 +20,7 @@ Effort: XS (<30min) · S (~1-2hr) · M (half-day) · L (multi-day) · XL (needs 
 | 20 | Add-to-collection: move checkbox to right | XS | ✅ Done — both AddGamesSheet (VibesView) and AddToCollectionSheet (GameDetailView) |
 | 17 | Game detail view: slight semitransparency | XS | ✅ Done — stats/links boxes now `Color(.systemGray6).opacity(0.7)` |
 | 22 | Ellipsis menu: share/copy BGG link | S | ✅ Done |
-| 5 | Reorder filters, custom most-important-first | S | ✅ Done — Players, Playtime, Rating, My Rating, Complexity, Best For, BGG Rank, Year, Times Played |
+| 5 | Reorder filters, custom most-important-first | S | ✅ Done — unified BGG-familiar order across all filter types (was numeric-only before): Type, Categories, Mechanics, Players, Playtime, Complexity, Best For, Rating, BGG Rank, My Rating, Language, Designers, Artists, Publisher, Year, Times Played, Title. `FilterRowKind` in FilterView.swift drives the single ordered list. |
 | 15 | Background gradient colors | S | ⏸️ Skipped — FinderView/FinderStartView bg was deliberately flattened from a gradient to flat #F5F5F5 on Jun 29 as part of design-token cleanup. Re-adding contradicts that decision; needs a concrete spec before touching. |
 | 21 | Collection icon corner badge (smart vs ranked) | S | ✅ Done — purple bolt for smart, pink star for ranked |
 | 27 | Clean up import log (no blank lines, iOS feel) | S | ✅ Done — guards against blank/whitespace log lines, per-status icons (check/warning/x) instead of uniform dot, capped in a 160pt scroll view so a large import doesn't blow out the layout |
@@ -49,6 +49,7 @@ Effort: XS (<30min) · S (~1-2hr) · M (half-day) · L (multi-day) · XL (needs 
 | 25 | Custom markdown rules input (char-limited) | S–M — depends on #23 |
 | 24 | Upload PDF/txt/md for rules | M–L — depends on #23, needs file storage decision |
 | 16 | Game detail: blend image into background | S–M |
+| 33 | Settings row to let user drag-reorder filters themselves | M — replaces hardcoded `FilterRowKind.rowOrder` (FilterView.swift) with a persisted user preference; needs a drag-to-reorder list UI + fallback to default order |
 
 ## Tier 4 — Big bets / needs a decision first (Confusion Protocol)
 
