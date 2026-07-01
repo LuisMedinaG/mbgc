@@ -43,7 +43,8 @@ ios/MBGC/
 ├── MBGCApp.swift              App entry — modelContainer([Game, Collection])
 ├── Models/
 │   ├── Game.swift             @Model — bggId is @Attribute(.unique) primary key
-│   └── Collection.swift       @Model — isDefault=true reserved for Library
+│   ├── Collection.swift       @Model — isDefault=true reserved for Library
+│   └── FinderFlow.swift       Tonight picker flow; per-question logic behind FinderAxis
 ├── Networking/
 │   ├── BGGClient.swift        actor — fetchThings(ids:token:), 5s pacing, 4-attempt retry
 │   ├── BGGXMLParser.swift     XMLParser delegate for /xmlapi2/thing XML
@@ -162,6 +163,12 @@ Add Swift files to the filesystem, then run `xcodegen generate` in `ios/`.
 Exception: sheets must be standalone `View` structs with their own
 `@Environment(\.modelContext)` (SwiftUI doesn't reliably propagate context into computed
 view properties used as sheet content).
+
+**Finder questions stay behind `FinderAxis`.** Add a new Tonight picker question by
+adding a `FinderAxis` case, a private `FinderQuestionKind` struct in
+`Models/FinderFlow.swift`, and a `FinderConfig.funnel` entry. Do not introduce a
+full factory/registration system until Finder needs runtime-configurable questions,
+multi-select/free-text question types, or a larger question catalog.
 
 **Do NOT add or call a backend API client.** Any new iOS data feature must go
 through `BGGClient` or SwiftData directly.
