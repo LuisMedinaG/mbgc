@@ -12,6 +12,34 @@ struct FinderOption: Identifiable, Equatable {
     var solidBg: Bool = false  // true = full-opacity bg with white text (vibe); false = pastel tint
 }
 
+// MARK: - Complexity
+
+enum ComplexityBucket: String, CaseIterable {
+    case light  = "Light"
+    case medium = "Medium"
+    case heavy  = "Heavy"
+    case veryHeavy = "Very Heavy"
+
+    var subtitle: String {
+        switch self {
+        case .light:     return "Easy to learn, quick decisions"
+        case .medium:    return "Moderate complexity, some strategy"
+        case .heavy:     return "Deep mechanics, think ahead"
+        case .veryHeavy: return "Brain burner, hours of planning"
+        }
+    }
+
+    func matches(_ weight: Double?) -> Bool {
+        guard let w = weight else { return false }
+        switch self {
+        case .light:     return w < 2.0
+        case .medium:    return w >= 2.0 && w < 2.75
+        case .heavy:     return w >= 2.75 && w < 3.5
+        case .veryHeavy: return w >= 3.5
+        }
+    }
+}
+
 // MARK: - Duration
 
 enum DurationBucket: String, CaseIterable {
@@ -188,17 +216,89 @@ private struct DurationQuestion: FinderQuestionKind {
     }
 }
 
+private struct ComplexityQuestion: FinderQuestionKind {
+    var question: String { "How complex should it be?" }
+    var usesGrid: Bool { true }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
+        var counts: [ComplexityBucket: Int] = [:]
+        for game in games {
+            let bucket: ComplexityBucket
+            if let weight = game.weight {
+                bucket = weight < 2.0 ? .light
+                       : weight < 2.75 ? .medium
+                       : weight < 3.5 ? .heavy
+                       : .veryHeavy
+            } else {
+                continue  // games without weight data are excluded
+            }
+            counts[bucket, default: 0] += 1
+        }
+
+        return ComplexityBucket.allCases.compactMap { bucket -> FinderOption? in
+            let n = counts[bucket, default: 0]
+            guard n > 0 else { return nil }
+            return FinderOption(id: "complexity:\(bucket.rawValue)", label: bucket.rawValue,
+                                count: n, tint: FinderConfig.complexityTints[bucket])
+        }
+    }
+
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        let raw = String(option.id.dropFirst("complexity:".count))
+        guard let bucket = ComplexityBucket(rawValue: raw) else { return games }
+        return games.filter { bucket.matches($0.weight) }
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        0
+    }
+}
+
+private struct CategoryQuestion: FinderQuestionKind {
+    var question: String { "What kind of game?" }
+    var usesGrid: Bool { true }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
+        var categoryCounts: [String: Int] = [:]
+        for game in games {
+            for category in game.categories ?? [] {
+                categoryCounts[category, default: 0] += 1
+            }
+        }
+
+        let sorted = categoryCounts.sorted { $0.value > $1.value }
+        let top = sorted.prefix(FinderConfig.maxCategoryOptions)
+
+        return top.enumerated().compactMap { index, item -> FinderOption? in
+            let tint = FinderConfig.categoryTints[index % FinderConfig.categoryTints.count]
+            return FinderOption(id: "category:\(item.key)", label: item.key,
+                                count: item.value, tint: tint)
+        }
+    }
+
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        let name = String(option.id.dropFirst("category:".count))
+        return games.filter { $0.categories?.contains(name) == true }
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        0
+    }
+}
+
 // MARK: - Axis
 
 // FinderAxis stays data-driven so reorder/toggle can become settings later.
 enum FinderAxis: String, CaseIterable {
-    case vibe, players, duration
+    case vibe, complexity, players, duration, category
 
     private var kind: FinderQuestionKind {
         switch self {
-        case .vibe:     return VibeQuestion()
-        case .players:  return PlayersQuestion()
-        case .duration: return DurationQuestion()
+        case .vibe:       return VibeQuestion()
+        case .complexity: return ComplexityQuestion()
+        case .players:    return PlayersQuestion()
+        case .duration:   return DurationQuestion()
+        case .category:   return CategoryQuestion()
         }
     }
 

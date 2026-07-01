@@ -3,7 +3,7 @@ import Foundation
 /// Single home for the picker's behavior knobs. Change the flow here, not in the views.
 enum FinderConfig {
     /// Order of questions in the picker. Reorder or trim to change the funnel.
-    static let funnel: [FinderAxis] = [.vibe, .players, .duration]
+    static let funnel: [FinderAxis] = [.vibe, .category, .complexity, .players, .duration]
 
     /// Largest distinct player count shown; counts at or above this fold into "N+".
     static let playerCap = 5
@@ -19,6 +19,21 @@ enum FinderConfig {
         .quick:  "#DCFCE7", .short:   "#FEF9C3", .medium: "#FED7AA",
         .long:   "#FECACA", .unknown: "#E2E8F0",
     ]
+
+    /// Complexity bucket button tints.
+    static let complexityTints: [ComplexityBucket: String] = [
+        .light:     "#DCFCE7", .medium:   "#FEF9C3",
+        .heavy:     "#FED7AA", .veryHeavy: "#FECACA",
+    ]
+
+    /// Category option tints, cycled in order.
+    static let categoryTints = [
+        "#E0E7FF", "#FCE7F3", "#ECFDF5", "#FEF3C7",
+        "#FEF9C3", "#DBEAFE", "#F3E8FF", "#FFE4E6",
+    ]
+
+    /// Maximum number of top categories shown as options.
+    static let maxCategoryOptions = 8
 
     // MARK: - Ranking
 
