@@ -18,10 +18,27 @@ struct SmartListEditor: View {
 
     private var baseCollections: [Collection] { lists.filter { rule.base.contains($0.id) } }
 
-    private var baseSummary: String {
-        if rule.base.isEmpty { return "Library" }
-        if rule.base.count == 1 { return baseCollections.first?.name ?? "Library" }
-        return "\(rule.base.count) lists"
+    private func gameCount(_ list: Collection) -> Int {
+        list.isSmart ? list.smartGames(collections: lists, allGames: allGames).count : list.games.count
+    }
+
+    /// Games from the base lists + set operations, before this rule's own filters — empty until a list is chosen.
+    private var resolvedGames: [Game] {
+        guard baseSelected else { return [] }
+        func ids(_ uuids: [UUID]) -> [Set<Int>] {
+            uuids.compactMap { id in lists.first { $0.id == id } }.map { Set(gameList($0).map(\.bggId)) }
+        }
+        var members: Set<Int> = []
+        for set in ids(rule.base) { members.formUnion(set) }
+        for set in ids(rule.combine) { members.formUnion(set) }
+        for set in ids(rule.intersect) { members.formIntersection(set) }
+        for set in ids(rule.subtract) { members.subtract(set) }
+        for set in ids(rule.exclude) { members.formSymmetricDifference(set) }
+        return allGames.filter { members.contains($0.bggId) }
+    }
+
+    private func gameList(_ list: Collection) -> [Game] {
+        list.isSmart ? list.smartGames(collections: lists, allGames: allGames) : list.games
     }
 
     init(rule: SmartRule, lists: [Collection], allGames: [Game], onSave: @escaping (SmartRule) -> Void) {
@@ -80,7 +97,7 @@ struct SmartListEditor: View {
                         }
                     }
                 }
-                FilterRows(filters: $rule.filters, games: allGames, showTitlePicker: $showTitlePicker, activeChecklist: $activeChecklist)
+                FilterRows(filters: $rule.filters, games: resolvedGames, showTitlePicker: $showTitlePicker, activeChecklist: $activeChecklist)
             }
             .navigationTitle("Smart Filter")
             .navigationBarTitleDisplayMode(.inline)
@@ -113,7 +130,7 @@ struct SmartListEditor: View {
             .sheet(item: $activeChecklist) { field in
                 ChecklistPickerSheet(
                     title: field.rawValue,
-                    options: field.values(from: allGames),
+                    options: field.values(from: resolvedGames),
                     selected: Binding(
                         get: { rule.filters.setFilters[field] ?? [] },
                         set: { rule.filters.setFilters[field] = $0.isEmpty ? nil : $0 }
@@ -152,7 +169,7 @@ struct SmartListEditor: View {
         } label: {
             HStack(spacing: 3) {
                 Text(baseSelected ? "Choose…" : "Off")
-                    .foregroundStyle(baseSelected ? Color.accentColor : .secondary)
+                    .foregroundStyle(.secondary)
                 Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
             }
             .font(.subheadline.weight(.medium))
@@ -160,18 +177,14 @@ struct SmartListEditor: View {
             .padding(.leading, 8)
             .contentShape(Rectangle())
         }
+        .tint(.primary)
     }
 
     private var fromSelectedRow: some View {
         HStack(spacing: 12) {
-            Image(systemName: "checklist").frame(width: 24).foregroundStyle(Color.accentColor)
             Text("From selected").font(.body).foregroundStyle(.primary)
             Spacer()
-            HStack(spacing: 3) {
-                Text(baseSummary).foregroundStyle(rule.base.isEmpty ? .secondary : Color.accentColor)
-                Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
-            }
-            .font(.subheadline.weight(.medium))
+            Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())
         .onTapGesture { showBaseSelect = true }
@@ -183,7 +196,7 @@ struct SmartListEditor: View {
                 .foregroundStyle(Color(hex: list.effectiveColorHex) ?? .orange).frame(width: 24)
             Text(list.name)
             Spacer()
-            Text("\(list.games.count)").foregroundStyle(.secondary).monospacedDigit()
+            Text("\(gameCount(list))").foregroundStyle(.secondary).monospacedDigit()
         }
     }
 
@@ -198,7 +211,7 @@ struct SmartListEditor: View {
                     .padding(.horizontal, 14).padding(.vertical, 12)
             }
         }
-        .background(Color(red: 1.0, green: 0.95, blue: 0.82).opacity(0.9))
+        .background(Color(.systemGray5))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 

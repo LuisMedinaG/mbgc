@@ -37,6 +37,14 @@ struct FinderStepView: View {
         }
         .padding(.bottom, Spacing.floatingNavReserved)
         .swipeBack { onBack?() }
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { v in
+                    if v.translation.width < -80, abs(v.translation.height) < 80 {
+                        onSelect(FinderOption(id: "skip", label: "Skip", count: survivorCount))
+                    }
+                }
+        )
     }
 
     private var header: some View {
