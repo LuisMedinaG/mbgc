@@ -20,6 +20,8 @@ components:
       6: The app lets the user filter local games by BGG rating or rank.
       7: The app lets the user combine multiple active filters.
       8: The app makes active filters visible and removable.
+      9: Numeric filters can constrain values to an inclusive range where range semantics are meaningful.
+      10: Numeric filter operation menus separate disabling a filter from choosing an active operation.
   COLLECTION_SCOPE:
     requirements:
       1: The app can restrict search and filter results to a selected collection.

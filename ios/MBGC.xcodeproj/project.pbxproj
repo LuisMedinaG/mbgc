@@ -12,25 +12,34 @@
 		1592D4AEF7EDC7899F0F1EBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */; };
 		1AE5F179806A31E8719F84F7 /* ImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29FB54336829DBBC66ECFAEC /* ImportView.swift */; };
 		1FCB576CE9671AA87AA86370 /* SmartRuleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B0DA77E2FB126C70333193 /* SmartRuleTests.swift */; };
+		3A3D7A5C0E9F5BE0EA6C2F65 /* CollectionSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = D677D3E820D649900BACD975 /* CollectionSheets.swift */; };
 		405F7579E675C4135E9EB978 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53CCB0E019B538D583D338CA /* SearchView.swift */; };
 		44CD545581A7A4C805CF5D93 /* Collection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A5D5C010301E549F84FE830 /* Collection.swift */; };
+		4D2B2909F06647E7718BFAFD /* FinderResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76AE58FB55442100A79A21D4 /* FinderResultView.swift */; };
 		4DCA1F0DC2C89D3E4FA49A5B /* BGGXMLParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFF36E1CC65BF3B805532A8B /* BGGXMLParserTests.swift */; };
 		4F0987099D966728673D3175 /* BGGGame.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD671A7394CE1D23B5C50B9B /* BGGGame.swift */; };
+		573D39B96C4E426CA722A985 /* CollectionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DEDC64814B3C6EEA468F928 /* CollectionDetailView.swift */; };
 		5AB30FE8725F3ED003DCBB49 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */; };
 		5B702FC979C65059E69AE1B5 /* Game.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62288FD9B5C3E5AC1E934102 /* Game.swift */; };
 		5E4FD49CAF151CF1BF3744F5 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B96A64CF3883FE552EF008C0 /* OnboardingView.swift */; };
+		5E832640C0596D0FEA90F659 /* CollectionPickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF01FF1876519D11ADE2F62 /* CollectionPickerView.swift */; };
+		63654D001E993B8C3CF12611 /* SmartListEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DFA2B2D19297B2A640C71C9 /* SmartListEditor.swift */; };
 		79E6A352ED151DA4B01F3C62 /* BGGCSVParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C70ACC3B90EA828A96A5ABC /* BGGCSVParser.swift */; };
 		7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */; };
 		7D047A0160CEE9F6C121E5F4 /* GameFiltersTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA171D0592C2F7FAB6B3A7A8 /* GameFiltersTests.swift */; };
 		80D024F0D11FFF26F68E036F /* VibesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E87CF1FE5164753FD476E2F /* VibesView.swift */; };
+		894B122F94E41C77F62F3395 /* CollectionActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 443939DABCAE03321653C0F0 /* CollectionActions.swift */; };
 		8C7EB56EE0A7BE6797BC0B6B /* FinderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2E23AAA250870CACDE4E88 /* FinderView.swift */; };
 		935AA5051C15F2D679F3A2BF /* FinderFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E346F76F771F6D51912B41A4 /* FinderFlow.swift */; };
 		93FC2BC690E736B32C8020F1 /* BGGXMLParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFC72A5148F980A8CE0BA6DD /* BGGXMLParser.swift */; };
+		9B5EC56C2FCEB463A1DAD65B /* Filters.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B613D4CED8EF6E8EE828DA /* Filters.swift */; };
 		A14CCA273BB6AB6567E82B6A /* FinderFlowTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A42060DB22126F2DE881609 /* FinderFlowTests.swift */; };
 		B4DF7982B73A5EFD2AD0C36D /* LocalImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */; };
+		C249E29316F2115D790162E7 /* CollectionPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A89451ABC1DCFCECD8813F /* CollectionPicker.swift */; };
 		CA1057DFA68EB6B461FF325B /* GameDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */; };
 		CC114164030AA1410BCFD7E6 /* FinderConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B4DF27C4868D325DA92BD2 /* FinderConfig.swift */; };
 		D8E40F4646E55370D3BF183A /* VibesViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FDE49F6EB6D9AC345ED03DD /* VibesViewModel.swift */; };
+		E3CC7A500BD4F0D7EC9CFBAD /* FinderStepView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3677B9B64495CA959018C27 /* FinderStepView.swift */; };
 		E9D751128EE12735DB9AC55D /* CsvImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2058E623BD5D079D092889E1 /* CsvImportView.swift */; };
 		EB72B79547FCFDBD1BBF01FD /* BGGCSVParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */; };
 		ED1F2C2F1CE713E431FD5D38 /* GameDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D54977781EC32711BF85BF6 /* GameDetailViewModel.swift */; };
@@ -54,6 +63,7 @@
 /* Begin PBXFileReference section */
 		0A5D5C010301E549F84FE830 /* Collection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Collection.swift; sourceTree = "<group>"; };
 		0C70ACC3B90EA828A96A5ABC /* BGGCSVParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGCSVParser.swift; sourceTree = "<group>"; };
+		0DEDC64814B3C6EEA468F928 /* CollectionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionDetailView.swift; sourceTree = "<group>"; };
 		1D54977781EC32711BF85BF6 /* GameDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameDetailViewModel.swift; sourceTree = "<group>"; };
 		1E87CF1FE5164753FD476E2F /* VibesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibesView.swift; sourceTree = "<group>"; };
 		1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
@@ -63,14 +73,18 @@
 		32B0DA77E2FB126C70333193 /* SmartRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartRuleTests.swift; sourceTree = "<group>"; };
 		3E2D1BBCB5BC4075C2C4396C /* CollectionName.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionName.swift; sourceTree = "<group>"; };
 		3FDE49F6EB6D9AC345ED03DD /* VibesViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibesViewModel.swift; sourceTree = "<group>"; };
+		443939DABCAE03321653C0F0 /* CollectionActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionActions.swift; sourceTree = "<group>"; };
 		46E263A072989194BBFE0959 /* FilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterView.swift; sourceTree = "<group>"; };
 		53CCB0E019B538D583D338CA /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
 		57A3327FCE88990AF0D527C5 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		62288FD9B5C3E5AC1E934102 /* Game.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Game.swift; sourceTree = "<group>"; };
 		710E5B77B4CA51882B3511F8 /* BGGCSVParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGCSVParserTests.swift; sourceTree = "<group>"; };
+		76AE58FB55442100A79A21D4 /* FinderResultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderResultView.swift; sourceTree = "<group>"; };
 		7872C3A8E2FC47FA7AA0C873 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7DFA2B2D19297B2A640C71C9 /* SmartListEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmartListEditor.swift; sourceTree = "<group>"; };
+		87A89451ABC1DCFCECD8813F /* CollectionPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPicker.swift; sourceTree = "<group>"; };
 		8CD293B5E140C89254FC4943 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		919888359B584A932473C8B1 /* MBGCTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MBGCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		99C1F0CBB227E63609C23F0A /* MBGCApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MBGCApp.swift; sourceTree = "<group>"; };
 		9CA44F60B2556FE5332A9D7A /* LocalImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalImportService.swift; sourceTree = "<group>"; };
 		A0076C98DF51184321766D82 /* BGGClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGClient.swift; sourceTree = "<group>"; };
@@ -82,10 +96,14 @@
 		BD2E23AAA250870CACDE4E88 /* FinderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderView.swift; sourceTree = "<group>"; };
 		BFC72A5148F980A8CE0BA6DD /* BGGXMLParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGXMLParser.swift; sourceTree = "<group>"; };
 		BFF36E1CC65BF3B805532A8B /* BGGXMLParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGXMLParserTests.swift; sourceTree = "<group>"; };
+		C3677B9B64495CA959018C27 /* FinderStepView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderStepView.swift; sourceTree = "<group>"; };
 		C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		CAF01FF1876519D11ADE2F62 /* CollectionPickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionPickerView.swift; sourceTree = "<group>"; };
 		CD671A7394CE1D23B5C50B9B /* BGGGame.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BGGGame.swift; sourceTree = "<group>"; };
+		D677D3E820D649900BACD975 /* CollectionSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CollectionSheets.swift; sourceTree = "<group>"; };
+		D8B613D4CED8EF6E8EE828DA /* Filters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Filters.swift; sourceTree = "<group>"; };
 		E346F76F771F6D51912B41A4 /* FinderFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderFlow.swift; sourceTree = "<group>"; };
-		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		E39A93651B6816EC03A8DE00 /* MBGC.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MBGC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E8B1B3026AF2474E8CCBCEDA /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		F2B4DF27C4868D325DA92BD2 /* FinderConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderConfig.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -164,16 +182,25 @@
 			isa = PBXGroup;
 			children = (
 				1F829DA0AAF75046CB4ECF65 /* CachedAsyncImage.swift */,
+				443939DABCAE03321653C0F0 /* CollectionActions.swift */,
+				0DEDC64814B3C6EEA468F928 /* CollectionDetailView.swift */,
+				87A89451ABC1DCFCECD8813F /* CollectionPicker.swift */,
+				CAF01FF1876519D11ADE2F62 /* CollectionPickerView.swift */,
+				D677D3E820D649900BACD975 /* CollectionSheets.swift */,
 				AF538B299162A6D4819794D5 /* ContentView.swift */,
 				2058E623BD5D079D092889E1 /* CsvImportView.swift */,
 				AF7975296F59BDAFDB8FD3E6 /* DesignTokens.swift */,
+				D8B613D4CED8EF6E8EE828DA /* Filters.swift */,
 				46E263A072989194BBFE0959 /* FilterView.swift */,
+				76AE58FB55442100A79A21D4 /* FinderResultView.swift */,
+				C3677B9B64495CA959018C27 /* FinderStepView.swift */,
 				BD2E23AAA250870CACDE4E88 /* FinderView.swift */,
 				A1C8C94158C0EFCACA56A0DF /* GameDetailView.swift */,
 				29FB54336829DBBC66ECFAEC /* ImportView.swift */,
 				B96A64CF3883FE552EF008C0 /* OnboardingView.swift */,
 				53CCB0E019B538D583D338CA /* SearchView.swift */,
 				C8157CFDB01A5C1EEC96AEDB /* SettingsView.swift */,
+				7DFA2B2D19297B2A640C71C9 /* SmartListEditor.swift */,
 				1E87CF1FE5164753FD476E2F /* VibesView.swift */,
 			);
 			path = Views;
@@ -252,9 +279,10 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2650;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					FF95678E676736D017659FA2 = {
+						DevelopmentTeam = T9YNQ73MS3;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -301,14 +329,22 @@
 				93FC2BC690E736B32C8020F1 /* BGGXMLParser.swift in Sources */,
 				5AB30FE8725F3ED003DCBB49 /* CachedAsyncImage.swift in Sources */,
 				44CD545581A7A4C805CF5D93 /* Collection.swift in Sources */,
+				894B122F94E41C77F62F3395 /* CollectionActions.swift in Sources */,
+				573D39B96C4E426CA722A985 /* CollectionDetailView.swift in Sources */,
 				EDF7B4F8DD98E7087FCA9712 /* CollectionName.swift in Sources */,
+				C249E29316F2115D790162E7 /* CollectionPicker.swift in Sources */,
+				5E832640C0596D0FEA90F659 /* CollectionPickerView.swift in Sources */,
+				3A3D7A5C0E9F5BE0EA6C2F65 /* CollectionSheets.swift in Sources */,
 				06F4D737679B788780E7F98D /* ContentView.swift in Sources */,
 				E9D751128EE12735DB9AC55D /* CsvImportView.swift in Sources */,
 				ED84D53E412BF348B27FFAFA /* DesignTokens.swift in Sources */,
 				0A7C095CF7B2E6E379EDAE81 /* Extensions.swift in Sources */,
 				EFCDB466CEB038333191E77D /* FilterView.swift in Sources */,
+				9B5EC56C2FCEB463A1DAD65B /* Filters.swift in Sources */,
 				CC114164030AA1410BCFD7E6 /* FinderConfig.swift in Sources */,
 				935AA5051C15F2D679F3A2BF /* FinderFlow.swift in Sources */,
+				4D2B2909F06647E7718BFAFD /* FinderResultView.swift in Sources */,
+				E3CC7A500BD4F0D7EC9CFBAD /* FinderStepView.swift in Sources */,
 				8C7EB56EE0A7BE6797BC0B6B /* FinderView.swift in Sources */,
 				5B702FC979C65059E69AE1B5 /* Game.swift in Sources */,
 				CA1057DFA68EB6B461FF325B /* GameDetailView.swift in Sources */,
@@ -319,6 +355,7 @@
 				5E4FD49CAF151CF1BF3744F5 /* OnboardingView.swift in Sources */,
 				405F7579E675C4135E9EB978 /* SearchView.swift in Sources */,
 				7C581E257341C7E306FFB2B2 /* SettingsView.swift in Sources */,
+				63654D001E993B8C3CF12611 /* SmartListEditor.swift in Sources */,
 				80D024F0D11FFF26F68E036F /* VibesView.swift in Sources */,
 				D8E40F4646E55370D3BF183A /* VibesViewModel.swift in Sources */,
 			);
@@ -353,7 +390,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = VM6KX236RP;
+				DEVELOPMENT_TEAM = T9YNQ73MS3;
 				INFOPLIST_FILE = MBGC/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -419,7 +456,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -504,7 +540,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -535,7 +570,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = VM6KX236RP;
+				DEVELOPMENT_TEAM = T9YNQ73MS3;
 				INFOPLIST_FILE = MBGC/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
