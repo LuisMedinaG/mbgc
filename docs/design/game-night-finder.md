@@ -108,22 +108,31 @@ The chain is data, not branching code — an ordered list of comparators — so 
 
 Pure on-device. No new networking. Three pieces:
 
-**(a) `FinderAxis` — the configurability "base" the funnel rides on.**
-A single enum where each case knows how to derive its own options and filter the
-survivors. This is the *minimal* shape that makes the funnel reorderable later —
-no protocol hierarchy, no DI, no factory.
+**(a) `FinderAxis` — the stable public question ID the funnel rides on.**
+The enum stays as the API used by `FinderConfig`, `FinderFlow`, and the views.
+Each case delegates its behavior to a private `FinderQuestionKind` struct in
+`FinderFlow.swift`, so a question's title, layout, option generation, filtering,
+and ranking contribution live together without spreading logic across large
+switch blocks.
 
 ```swift
-enum FinderAxis: Codable {            // Codable → a saved config is just [FinderAxis]
+enum FinderAxis: CaseIterable {
     case vibe, players, duration
-    // later: weight, language, category, mechanic — drop-in, no new plumbing
 
-    func options(from games: [Game], context: FinderContext) -> [FinderOption]
-    func filter(_ games: [Game], by option: FinderOption) -> [Game]
+    private var kind: FinderQuestionKind { ... }
+    var question: String { kind.question }
+    var usesGrid: Bool { kind.usesGrid }
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption]
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game]
 }
 
-let v1Funnel: [FinderAxis] = [.vibe, .players, .duration]   // ← the only hard-coded part
+let funnel: [FinderAxis] = [.vibe, .players, .duration]
 ```
+
+This is deliberately not a full factory/registration system yet. Revisit that
+when Finder needs runtime-configurable questions, multi-select/free-text
+questions, questions generated from `GameFilters`, or a larger catalog where
+adding a case + private struct stops being cheap.
 
 **(b) `FinderFlow` — an `@Observable` holding funnel state** (the ordered axes, the
 picks so far). `survivors` and `nextOptions` are **pure functions** of
@@ -140,8 +149,9 @@ Entry point: a prominent button or a new tab (working name **"Tonight"** —
 
 ## 9. Filter-axis catalog (the question pool)
 
-v1 uses the first three. The rest are already-present `Game` fields that drop
-into the `FinderAxis` enum + `v1Funnel` array later with no new plumbing:
+v1 uses the first three. The rest are already-present `Game` fields that can be
+added by creating a new `FinderAxis` case, a private `FinderQuestionKind` struct,
+and a `FinderConfig.funnel` entry:
 
 | Axis | Reads | Option derivation |
 | --- | --- | --- |
@@ -155,8 +165,9 @@ into the `FinderAxis` enum + `v1Funnel` array later with no new plumbing:
 
 ## 10. Out of scope for v1 (deliberately)
 
-- Configurable-questions **UI** (the `FinderAxis`/comparator *model* is built; the
-  settings screen that edits them is later).
+- Configurable-questions **UI** (fixed `FinderConfig.funnel` is enough for now;
+  a factory/registration model belongs with a real settings screen or larger
+  question catalog).
 - Non-owned / all-database games (v1 = owned/Library only).
 - AI-generated vibes.
 - `userRating` capture (graceful degrade until then).
@@ -209,8 +220,9 @@ This is a navigation restructure (ContentView + TabBar changes) with no logic im
 
 ## 11. Build phases
 
-1. **Logic (pure, testable):** `FinderAxis`, `FinderFlow` survivors/options,
-   early-stop, ranking chain. Hard-code `v1Funnel`.
+1. **Logic (pure, testable):** `FinderAxis`, private `FinderQuestionKind`
+   structs, `FinderFlow` survivors/options, early-stop, ranking chain.
+   Configure order in `FinderConfig.funnel`.
 2. **Views:** `FinderStepView` + `FinderResultView`, wired to an entry point.
 3. **Near-future:** capture `userRating`; settings screen to reorder/toggle axes
    and tiebreakers (reads/writes the `[FinderAxis]` + comparator list from §8/§6).
