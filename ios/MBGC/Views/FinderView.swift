@@ -76,6 +76,7 @@ struct FinderView: View {
     private func sync() {
         flow.ownedGames = allGames
         flow.allCollections = collections
+        flow.skipEmptySteps()
     }
 
     private func exitTest() {

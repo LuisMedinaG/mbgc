@@ -102,4 +102,20 @@ import Testing
 
         #expect(filters.apply([keeper, miss]).map(\.bggId) == [1])
     }
+
+    @Test func languageLevelsMatchExactlyNotGreaterThan() {
+        let games = (1...5).map { level -> Game in
+            let g = game(level)
+            g.languageDependence = level
+            return g
+        }
+
+        var single = GameFilters()
+        single.languageLevels = [1]
+        #expect(single.apply(games).map(\.bggId) == [1])
+
+        var firstTwo = GameFilters()
+        firstTwo.languageLevels = [1, 2]
+        #expect(firstTwo.apply(games).map(\.bggId) == [1, 2])
+    }
 }

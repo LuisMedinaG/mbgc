@@ -1114,8 +1114,7 @@ struct CollectionDetailView: View {
                 destinations: otherCollections.filter { !$0.isSmart }
             ) {
                 haptic += 1
-                if action == .move { exitSelection() }
-                else { selectedIds.removeAll() }
+                exitSelection()
             }
         }
         .alert("Delete \"\(collection.name)\"?", isPresented: $showDeleteCollectionConfirm) {

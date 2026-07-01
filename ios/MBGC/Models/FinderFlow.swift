@@ -284,7 +284,19 @@ final class FinderFlow {
 
     // MARK: Actions
 
-    func select(_ option: FinderOption) { picks.append(option) }
+    func select(_ option: FinderOption) {
+        picks.append(option)
+        skipEmptySteps()
+    }
     func back() { if !picks.isEmpty { picks.removeLast() } }
     func reset() { picks = [] }
+
+    // A question with no options can't split anything — treat it as "select all"
+    // (skip) and move straight to the next axis instead of stalling on an empty screen.
+    // Called after ownedGames/allCollections are both in sync, and after each select().
+    func skipEmptySteps() {
+        while currentAxis != nil, currentOptions.isEmpty {
+            picks.append(FinderOption(id: "skip", label: "Skip", count: survivors.count))
+        }
+    }
 }

@@ -49,4 +49,19 @@ import Testing
         // At the start it's a no-op (the view exits the test instead).
         flow.back(); #expect(flow.stepIndex == 0)
     }
+
+    /// A question with zero options can't split anything (e.g. no vibe collections
+    /// exist yet). It must auto-skip straight to the next axis, never stall on an
+    /// empty screen.
+    @Test func emptyAxisAutoSkips() {
+        let g1 = game(1, playtime: 20, minPlayers: 1, maxPlayers: 4)
+
+        let flow = FinderFlow()
+        flow.ownedGames = [g1]
+        flow.allCollections = [] // no vibe collections → vibe axis has zero options
+        flow.skipEmptySteps()
+
+        #expect(flow.stepIndex == 1)
+        #expect(flow.currentAxis == .players)
+    }
 }
