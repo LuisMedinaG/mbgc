@@ -26,17 +26,5 @@ extension View {
             Text(message.wrappedValue ?? "")
         }
     }
-
-    /// Horizontal-only right-edge drag fires `action` once. Used by the Finder
-    /// quiz + result views to back out of the same way as the back chevron.
-    /// `width>80, |height|<80` keeps a diagonal scroll from triggering it.
-    func swipeBack(_ action: @escaping () -> Void) -> some View {
-        gesture(
-            DragGesture(minimumDistance: 20)
-                .onEnded { v in
-                    if v.translation.width > 80, abs(v.translation.height) < 80 { action() }
-                }
-        )
-    }
 }
 

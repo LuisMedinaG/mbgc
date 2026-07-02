@@ -16,11 +16,14 @@ struct CreateCollectionSheet: View {
     @State private var rule = SmartRule()
     @State private var showRuleEditor = false
     @State private var errorMessage: String?
+    private var orderedCollections: [Collection] { Collection.ordered(collections) }
 
     init(kind: CollectionKind) {
         self.kind = kind
-        _selectedColor = State(initialValue: "#2196F3")
-        _selectedIcon = State(initialValue: kind.defaultIcon)
+        // Defaults track the first swatch / icon in CollectionPickerBody so
+        // they stay in sync if either list changes.
+        _selectedColor = State(initialValue: CollectionPickerBody<EmptyView>.colors.first ?? "#3D4A52")
+        _selectedIcon = State(initialValue: CollectionPickerBody<EmptyView>.icons.first ?? "list.bullet")
     }
 
     var body: some View {
@@ -41,7 +44,7 @@ struct CreateCollectionSheet: View {
                 }
                 .errorAlert($errorMessage)
                 .sheet(isPresented: $showRuleEditor) {
-                    SmartListEditor(rule: rule, lists: collections, allGames: allGames) { rule = $0 }
+                    SmartListEditor(rule: rule, lists: orderedCollections, allGames: allGames) { rule = $0 }
                 }
         }
         .presentationDetents([.large])

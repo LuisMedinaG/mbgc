@@ -36,12 +36,21 @@ enum GameSort: String, CaseIterable, Identifiable {
     var isCustomImage: Bool { self == .bggRating }
 }
 
+enum CollectionGridColumnCount: Int, CaseIterable, Identifiable {
+    case two = 2
+    case three = 3
+
+    var id: Int { rawValue }
+    var label: String { "\(rawValue) Columns" }
+}
+
 /// Displays the games within a specific collection, supporting sorting, filtering,
 /// and batch management actions.
 struct CollectionDetailView: View {
     /// The collection being viewed.
     let collection: Collection
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.openURL) private var openURL
     @Query(sort: \Game.name) private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var allCollections: [Collection]
     @State private var showAddGames = false
@@ -56,11 +65,21 @@ struct CollectionDetailView: View {
     @State private var showEditRule = false
     @State private var showDeleteCollectionConfirm = false
     @State private var haptic = 0
+    // Remembered app-wide so the chosen layout sticks across collections.
+    @AppStorage("collectionUsesGrid") private var useGrid = false
+    @AppStorage("collectionGridColumnCount") private var gridColumnCount = CollectionGridColumnCount.three.rawValue
+
+    private var gridColumns: [GridItem] {
+        Array(
+            repeating: GridItem(.flexible(), spacing: Spacing.lg),
+            count: max(CollectionGridColumnCount.two.rawValue, min(gridColumnCount, CollectionGridColumnCount.three.rawValue))
+        )
+    }
 
     /// Membership source: derived rule set for smart lists, hand-curated games otherwise.
     private var effectiveGames: [Game] {
         collection.isSmart
-            ? collection.smartGames(collections: allCollections, allGames: allGames)
+            ? collection.smartGames(collections: orderedCollections, allGames: allGames)
             : collection.games
     }
 
@@ -98,7 +117,10 @@ struct CollectionDetailView: View {
     }
     private var filteredGames: [Game] { filters.apply(sortedGames) }
     private var selectedGames: [Game] { filteredGames.filter { selectedIds.contains($0.bggId) } }
-    private var otherCollections: [Collection] { allCollections.filter { $0.persistentModelID != collection.persistentModelID } }
+    private var orderedCollections: [Collection] { Collection.ordered(allCollections) }
+    private var otherCollections: [Collection] {
+        orderedCollections.filter { $0.persistentModelID != collection.persistentModelID }
+    }
 
     var body: some View {
         Group {
@@ -114,80 +136,15 @@ struct CollectionDetailView: View {
                                 : "Tap ··· to add games from your Library."
                     )
                 )
+            } else if useGrid {
+                gameGrid
             } else {
-                List {
-                    if !filters.isEmpty {
-                        filterPillsBar
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                            .listRowSeparator(.hidden)
-                    }
-                    if filteredGames.isEmpty {
-                        ContentUnavailableView(
-                            "No Matches",
-                            systemImage: "line.3.horizontal.decrease.circle",
-                            description: Text("No games match your current filters.")
-                        )
-                        .listRowSeparator(.hidden)
-                    } else {
-                        ForEach(filteredGames, id: \.bggId) { game in
-                            if isSelecting {
-                                Button { toggleSelection(game) } label: {
-                                    HStack(spacing: 14) {
-                                        Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
-                                            .foregroundStyle(selectedIds.contains(game.bggId) ? Color.accentColor : .secondary)
-                                            .font(.title3)
-                                        if collection.isRanked { rankBadge(game) }
-                                        gameRow(game)
-                                    }
-                                    .foregroundStyle(.primary)
-                                }
-                            } else {
-                                NavigationLink(destination: GameDetailView(gameId: game.bggId)
-                                    .toolbar(.visible, for: .navigationBar)) {
-                                    HStack(spacing: 12) {
-                                        if collection.isRanked { rankBadge(game) }
-                                        gameRow(game)
-                                    }
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    // Smart lists derive membership — no hand delete/move from source.
-                                    if !collection.isSmart {
-                                        Button(role: .destructive) {
-                                            collection.games.removeAll { $0.bggId == game.bggId }
-                                            try? modelContext.save()
-                                            haptic += 1
-                                        } label: {
-                                            Label("Delete", systemImage: "trash")
-                                        }
-                                        if !collection.isDefault {
-                                            Button {
-                                                selectedIds = [game.bggId]
-                                                pendingAction = .move
-                                            } label: {
-                                                Label("Move", systemImage: "arrow.right.circle")
-                                            }
-                                            .tint(.orange)
-                                        }
-                                    }
-                                    Button {
-                                        selectedIds = [game.bggId]
-                                        pendingAction = .copy
-                                    } label: {
-                                        Label("Copy", systemImage: "plus.square.on.square")
-                                    }
-                                    .tint(.blue)
-                                }
-                            }
-                        }
-                        .onMove(perform: moveRanked)
-                    }
-                }
-                .listStyle(.plain)
-                .searchable(text: $filters.titleContains, prompt: "Search \(collection.name)")
+                gameList
             }
         }
         .navigationTitle(collection.name)
         .navigationBarTitleDisplayMode(.large)
+        .searchable(text: $filters.titleContains, prompt: "Search \(collection.name)")
         .sensoryFeedback(.selection, trigger: selectedIds)
         .sensoryFeedback(.impact(weight: .medium), trigger: haptic)
         .toolbar(.visible, for: .navigationBar)
@@ -207,6 +164,26 @@ struct CollectionDetailView: View {
                     }
                 }
                 if !effectiveGames.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        // Icon shows the layout you'd switch to (Apple convention).
+                        Button { useGrid.toggle() } label: {
+                            Image(systemName: useGrid ? "list.bullet" : "square.grid.2x2")
+                        }
+                        .contextMenu {
+                            ForEach(CollectionGridColumnCount.allCases) { option in
+                                Button {
+                                    gridColumnCount = option.rawValue
+                                    useGrid = true
+                                } label: {
+                                    Label(
+                                        option.label,
+                                        systemImage: gridColumnCount == option.rawValue ? "checkmark" : "square.grid.2x2"
+                                    )
+                                }
+                            }
+                        }
+                        .accessibilityLabel(useGrid ? "List view" : "Grid view")
+                    }
                     if !collection.isSmart {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button { showFilters = true } label: {
@@ -271,7 +248,7 @@ struct CollectionDetailView: View {
         }
         .safeAreaInset(edge: .bottom) {
             if isSelecting {
-                HStack(spacing: 16) {
+                HStack(spacing: Spacing.lg) {
                     HStack(spacing: 0) {
                         Button {
                             selectedIds = Set(filteredGames.map(\.bggId))
@@ -301,7 +278,7 @@ struct CollectionDetailView: View {
                     .disabled(filteredGames.isEmpty)
                 }
                 .buttonStyle(.plain)
-                .padding(.vertical, 10)
+                .padding(.vertical, Spacing.md)
             }
         }
         .sheet(isPresented: $showAddGames) {
@@ -339,6 +316,210 @@ struct CollectionDetailView: View {
         .alert("Delete \"\(collection.name)\"?", isPresented: $showDeleteCollectionConfirm) {
             Button("Delete", role: .destructive) { deleteCollection() }
             Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private var gameList: some View {
+        List {
+            if !filters.isEmpty {
+                filterPillsBar
+                    .listRowInsets(EdgeInsets(
+                        top: Spacing.xs,
+                        leading: Spacing.lg,
+                        bottom: Spacing.xs,
+                        trailing: Spacing.lg
+                    ))
+                    .listRowSeparator(.hidden)
+            }
+            if filteredGames.isEmpty {
+                ContentUnavailableView(
+                    "No Matches",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("No games match your current filters.")
+                )
+                .listRowSeparator(.hidden)
+            } else {
+                ForEach(filteredGames, id: \.bggId) { game in
+                    if isSelecting {
+                        Button { toggleSelection(game) } label: {
+                            HStack(spacing: Spacing.lg) {
+                                Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selectedIds.contains(game.bggId) ? Color.accentColor : .secondary)
+                                    .font(.title3)
+                                if collection.isRanked { rankBadge(game) }
+                                gameRow(game)
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                        .contextMenu {
+                            gameContextMenu(for: game)
+                        }
+                    } else {
+                        NavigationLink(destination: GameDetailView(gameId: game.bggId)
+                            .toolbar(.visible, for: .navigationBar)) {
+                            HStack(spacing: Spacing.md) {
+                                if collection.isRanked { rankBadge(game) }
+                                gameRow(game)
+                            }
+                        }
+                        .contextMenu {
+                            gameContextMenu(for: game)
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            // Smart lists derive membership — no hand delete/move from source.
+                            if !collection.isSmart {
+                                Button(role: .destructive) {
+                                    remove(game)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                if !collection.isDefault {
+                                    Button {
+                                        selectedIds = [game.bggId]
+                                        pendingAction = .move
+                                    } label: {
+                                        Label("Move", systemImage: "arrow.right.circle")
+                                    }
+                                    .tint(.orange)
+                                }
+                            }
+                            Button {
+                                selectedIds = [game.bggId]
+                                pendingAction = .copy
+                            } label: {
+                                Label("Copy", systemImage: "plus.square.on.square")
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                }
+                .onMove(perform: moveRanked)
+            }
+        }
+        .listStyle(.plain)
+    }
+
+    // MARK: Grid layout
+
+    private var gameGrid: some View {
+        ScrollView {
+            if !filters.isEmpty {
+                filterPillsBar
+                    .padding(.horizontal, Spacing.screen)
+                    .padding(.bottom, Spacing.sm)
+            }
+            if filteredGames.isEmpty {
+                ContentUnavailableView(
+                    "No Matches",
+                    systemImage: "line.3.horizontal.decrease.circle",
+                    description: Text("No games match your current filters.")
+                )
+                .padding(.top, Spacing.section)
+            } else {
+                LazyVGrid(columns: gridColumns, spacing: Spacing.lg) {
+                    ForEach(filteredGames, id: \.bggId) { game in
+                        gridCell(game)
+                    }
+                }
+                .padding(.horizontal, Spacing.screen)
+                .padding(.bottom, Spacing.section)
+            }
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private func gridCell(_ game: Game) -> some View {
+        if isSelecting {
+            Button { toggleSelection(game) } label: { gridCard(game) }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    gameContextMenu(for: game)
+                }
+        } else {
+            NavigationLink(destination: GameDetailView(gameId: game.bggId)
+                .toolbar(.visible, for: .navigationBar)) {
+                gridCard(game)
+            }
+            .buttonStyle(.plain)
+            .contextMenu {
+                gameContextMenu(for: game)
+            }
+        }
+    }
+
+    private func gridCard(_ game: Game) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            GameCoverImage(url: URL(string: game.image ?? game.thumbnail ?? ""),
+                           size: nil, cornerRadius: Radius.medium)
+                .aspectRatio(1, contentMode: .fill)
+                .overlay(alignment: .topLeading) {
+                    if collection.isRanked {
+                        rankBadge(game).padding(Spacing.sm)
+                    }
+                }
+                .overlay(alignment: .topTrailing) {
+                    if isSelecting {
+                        Image(systemName: selectedIds.contains(game.bggId) ? "checkmark.circle.fill" : "circle")
+                            .font(.title3)
+                            .foregroundStyle(selectedIds.contains(game.bggId) ? BrandAccent.color : .white)
+                            .background(Circle().fill(.black.opacity(0.25)))
+                            .padding(Spacing.sm)
+                    }
+                }
+            Text(game.name)
+                .font(Typography.metadata.weight(.semibold))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .frame(height: Sizing.gridTitleHeight, alignment: .topLeading)
+            if let year = game.yearPublished, year > 0 {
+                Text(String(format: "%d", year))
+                    .font(Typography.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func gameContextMenu(for game: Game) -> some View {
+        Button {
+            selectedIds = [game.bggId]
+            isSelecting = true
+        } label: {
+            Label("Select", systemImage: "checkmark.circle")
+        }
+        Button {
+            selectedIds = [game.bggId]
+            pendingAction = .copy
+        } label: {
+            Label("Copy to...", systemImage: "plus.square.on.square")
+        }
+        if !collection.isSmart {
+            if !collection.isDefault {
+                Button {
+                    selectedIds = [game.bggId]
+                    pendingAction = .move
+                } label: {
+                    Label("Move to...", systemImage: "arrow.right.circle")
+                }
+            }
+            Button(role: .destructive) {
+                remove(game)
+            } label: {
+                Label("Remove from List", systemImage: "trash")
+            }
+        }
+        Button {
+            UIPasteboard.general.string = game.name
+        } label: {
+            Label("Copy Name", systemImage: "doc.on.doc")
+        }
+        Button {
+            openURL(bggURL(for: game))
+        } label: {
+            Label("Open BGG", systemImage: "safari")
         }
     }
 
@@ -420,9 +601,19 @@ struct CollectionDetailView: View {
         haptic += 1
     }
 
+    private func remove(_ game: Game) {
+        collection.games.removeAll { $0.bggId == game.bggId }
+        try? modelContext.save()
+        haptic += 1
+    }
+
     private func exitSelection() {
         isSelecting = false
         selectedIds.removeAll()
+    }
+
+    private func bggURL(for game: Game) -> URL {
+        URL(string: "https://boardgamegeek.com/boardgame/\(game.bggId)")!
     }
 
     /// Pink position badge for ranked lists (1, 2, 3 …).
@@ -432,13 +623,17 @@ struct CollectionDetailView: View {
         Text("\(rank)")
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.pink)
-            .frame(width: 30, height: 30)
+            .frame(width: Sizing.rankBadge, height: Sizing.rankBadge)
             .background(Color.pink.opacity(0.15), in: Circle())
     }
 
     private func gameRow(_ game: Game) -> some View {
-        HStack(spacing: 14) {
-            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
+        HStack(spacing: Spacing.lg) {
+            GameCoverImage(
+                url: URL(string: game.thumbnail ?? game.image ?? ""),
+                size: Sizing.rowThumbnail,
+                cornerRadius: Radius.small
+            )
 
             if let year = game.yearPublished, year > 0 {
                 Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
@@ -450,29 +645,29 @@ struct CollectionDetailView: View {
 
     private var filterPillsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: Spacing.sm) {
                 if !filters.titleContains.isEmpty {
                     Button { filters.titleContains = "" } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.xs) {
                             Image(systemName: "textformat.abc").font(.caption2)
                             Text(filters.titleContains).font(.caption)
                         }
                         .foregroundStyle(Color.orange)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.xs)
                         .background(Color.orange.opacity(0.12))
                         .clipShape(Capsule())
                     }
                 }
                 if !filters.languageLevels.isEmpty {
                     Button { filters.languageLevels.removeAll() } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: Spacing.xs) {
                             Image(systemName: "text.bubble").font(.caption2)
                             Text("\(filters.languageLevels.count)").font(.caption.monospacedDigit())
                         }
                         .foregroundStyle(Color.indigo)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.xs)
                         .background(Color.indigo.opacity(0.12))
                         .clipShape(Capsule())
                     }
@@ -480,13 +675,13 @@ struct CollectionDetailView: View {
                 ForEach(SetFilterField.allCases) { field in
                     if let selected = filters.setFilters[field] {
                         Button { filters.setFilters[field] = nil } label: {
-                            HStack(spacing: 4) {
+                            HStack(spacing: Spacing.xs) {
                                 Image(systemName: field.icon).font(.caption2)
                                 Text("\(selected.count)").font(.caption.monospacedDigit())
                             }
                             .foregroundStyle(field.color)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, Spacing.xs)
                             .background(field.color.opacity(0.12))
                             .clipShape(Capsule())
                         }
@@ -498,7 +693,7 @@ struct CollectionDetailView: View {
                     }
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, Spacing.xs)
         }
     }
 
@@ -506,7 +701,7 @@ struct CollectionDetailView: View {
         let symbol = spec.mode == .minimum ? "≥" : spec.mode == .maximum ? "≤" : "="
         let value = field.formatValue(spec.value) + (field.unit.map { " \($0)" } ?? "")
         return Button { filters.specs[field] = nil } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: Spacing.xs) {
                 if field.isCustomImage {
                     Image(field.icon).font(.caption2)
                 } else {
@@ -516,8 +711,8 @@ struct CollectionDetailView: View {
                     .font(.caption.monospacedDigit())
             }
             .foregroundStyle(spec.mode.color)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.xs)
             .background(spec.mode.color.opacity(0.12))
             .clipShape(Capsule())
         }

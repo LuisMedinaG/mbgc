@@ -115,6 +115,11 @@ infra/.env
 set-deploy-secrets.sh
 
 ##############################################################################
+# Large dataset files (offloaded to ~/Downloads/mbgc-datadump-archive/)
+##############################################################################
+ios/datadump/
+
+##############################################################################
 # iOS / Xcode
 ##############################################################################
 # Based on github/gitignore Swift template — generic, not path-scoped

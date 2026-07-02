@@ -102,11 +102,11 @@ ios/MBGC/
 | Library collection — lists imported games | ✅ Working |
 | Game detail — reads from SwiftData cache | ✅ Working (no network needed) |
 | BGG username save / load | ✅ Working (UserDefaults) |
-| Discover tab | ⏳ Placeholder |
 | Search | ✅ Working (local-first @Query filter) |
 | BGG username sync (full) | ✅ Working (local-first via BGG public API) |
 | Vibes/Collections editing on game detail | ✅ Working (local-first via SwiftData) |
 | Smart Filter editor (`SmartListEditor`) — base lists + combine/intersect/subtract/exclude, filters scoped to resolved set | ✅ Working (local-first) |
+| Collection detail grid/list toggle (`@AppStorage("collectionUsesGrid")`) | ✅ Working |
 
 ---
 

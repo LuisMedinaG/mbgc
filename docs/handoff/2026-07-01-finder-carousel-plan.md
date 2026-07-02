@@ -1,10 +1,11 @@
 ---
 title: "feat: Finder carousel navigation"
 date: 2026-07-01
-status: draft
+status: completed
 type: feature
 author: opencode
 origin: user request
+shipped: 2026-07-01
 ---
 
 # Finder Carousel Navigation
@@ -71,14 +72,13 @@ A carousel interface would make navigation more intuitive: swipe left to advance
 
 ### 2. Auto-Advance After Selection
 
-**Decision:** Do NOT auto-advance after selection.
+**Decision:** Auto-advance to the next page after selecting an option (tapping the same option again clears it and stays put).
 
 **Rationale:**
-- Users may want to review their selection before advancing
-- Manual swipe is more explicit and less surprising
-- Matches the "skip by swiping" mental model
+- Fewer taps to get through the funnel
+- Re-selecting to change an answer still works from any page via swipe-back
 
-**Trade-off:** Requires one extra swipe per question, but reduces accidental advances.
+**Trade-off:** One less manual swipe per question, but selecting immediately moves you forward — mitigated by the checkmark/dim state making the pick visible if you swipe back to check.
 
 ### 3. State Management for Picks
 

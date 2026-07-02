@@ -23,6 +23,18 @@ enum Spacing {
     static let floatingNavReserved: CGFloat = 40
 }
 
+// MARK: - Sizing
+
+enum Sizing {
+    static let iconColumn: CGFloat = 28
+    static let compactThumbnail: CGFloat = 44
+    static let rowThumbnail: CGFloat = 60
+    static let rankBadge: CGFloat = 30
+    static let gridMinColumnWidth: CGFloat = 112
+    static let gridMaxColumnWidth: CGFloat = 168
+    static let gridTitleHeight: CGFloat = 40
+}
+
 // MARK: - Radius
 
 enum Radius {
@@ -228,7 +240,7 @@ struct SelectableCard: View {
                     Image(systemName: symbol)
                         .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(isSelected ? BrandAccent.color : Surface.metadataText)
-                        .frame(width: 28)
+                        .frame(width: Sizing.iconColumn)
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label)
@@ -293,19 +305,20 @@ struct GameCoverImage: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .modifier(CoverFrame(size: size))
+        .modifier(CoverFrame(size: size, cornerRadius: cornerRadius))
     }
 }
 
 private struct CoverFrame: ViewModifier {
     let size: CGFloat?
+    let cornerRadius: CGFloat
 
     func body(content: Content) -> some View {
         if let size {
             content.frame(width: size, height: size)
         } else {
             // No fixed size — parent owns layout (typically via .aspectRatio).
-            content
+            content.clipShape(RoundedRectangle(cornerRadius: cornerRadius))
         }
     }
 }
