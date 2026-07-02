@@ -396,8 +396,9 @@ final class FinderFlow {
         return FinderConfig.score(game) + axisContributions
     }
 
-    var hasCollections: Bool {
-        allCollections.contains(where: { !$0.isDefault })
+    var hasLocalGames: Bool {
+        // finder.FLOW.1-1
+        !ownedGames.isEmpty
     }
 
     /// 0–100 match score for a single game against the current picks.
@@ -444,7 +445,6 @@ final class FinderFlow {
         guard visiblePage < availableQuestionIndices.count else { return }
         select(at: availableQuestionIndices[visiblePage], option: option)
     }
-    func back() { if visiblePage > 0 { visiblePage -= 1 } }
     func reset() {
         picks = Array<FinderOption?>(repeating: nil, count: funnel.count)
         visiblePage = 0

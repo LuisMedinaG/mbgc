@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-/// "Tonight's Pick" container. Hosts three modes (no collections, intro cover,
+/// "Tonight's Pick" container. Hosts three modes (no games, intro cover,
 /// active test) and routes between them as the user advances through the funnel.
 struct FinderView: View {
     @Binding var path: [Int]
@@ -12,13 +12,14 @@ struct FinderView: View {
     @State private var carouselHintOffset: CGFloat = 0
     @Query private var allGames: [Game]
     @Query(sort: \Collection.createdAt) private var collections: [Collection]
+    private var orderedCollections: [Collection] { Collection.ordered(collections) }
 
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
                 Surface.background.ignoresSafeArea()
 
-                if !flow.hasCollections {
+                if !flow.hasLocalGames {
                     FinderEmptyView()
                 } else if !active {
                     FinderStartView { withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { active = true } }
@@ -83,6 +84,7 @@ struct FinderView: View {
             }
             .offset(x: carouselHintOffset)
             .tabViewStyle(.page(indexDisplayMode: .never))
+            .simultaneousGesture(firstPageExitGesture)
 
             // finder.FLOW.7
             pageIndicator(pageCount: pageCount)
@@ -98,9 +100,22 @@ struct FinderView: View {
         }
     }
 
+    private var firstPageExitGesture: some Gesture {
+        DragGesture(minimumDistance: 20)
+            .onEnded { value in
+                guard flow.visiblePage == 0,
+                      value.translation.width > 80,
+                      abs(value.translation.height) < 80 else { return }
+                // finder.FLOW.11
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                    exitTest()
+                }
+            }
+    }
+
     private func sync() {
         flow.ownedGames = allGames
-        flow.allCollections = collections
+        flow.allCollections = orderedCollections
         flow.skipEmptySteps()
     }
 
@@ -128,6 +143,9 @@ struct FinderView: View {
 
     @MainActor
     private func playCarouselHintIfNeeded(questionCount: Int) async {
+        // finder.FLOW.7 — defer guarantees the carousel snaps back to 0 even if this
+        // task is cancelled mid-nudge (e.g. user exits the test during the hint).
+        defer { carouselHintOffset = 0 }
         guard active, !carouselHintSeen, questionCount > 1, flow.visiblePage == 0 else { return }
         try? await Task.sleep(for: .seconds(0.8))
         guard active, flow.visiblePage == 0 else { return }
@@ -209,9 +227,9 @@ private struct FinderStartView: View {
 private struct FinderEmptyView: View {
     var body: some View {
         ContentUnavailableView(
-            "No Vibes Yet",
-            systemImage: "rectangle.stack.badge.plus",
-            description: Text("Create collections in the Collection tab — add vibes like \"Party\" or \"Euro\" to get started.")
+            "No Games Yet",
+            systemImage: "tray",
+            description: Text("Import games to start finding tonight's pick.")
         )
     }
 }

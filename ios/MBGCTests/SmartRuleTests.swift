@@ -208,3 +208,29 @@ import Testing
         #expect(library.games.map(\.bggId).sorted() == [1, 2])
     }
 }
+
+@Suite @MainActor struct CollectionOrderingTests {
+    @Test func localLibraryCollections6OrdersLegacyRowsByCreationDate() {
+        let library = Collection(name: "Library", isDefault: true)
+        let first = Collection(name: "First")
+        let second = Collection(name: "Second")
+        library.displayOrder = 0
+        first.displayOrder = 0
+        second.displayOrder = 0
+        library.createdAt = Date(timeIntervalSinceReferenceDate: 0)
+        first.createdAt = Date(timeIntervalSinceReferenceDate: 1)
+        second.createdAt = Date(timeIntervalSinceReferenceDate: 2)
+
+        #expect(Collection.ordered([second, first, library]).map(\.name) == ["Library", "First", "Second"])
+    }
+
+    @Test func localLibraryCollections6AppliesManualDisplayOrder() {
+        let library = Collection(name: "Library", isDefault: true)
+        let first = Collection(name: "First")
+        let second = Collection(name: "Second")
+
+        Collection.applyDisplayOrder([second, library, first])
+
+        #expect(Collection.ordered([library, first, second]).map(\.name) == ["Library", "Second", "First"])
+    }
+}

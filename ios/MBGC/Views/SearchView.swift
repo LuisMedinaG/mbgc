@@ -2,10 +2,14 @@ import SwiftData
 import SwiftUI
 
 struct SearchView: View {
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @Query(sort: \Game.name) private var allGames: [Game]
+    @Query(sort: \Collection.createdAt) private var collections: [Collection]
     @State private var query = ""
     @State private var navigationPath = NavigationPath()
+    private var orderedCollections: [Collection] { Collection.ordered(collections) }
 
     private var results: [Game] {
         let q = query.trimmingCharacters(in: .whitespaces)
@@ -58,14 +62,52 @@ struct SearchView: View {
                     gameRow(game)
                 }
                 .foregroundStyle(.primary)
+                .contextMenu {
+                    gameContextMenu(for: game)
+                }
             }
             .listStyle(.plain)
         }
     }
 
+    @ViewBuilder
+    private func gameContextMenu(for game: Game) -> some View {
+        Button {
+            navigationPath.append(game.bggId)
+        } label: {
+            Label("Open Detail", systemImage: "info.circle")
+        }
+        Menu {
+            ForEach(orderedCollections.filter { !$0.isSmart }) { collection in
+                Button {
+                    LocalLibrary.add([game], to: collection)
+                    try? modelContext.save()
+                } label: {
+                    Label(collection.name, systemImage: collection.isDefault ? "square.grid.2x2.fill" : "folder")
+                }
+            }
+        } label: {
+            Label("Add to Collection", systemImage: "plus")
+        }
+        Button {
+            UIPasteboard.general.string = game.name
+        } label: {
+            Label("Copy Name", systemImage: "doc.on.doc")
+        }
+        Button {
+            openURL(bggURL(for: game))
+        } label: {
+            Label("Open BGG", systemImage: "safari")
+        }
+    }
+
     private func gameRow(_ game: Game) -> some View {
-        HStack(spacing: 12) {
-            CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 60, cornerRadius: 8)
+        HStack(spacing: Spacing.md) {
+            GameCoverImage(
+                url: URL(string: game.thumbnail ?? game.image ?? ""),
+                size: Sizing.rowThumbnail,
+                cornerRadius: Radius.small
+            )
 
             if let year = game.yearPublished, year > 0 {
                 Text("\(game.name) ") + Text("(\(year))").foregroundColor(.secondary)
@@ -73,5 +115,9 @@ struct SearchView: View {
                 Text(game.name)
             }
         }
+    }
+
+    private func bggURL(for game: Game) -> URL {
+        URL(string: "https://boardgamegeek.com/boardgame/\(game.bggId)")!
     }
 }

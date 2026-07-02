@@ -86,4 +86,19 @@ import Testing
         #expect(flow.currentAxis == .players)
         #expect(flow.availableQuestionIndices.allSatisfy { !flow.options(at: $0).isEmpty })
     }
+
+    @Test func localGamesStartFinderWithoutVibes_finder_FLOW_1_1() {
+        let library = Collection(name: "Library", isDefault: true)
+        let g1 = game(1, playtime: 20, minPlayers: 1, maxPlayers: 4)
+        g1.collections = [library]
+
+        let flow = FinderFlow()
+        flow.ownedGames = [g1]
+        flow.allCollections = [library]
+        flow.skipEmptySteps()
+
+        #expect(flow.hasLocalGames)
+        #expect(!flow.availableQuestionIndices.isEmpty)
+        #expect(flow.currentAxis != .vibe)
+    }
 }

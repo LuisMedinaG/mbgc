@@ -17,6 +17,7 @@ components:
       3: The app lets the user delete custom local collections without deleting the games they contain.
       4: The app prevents the default Library collection from being renamed or deleted.
       5: The app lets the user add and remove games from custom local collections.
+      6: The app lets the user manually reorder local collections and persists that order.
   SMART_COLLECTIONS:
     requirements:
       1: The app lets the user define a smart collection from local game metadata filters.

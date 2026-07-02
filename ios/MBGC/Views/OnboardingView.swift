@@ -69,14 +69,14 @@ struct OnboardingView: View {
                 .padding(.top, 6)
 
             VStack(spacing: 22) {
-                FeatureRow(symbol: "square.grid.2x2.fill", tint: brandOrange,
-                           title: "Discover", subtitle: "Find out which games are in the spotlight.")
+                FeatureRow(symbol: "dice.fill", tint: brandOrange,
+                           title: "Tonight", subtitle: "Answer a few questions, get tonight's pick.")
                 FeatureRow(symbol: "magnifyingglass", tint: .green,
                            title: "Search", subtitle: "Look up any board game with ease.")
                 FeatureRow(symbol: "square.stack.3d.up.fill", tint: .blue,
                            title: "Collect", subtitle: "Organize your collection into custom lists.")
                 FeatureRow(symbol: "link", tint: .purple,
-                           title: "Share", subtitle: "Generate links to your lists and share them with anyone.")
+                           title: "Share", subtitle: "Send your lists to anyone, right from the app.")
             }
             .padding(.top, 32)
             .padding(.horizontal, 28)
