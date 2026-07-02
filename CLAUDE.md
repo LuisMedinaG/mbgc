@@ -87,7 +87,6 @@ Does not apply to routine coding, small features, or obvious changes.
 - Never commit secrets. If `.env` is touched, verify `.gitignore` before any commit.
 - Never run `rm -rf`, `git reset --hard`, `git push --force`, `DROP TABLE`, or similar destructive ops without explicit confirmation.
 - Never skip pre-commit hooks with `--no-verify`. If a hook fails, fix the underlying issue.
-- Never manually edit `.pbxproj` or `.xcodeproj/` — use `xcodegen generate`.
 - Before any action that touches production, state what you're about to do and wait for confirmation.
 
 ## How Luis wants to be talked to
