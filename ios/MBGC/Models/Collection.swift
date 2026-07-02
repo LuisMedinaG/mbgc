@@ -34,7 +34,7 @@ final class Collection {
     @Relationship(deleteRule: .nullify, inverse: \Game.collections)
     var games: [Game] = []
 
-    // ponytail: append-only — indices must stay stable; colorPalette[i] must always map to same color
+    // Append-only: indices must stay stable so each index always maps to the same color.
     static let colorPalette: [String] = [
         "#C8622A", // terracotta
         "#C8921C", // amber
@@ -88,8 +88,7 @@ struct SmartRule: Codable, Equatable {
     var combine:   [UUID] = []   // union these lists onto the base
     var intersect: [UUID] = []   // keep only games present in ALL of these
     var subtract:  [UUID] = []   // remove games present in ANY of these (A \ B)
-    // ponytail: exclude = symmetric difference (games in exactly one side), distinct from
-    // subtract to match the 4 screenshot rows. Drop it + its UI row to collapse to 3 ops.
+    // Symmetric difference: games present in exactly one side.
     var exclude:   [UUID] = []
     var filters:   GameFilters = .init()
 
@@ -187,9 +186,7 @@ enum LocalLibrary {
     }
 
     static func existingBggIds(in modelContext: ModelContext, from ids: [Int]) -> Set<Int> {
-        let idSet = Set(ids)
-        let all = (try? modelContext.fetch(FetchDescriptor<Game>())) ?? []
-        return Set(all.map(\.bggId).filter { idSet.contains($0) })
+        Set(games(matching: ids, in: modelContext).map(\.bggId))
     }
 
     /// Local Game objects whose bggId is in `ids` — for routing an imported set to a collection.

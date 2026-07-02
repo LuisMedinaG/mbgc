@@ -1,3 +1,4 @@
+import OSLog
 import SwiftData
 import SwiftUI
 
@@ -17,6 +18,11 @@ struct ContentView: View {
     @State private var showCreate = false
     @State private var createKind: CollectionKind?
 
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "MBGC",
+        category: "ContentView"
+    )
+
     private var preferredScheme: ColorScheme? {
         switch appearanceMode {
         case "light": return .light
@@ -25,10 +31,17 @@ struct ContentView: View {
         }
     }
 
-    // Hide chrome when inside a collection detail so toolbar items and bottom bar don't conflict
-    private var isInDetailView: Bool {
+    // Pill hides when a detail view is pushed on top or Finder is running.
+    private var hidesPill: Bool {
         (!collectionPath.isEmpty && tab == .collection) ||
-        (!finderPath.isEmpty && tab == .tonight)
+        (!finderPath.isEmpty && tab == .tonight) ||
+        // finder.FLOW.12
+        (finderActive && tab == .tonight)
+    }
+
+    // Search/gear/create also hide while the finder flow is running.
+    private var hidesHomeChrome: Bool {
+        hidesPill || (finderActive && tab == .tonight)
     }
 
     var body: some View {
@@ -38,6 +51,7 @@ struct ContentView: View {
             case .tonight:    FinderView(path: $finderPath, active: $finderActive)
             }
         }
+        .background(Surface.background.ignoresSafeArea())
         .overlay {
             // Tap-away to dismiss the create chooser. No dim — sits under the bottom bar/chooser.
             if showCreate {
@@ -47,7 +61,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !isInDetailView {
+            if !hidesPill {
                 VStack(spacing: 0) {
                     if showCreate {
                         CreateTypeChooser { kind in
@@ -59,25 +73,27 @@ struct ContentView: View {
                     HStack(alignment: .center) {
                         HomePillView(tab: $tab)
                         Spacer()
-                        HomeChromeButton(systemName: "magnifyingglass", size: 54) {
-                            showSearch = true
-                        }
-                        .accessibilityLabel("Search")
-                        // Plus floats above the search button via overlay so it adds no
-                        // layout height — keeps the search button centered with the pill.
-                        .overlay(alignment: .top) {
-                            if tab == .collection && collectionPath.isEmpty && !showCreate {
-                                Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
-                                    Image(systemName: "plus")
-                                        .font(.title2.weight(.semibold))
-                                        .foregroundStyle(.white)
-                                        .frame(width: 52, height: 52)
-                                        .background(Color.accentColor)
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        if !hidesHomeChrome {
+                            HomeChromeButton(systemName: "magnifyingglass", size: 54) {
+                                showSearch = true
+                            }
+                            .accessibilityLabel("Search")
+                            // Plus floats above the search button via overlay so it adds no
+                            // layout height — keeps the search button centered with the pill.
+                            .overlay(alignment: .top) {
+                                if tab == .collection && collectionPath.isEmpty && !showCreate {
+                                    Button { withAnimation(.spring(duration: 0.25)) { showCreate = true } } label: {
+                                        Image(systemName: "plus")
+                                            .font(.title2.weight(.semibold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 52, height: 52)
+                                            .background(Color.accentColor)
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                    .accessibilityLabel("New Collection")
+                                    .offset(y: -(52 + 10))
+                                    .transition(.scale.combined(with: .opacity))
                                 }
-                                .accessibilityLabel("New Collection")
-                                .offset(y: -(52 + 10))
-                                .transition(.scale.combined(with: .opacity))
                             }
                         }
                     }
@@ -89,7 +105,7 @@ struct ContentView: View {
             }
         }
         .overlay(alignment: .topTrailing) {
-            if !isInDetailView && tab != .tonight {
+            if !hidesHomeChrome && tab != .tonight {
                 HomeChromeButton(systemName: "gearshape", size: 44) {
                     showSettings = true
                 }
@@ -121,8 +137,12 @@ struct ContentView: View {
     // MARK: — Library seed
 
     private func seedLibraryIfNeeded() {
-        guard (try? LocalLibrary.ensureDefaultCollection(in: modelContext)) != nil else { return }
-        try? modelContext.save()
+        do {
+            _ = try LocalLibrary.ensureDefaultCollection(in: modelContext)
+            try modelContext.save()
+        } catch {
+            Self.logger.error("Failed to seed Library collection: \(error.localizedDescription)")
+        }
     }
 }
 
@@ -152,25 +172,26 @@ struct HomePillView: View {
             pillButton("Tonight", icon: "moon.stars.fill", for: .tonight)
         }
         .padding(4)
-        .background(Color.white)
+        .background(Color(.secondarySystemBackground))
         .clipShape(Capsule())
         .overlay(Capsule().strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
         .sensoryFeedback(.selection, trigger: tab)
     }
 
     private func pillButton(_ label: String, icon: String, for target: HomeTab) -> some View {
-        Button { tab = target } label: {
+        let isActive = tab == target
+        return Button { tab = target } label: {
             VStack(spacing: 4) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundStyle(Color(red: 0.25, green: 0.35, blue: 0.6))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
                 Text(label)
-                    .font(.caption2.weight(tab == target ? .semibold : .regular))
-                    .foregroundStyle(tab == target ? Color.primary : .secondary)
+                    .font(.caption2.weight(isActive ? .semibold : .regular))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
-            .background(tab == target ? Color(.systemGray5) : Color.clear)
+            .background(isActive ? Color.accentColor.opacity(0.10) : Color.clear)
             .clipShape(Capsule())
         }
         .accessibilityLabel(label)

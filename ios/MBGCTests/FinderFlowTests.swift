@@ -17,9 +17,7 @@ import Testing
         ))
     }
 
-    /// Swipe-back maps to flow.back(); it must unwind one page at a time across the
-    /// whole funnel (vibe → players → duration) and no-op at the start.
-    @Test func backUnwindsEveryPage() {
+    @Test func carouselSelection_finder_FLOW_4_finder_FLOW_6() {
         let vibe = Collection(name: "Party")   // non-default, non-smart
         let g1 = game(1, playtime: 20, minPlayers: 1, maxPlayers: 4)
         let g2 = game(2, playtime: 90, minPlayers: 2, maxPlayers: 5)
@@ -30,23 +28,62 @@ import Testing
         flow.ownedGames = [g1, g2]
         flow.allCollections = [vibe]
 
-        // Forward through all three pages.
-        #expect(flow.stepIndex == 0)
+        #expect(flow.picks.count == flow.funnel.count)
         #expect(flow.currentAxis == .vibe)
-        flow.select(flow.currentOptions.first!)
-        #expect(flow.stepIndex == 1)
-        #expect(flow.currentAxis == .players)
-        flow.select(flow.currentOptions.first!)
-        #expect(flow.stepIndex == 2)
-        #expect(flow.currentAxis == .duration)
-        flow.select(flow.currentOptions.first!)
-        #expect(flow.stepIndex == 3)
 
-        // Back unwinds each page.
-        flow.back(); #expect(flow.stepIndex == 2)
-        flow.back(); #expect(flow.stepIndex == 1)
-        flow.back(); #expect(flow.stepIndex == 0)
-        // At the start it's a no-op (the view exits the test instead).
-        flow.back(); #expect(flow.stepIndex == 0)
+        let party = flow.options(at: 0).first!
+        flow.select(at: 0, option: party)
+
+        #expect(flow.picks[0]?.id == party.id)
+        #expect(flow.isPageAnswered(at: 0))
+        #expect(flow.visiblePage == 0)
+        #expect(flow.survivors.map(\.bggId) == [1, 2])
+
+        flow.select(at: 0, option: party)
+
+        #expect(flow.picks[0] == nil)
+        #expect(!flow.isPageAnswered(at: 0))
+        #expect(flow.survivors.count == 2)
+    }
+
+    /// Changing an upstream answer must invalidate any downstream pick whose option
+    /// no longer exists in the re-narrowed survivors (validatePicks cascade).
+    @Test func upstreamChangeInvalidatesDownstreamPick() {
+        let g1 = game(1, playtime: 20, minPlayers: 1, maxPlayers: 2)  // supports 1-2, Quick
+        let g2 = game(2, playtime: 90, minPlayers: 3, maxPlayers: 4)  // supports 3-4, Medium
+
+        let flow = FinderFlow()
+        flow.ownedGames = [g1, g2]
+        flow.allCollections = []
+
+        // funnel = [vibe, category, complexity, players(3), duration(4)]
+        let players2 = flow.options(at: 3).first { $0.id == "players:2" }!
+        flow.select(at: 3, option: players2)
+        #expect(flow.survivors.map(\.bggId) == [1])
+
+        let quick = flow.options(at: 4).first!   // only g1 survives → Quick bucket
+        flow.select(at: 4, option: quick)
+        #expect(flow.picks[4]?.id == quick.id)
+
+        // Swap the upstream players pick to one that excludes g1. g2 is now the only
+        // survivor (Medium), so the Quick duration pick is stale and must be dropped.
+        let players4 = flow.options(at: 3).first { $0.id == "players:4" }!
+        flow.select(at: 3, option: players4)
+
+        #expect(flow.survivors.map(\.bggId) == [2])
+        #expect(!flow.options(at: 4).contains { $0.id == quick.id })
+        #expect(flow.picks[4] == nil)   // cascade invalidated the downstream pick
+    }
+
+    @Test func emptyAxisAutoSkips_finder_FLOW_3() {
+        let g1 = game(1, playtime: 20, minPlayers: 1, maxPlayers: 4)
+
+        let flow = FinderFlow()
+        flow.ownedGames = [g1]
+        flow.allCollections = [] // no vibe collections → vibe axis has zero options
+        flow.skipEmptySteps()
+
+        #expect(flow.currentAxis == .players)
+        #expect(flow.availableQuestionIndices.allSatisfy { !flow.options(at: $0).isEmpty })
     }
 }

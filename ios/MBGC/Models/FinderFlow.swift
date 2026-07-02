@@ -12,6 +12,34 @@ struct FinderOption: Identifiable, Equatable {
     var solidBg: Bool = false  // true = full-opacity bg with white text (vibe); false = pastel tint
 }
 
+// MARK: - Complexity
+
+enum ComplexityBucket: String, CaseIterable {
+    case light  = "Light"
+    case medium = "Medium"
+    case heavy  = "Heavy"
+    case veryHeavy = "Very Heavy"
+
+    var subtitle: String {
+        switch self {
+        case .light:     return "Easy to learn, quick decisions"
+        case .medium:    return "Moderate complexity, some strategy"
+        case .heavy:     return "Deep mechanics, think ahead"
+        case .veryHeavy: return "Brain burner, hours of planning"
+        }
+    }
+
+    func matches(_ weight: Double?) -> Bool {
+        guard let w = weight else { return false }
+        switch self {
+        case .light:     return w < 2.0
+        case .medium:    return w >= 2.0 && w < 2.75
+        case .heavy:     return w >= 2.75 && w < 3.5
+        case .veryHeavy: return w >= 3.5
+        }
+    }
+}
+
 // MARK: - Duration
 
 enum DurationBucket: String, CaseIterable {
@@ -43,31 +71,25 @@ enum DurationBucket: String, CaseIterable {
     }
 }
 
-// MARK: - Axis
+// MARK: - Question kinds
+//
+// Each FinderAxis case delegates to one of these. Adding a question today still
+// means adding a case below + a struct here — this just gives each case's logic
+// a single, self-contained home instead of spreading it across 5 switch arms.
 
-// ponytail: funnel is [FinderAxis] array — reorder/toggle becomes a settings screen later, not a rewrite
-enum FinderAxis: String, CaseIterable {
-    case vibe, players, duration
+private protocol FinderQuestionKind {
+    var question: String { get }
+    var usesGrid: Bool { get }
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption]
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game]
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double
+}
 
-    var question: String {
-        switch self {
-        case .vibe:     return "What's the vibe?"
-        case .players:  return "How many players tonight?"
-        case .duration: return "How much time do you have?"
-        }
-    }
-
-    // MARK: - Options
+private struct VibeQuestion: FinderQuestionKind {
+    var question: String { "What's the vibe?" }
+    var usesGrid: Bool { true }
 
     func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
-        switch self {
-        case .vibe:      return vibeOptions(games: games, collections: collections)
-        case .players:   return playerOptions(games: games)
-        case .duration:  return durationOptions(games: games)
-        }
-    }
-
-    private func vibeOptions(games: [Game], collections: [Collection]) -> [FinderOption] {
         var manualCounts: [String: Int] = [:]
         for game in games {
             for collection in game.collections where !collection.isSmart {
@@ -89,7 +111,24 @@ enum FinderAxis: String, CaseIterable {
             }
     }
 
-    private func playerOptions(games: [Game]) -> [FinderOption] {
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        let name = String(option.id.dropFirst("vibe:".count))
+        guard let col = collections.first(where: { $0.name == name }) else { return [] }
+        return col.isSmart
+            ? col.smartGames(collections: collections, allGames: games)
+            : games.filter { $0.collections.contains(where: { $0.name == name }) }
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        0  // filter-only axis; picking it doesn't change individual game scores
+    }
+}
+
+private struct PlayersQuestion: FinderQuestionKind {
+    var question: String { "How many players tonight?" }
+    var usesGrid: Bool { false }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
         let cap = FinderConfig.playerCap
         let tints = FinderConfig.playerTints
 
@@ -121,7 +160,29 @@ enum FinderAxis: String, CaseIterable {
         }
     }
 
-    private func durationOptions(games: [Game]) -> [FinderOption] {
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        // "Supports N" — game is playable with N people when N is in its [min, max] range.
+        // Games where N is the BGG-recommended count are ranked higher (see FinderFlow.ranked).
+        guard let n = FinderAxis.playerCount(from: option.id) else { return games }
+        return games.filter {
+            let lo = $0.minPlayers ?? 1
+            let hi = $0.maxPlayers ?? lo
+            return lo <= n && n <= hi
+        }
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        guard let pick, let n = FinderAxis.playerCount(from: pick.id),
+              game.recommendedPlayers?.contains(n) == true else { return 0 }
+        return weights.recommendedPlayers
+    }
+}
+
+private struct DurationQuestion: FinderQuestionKind {
+    var question: String { "How much time do you have?" }
+    var usesGrid: Bool { true }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
         var counts: [DurationBucket: Int] = [:]
         for game in games {
             let bucket: DurationBucket
@@ -144,52 +205,118 @@ enum FinderAxis: String, CaseIterable {
         }
     }
 
-    // MARK: - Score contribution
-    //
-    // Each axis knows its own ranking signal. Return 0 when the pick is nil (skipped) or
-    // this axis has no ranking signal (filter-only). To add a new signal: add a case here.
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        let raw = String(option.id.dropFirst("duration:".count))
+        guard let bucket = DurationBucket(rawValue: raw) else { return games }
+        return games.filter { bucket.matches($0.playtime) }
+    }
 
     func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
-        guard let pick, pick.id != "skip" else { return 0 }
-        switch self {
-        case .vibe, .duration:
-            return 0  // filter-only axes; picking them doesn't change individual game scores
+        0  // filter-only axis; picking it doesn't change individual game scores
+    }
+}
 
-        case .players:
-            guard let n = Self.playerCount(from: pick.id),
-                  game.recommendedPlayers?.contains(n) == true else { return 0 }
-            return weights.recommendedPlayers
+private struct ComplexityQuestion: FinderQuestionKind {
+    var question: String { "How complex should it be?" }
+    var usesGrid: Bool { true }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
+        var counts: [ComplexityBucket: Int] = [:]
+        for game in games {
+            let bucket: ComplexityBucket
+            if let weight = game.weight {
+                bucket = weight < 2.0 ? .light
+                       : weight < 2.75 ? .medium
+                       : weight < 3.5 ? .heavy
+                       : .veryHeavy
+            } else {
+                continue  // games without weight data are excluded
+            }
+            counts[bucket, default: 0] += 1
+        }
+
+        return ComplexityBucket.allCases.compactMap { bucket -> FinderOption? in
+            let n = counts[bucket, default: 0]
+            guard n > 0 else { return nil }
+            return FinderOption(id: "complexity:\(bucket.rawValue)", label: bucket.rawValue,
+                                count: n, tint: FinderConfig.complexityTints[bucket])
         }
     }
 
-    // MARK: - Apply
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        let raw = String(option.id.dropFirst("complexity:".count))
+        guard let bucket = ComplexityBucket(rawValue: raw) else { return games }
+        return games.filter { bucket.matches($0.weight) }
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        0
+    }
+}
+
+private struct CategoryQuestion: FinderQuestionKind {
+    var question: String { "What kind of game?" }
+    var usesGrid: Bool { true }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
+        var categoryCounts: [String: Int] = [:]
+        for game in games {
+            for category in game.categories ?? [] {
+                categoryCounts[category, default: 0] += 1
+            }
+        }
+
+        let sorted = categoryCounts.sorted { $0.value > $1.value }
+        let top = sorted.prefix(FinderConfig.maxCategoryOptions)
+
+        return top.enumerated().compactMap { index, item -> FinderOption? in
+            let tint = FinderConfig.categoryTints[index % FinderConfig.categoryTints.count]
+            return FinderOption(id: "category:\(item.key)", label: item.key,
+                                count: item.value, tint: tint)
+        }
+    }
+
+    func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
+        let name = String(option.id.dropFirst("category:".count))
+        return games.filter { $0.categories?.contains(name) == true }
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        0
+    }
+}
+
+// MARK: - Axis
+
+// FinderAxis stays data-driven so reorder/toggle can become settings later.
+enum FinderAxis: String, CaseIterable {
+    case vibe, complexity, players, duration, category
+
+    private var kind: FinderQuestionKind {
+        switch self {
+        case .vibe:       return VibeQuestion()
+        case .complexity: return ComplexityQuestion()
+        case .players:    return PlayersQuestion()
+        case .duration:   return DurationQuestion()
+        case .category:   return CategoryQuestion()
+        }
+    }
+
+    var question: String { kind.question }
+    var usesGrid: Bool { kind.usesGrid }
+
+    func options(from games: [Game], collections: [Collection]) -> [FinderOption] {
+        kind.options(from: games, collections: collections)
+    }
+
+    func scoreContribution(pick: FinderOption?, game: Game, weights: FinderConfig.RankingWeights) -> Double {
+        guard let pick, pick.id != "skip" else { return 0 }
+        return kind.scoreContribution(pick: pick, game: game, weights: weights)
+    }
 
     func apply(_ option: FinderOption, to games: [Game], collections: [Collection]) -> [Game] {
         guard option.id != "skip" else { return games }
-        switch self {
-        case .vibe:
-            let name = String(option.id.dropFirst("vibe:".count))
-            guard let col = collections.first(where: { $0.name == name }) else { return [] }
-            let filtered = col.isSmart
-                ? col.smartGames(collections: collections, allGames: games)
-                : games.filter { $0.collections.contains(where: { $0.name == name }) }
-            return filtered
-
-        case .players:
-            // "Supports N" — game is playable with N people when N is in its [min, max] range.
-            // Games where N is the BGG-recommended count are ranked higher (see FinderFlow.ranked).
-            guard let n = Self.playerCount(from: option.id) else { return games }
-            return games.filter {
-                let lo = $0.minPlayers ?? 1
-                let hi = $0.maxPlayers ?? lo
-                return lo <= n && n <= hi
-            }
-
-        case .duration:
-            let raw = String(option.id.dropFirst("duration:".count))
-            guard let bucket = DurationBucket(rawValue: raw) else { return games }
-            return games.filter { bucket.matches($0.playtime) }
-        }
+        return kind.apply(option, to: games, collections: collections)
     }
 
     // Parses "players:N" option IDs. Single source so options(), apply(), and chosenPlayerCount agree.
@@ -205,7 +332,8 @@ enum FinderAxis: String, CaseIterable {
 @Observable
 final class FinderFlow {
     let funnel = FinderConfig.funnel
-    private(set) var picks: [FinderOption] = []
+    private(set) var picks = Array<FinderOption?>(repeating: nil, count: FinderConfig.funnel.count)
+    var visiblePage = 0
 
     var ownedGames: [Game] = []
     var allCollections: [Collection] = []
@@ -214,42 +342,53 @@ final class FinderFlow {
 
     var survivors: [Game] {
         var result = ownedGames
-        for (i, pick) in picks.enumerated() {
+        for (i, maybePick) in picks.enumerated() {
+            guard let pick = maybePick else { continue }
             result = funnel[i].apply(pick, to: result, collections: allCollections)
         }
         return result
     }
 
-    var stepIndex: Int { picks.count }
-    var currentAxis: FinderAxis? { stepIndex < funnel.count ? funnel[stepIndex] : nil }
+    var availableQuestionIndices: [Int] {
+        funnel.indices.filter { !options(at: $0).isEmpty }
+    }
+
+    var stepIndex: Int { visiblePage }
+    var currentAxis: FinderAxis? {
+        guard visiblePage < availableQuestionIndices.count else { return nil }
+        return funnel[availableQuestionIndices[visiblePage]]
+    }
 
     var currentOptions: [FinderOption] {
-        currentAxis?.options(from: survivors, collections: allCollections) ?? []
+        guard visiblePage < availableQuestionIndices.count else { return [] }
+        return options(at: availableQuestionIndices[visiblePage])
     }
 
     // Runs every axis. Stops when the funnel is exhausted OR the next axis produces no options
     // (e.g. all survivors share the same duration bucket — asking wouldn't split anything).
     var isDone: Bool {
-        guard !ownedGames.isEmpty, stepIndex > 0 else { return false }
-        return currentAxis == nil || currentOptions.isEmpty
+        guard !ownedGames.isEmpty else { return false }
+        return visiblePage >= availableQuestionIndices.count
     }
 
     var chosenPlayerCount: Int? {
-        picks.first { $0.id.hasPrefix("players:") }
+        picks.compactMap { $0 }.first { $0.id.hasPrefix("players:") }
             .flatMap { FinderAxis.playerCount(from: $0.id) }
     }
 
     var ranked: [Game] {
         let w = FinderConfig.rankingWeights
         return survivors.sorted { a, b in
-            let scoreA = score(a, weights: w), scoreB = score(b, weights: w)
+            let scoreA = rawScore(for: a, weights: w), scoreB = rawScore(for: b, weights: w)
             guard scoreA == scoreB else { return scoreA > scoreB }
             let rankA = a.bggRank ?? Int.max, rankB = b.bggRank ?? Int.max
             return rankA < rankB
         }
     }
 
-    private func score(_ game: Game, weights: FinderConfig.RankingWeights) -> Double {
+    /// Static Game score + the sum of every picker axis' contribution for the
+    /// current picks. Single source so `ranked` and `matchPercent(for:)` agree.
+    private func rawScore(for game: Game, weights: FinderConfig.RankingWeights) -> Double {
         let axisContributions = funnel.enumerated().reduce(0.0) { sum, item in
             let pick = item.offset < picks.count ? picks[item.offset] : nil
             return sum + item.element.scoreContribution(pick: pick, game: game, weights: weights)
@@ -261,9 +400,81 @@ final class FinderFlow {
         allCollections.contains(where: { !$0.isDefault })
     }
 
+    /// 0–100 match score for a single game against the current picks.
+    func matchPercent(for game: Game) -> Int {
+        let w = FinderConfig.rankingWeights
+        let raw = rawScore(for: game, weights: w)
+        let ceiling = w.userRating + w.geekRating + w.wantToPlay + w.recommendedPlayers + w.bggRank
+        let pct = ceiling > 0 ? min(max(raw / ceiling, 0), 1) : 0
+        return Int((pct * 100).rounded())
+    }
+
     // MARK: Actions
 
-    func select(_ option: FinderOption) { picks.append(option) }
-    func back() { if !picks.isEmpty { picks.removeLast() } }
-    func reset() { picks = [] }
+    func options(at index: Int) -> [FinderOption] {
+        guard funnel.indices.contains(index) else { return [] }
+        return funnel[index].options(from: survivors(before: index), collections: allCollections)
+    }
+
+    func isPageAnswered(at index: Int) -> Bool {
+        guard picks.indices.contains(index) else { return false }
+        return picks[index] != nil
+    }
+
+    // finder.FLOW.6
+    func select(at index: Int, option: FinderOption) {
+        guard picks.indices.contains(index) else { return }
+        if picks[index]?.id == option.id {
+            clearPick(at: index)
+            return
+        }
+        picks[index] = option
+        validatePicks(after: index)
+        clampVisiblePage()
+    }
+
+    func clearPick(at index: Int) {
+        guard picks.indices.contains(index) else { return }
+        picks[index] = nil
+        validatePicks(after: index)
+        clampVisiblePage()
+    }
+
+    func select(_ option: FinderOption) {
+        guard visiblePage < availableQuestionIndices.count else { return }
+        select(at: availableQuestionIndices[visiblePage], option: option)
+    }
+    func back() { if visiblePage > 0 { visiblePage -= 1 } }
+    func reset() {
+        picks = Array<FinderOption?>(repeating: nil, count: funnel.count)
+        visiblePage = 0
+    }
+
+    // finder.FLOW.3
+    func skipEmptySteps() {
+        validatePicks(after: -1)
+        clampVisiblePage()
+    }
+
+    private func survivors(before index: Int) -> [Game] {
+        var result = ownedGames
+        for i in funnel.indices where i < index {
+            guard let pick = picks[i] else { continue }
+            result = funnel[i].apply(pick, to: result, collections: allCollections)
+        }
+        return result
+    }
+
+    private func validatePicks(after index: Int) {
+        for i in funnel.indices where i > index {
+            guard let pick = picks[i] else { continue }
+            if !options(at: i).contains(where: { $0.id == pick.id }) {
+                picks[i] = nil
+            }
+        }
+    }
+
+    private func clampVisiblePage() {
+        visiblePage = min(visiblePage, availableQuestionIndices.count)
+    }
 }

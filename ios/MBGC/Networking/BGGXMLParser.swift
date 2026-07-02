@@ -47,6 +47,20 @@ enum BGGXMLParser {
         ("&bull;", "•"), ("&hellip;", "…")
     ]
 
+    // BGG's eight fixed subdomain families. Maps the `name` attribute of `<rank type="family">`
+    // to a user-facing label. Games with a numeric `value` are ranked in that subdomain;
+    // "Not Ranked" entries are skipped at the call site.
+    fileprivate static let subdomainLabels: [String: String] = [
+        "strategygames": "Strategy Games",
+        "familygames": "Family Games",
+        "partygames": "Party Games",
+        "abstracts": "Abstract Games",
+        "childrensgames": "Children's Games",
+        "cgs": "Customizable Games",
+        "thematic": "Thematic Games",
+        "wargames": "Wargames"
+    ]
+
     private static let numericEntityRegex = try? NSRegularExpression(pattern: "&#(x?[0-9a-fA-F]+);", options: [])
     private static let htmlTagRegex = try? NSRegularExpression(pattern: "<[^>]+>", options: [])
     private static let multiWhitespaceRegex = try? NSRegularExpression(pattern: "[ \\t]+", options: [])
@@ -223,9 +237,13 @@ enum BGGXMLParser {
         private var currentRecommended: Int = 0
         private var currentNotRec: Int = 0
 
-        func parser(_ parser: XMLParser, didStartElement elementName: String,
-                     namespaceURI: String?, qualifiedName qName: String?,
-                     attributes attributeDict: [String: String] = [:]) {
+        func parser(
+            _ parser: XMLParser,
+            didStartElement elementName: String,
+            namespaceURI: String?,
+            qualifiedName qName: String?,
+            attributes attributeDict: [String: String] = [:]
+        ) {
             currentElement = elementName
             textBuffer = ""
 
@@ -257,7 +275,6 @@ enum BGGXMLParser {
                 switch linkType {
                 case "boardgamecategory":  categories.append(value)
                 case "boardgamemechanic":  mechanics.append(value)
-                case "boardgamesubdomain": types.append(value)
                 case "boardgamedesigner":  designers.append(value)
                 case "boardgameartist":    artists.append(value)
                 case "boardgamepublisher": publishers.append(value)
@@ -276,6 +293,11 @@ enum BGGXMLParser {
                 if attributeDict["type"] == "subtype", attributeDict["name"] == "boardgame",
                    let v = attributeDict["value"], let r = Int(v) {
                     bggRank = r
+                } else if attributeDict["type"] == "family",
+                          let name = attributeDict["name"],
+                          let v = attributeDict["value"], Int(v) != nil,
+                          let label = BGGXMLParser.subdomainLabels[name] {
+                    types.append(label)
                 }
             case "averageweight" where inRatings:
                 weight = Double(attributeDict["value"] ?? "") ?? 0
@@ -326,8 +348,12 @@ enum BGGXMLParser {
             textBuffer += string
         }
 
-        func parser(_ parser: XMLParser, didEndElement elementName: String,
-                     namespaceURI: String?, qualifiedName qName: String?) {
+        func parser(
+            _ parser: XMLParser,
+            didEndElement elementName: String,
+            namespaceURI: String?,
+            qualifiedName qName: String?
+        ) {
             switch elementName {
             case "thumbnail" where inItem:
                 thumbnail = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -335,12 +361,10 @@ enum BGGXMLParser {
                 image = textBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
             case "description" where inItem:
                 desc = BGGXMLParser.unescapeHTML(textBuffer.trimmingCharacters(in: .whitespacesAndNewlines))
-
             case "statistics":
                 inStatistics = false
             case "ratings":
                 inRatings = false
-
             case "results" where currentPollName == "suggested_numplayers":
                 playerGroups.append((
                     numPlayers: currentPlayerCount,
@@ -348,7 +372,6 @@ enum BGGXMLParser {
                     recommended: currentRecommended,
                     notRec: currentNotRec
                 ))
-
             case "poll":
                 if currentPollName == "language_dependence" {
                     languageDependence = computeLanguageDependence()
@@ -356,7 +379,6 @@ enum BGGXMLParser {
                     recommendedPlayers = computeRecommendedPlayers()
                 }
                 currentPollName = ""
-
             case "item":
                 // Skip items with malformed/missing id — a zero bggId would
                 // collide with the @Attribute(.unique) Game row in SwiftData.

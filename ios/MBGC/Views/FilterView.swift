@@ -1,287 +1,5 @@
 import SwiftUI
 
-// MARK: - Filter model
-
-enum FilterMode: String, CaseIterable, Identifiable, Codable {
-    case minimum = "Minimum"
-    case maximum = "Maximum"
-    case exactly = "Exactly"
-    var id: String { rawValue }
-
-    var color: Color {
-        switch self {
-        case .minimum: return .red
-        case .maximum: return .green
-        case .exactly: return .orange
-        }
-    }
-}
-
-enum FilterField: String, CaseIterable, Identifiable, Codable {
-    case rating        = "Rating"
-    case userRating    = "My Rating"
-    case weight        = "Complexity"
-    case playtime      = "Playtime"
-    case players       = "Players"
-    case bestFor       = "Best For"
-    case bggRank       = "BGG Rank"
-    case yearPublished = "Year Published"
-    case timesPlayed   = "Times Played"
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .rating:        return "star"
-        case .userRating:    return "star.fill"
-        case .weight:        return "scalemass"
-        case .playtime:      return "clock"
-        case .players:       return "person.2"
-        case .bestFor:       return "person.2.circle"
-        case .bggRank:       return "trophy"
-        case .yearPublished: return "calendar"
-        case .timesPlayed:   return "clock.arrow.circlepath"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .rating:        return .yellow
-        case .userRating:    return .orange
-        case .weight:        return .purple
-        case .playtime:      return .blue
-        case .players:       return .green
-        case .bestFor:       return .teal
-        case .bggRank:       return .yellow
-        case .yearPublished: return .orange
-        case .timesPlayed:   return .teal
-        }
-    }
-
-    var range: ClosedRange<Double> {
-        switch self {
-        case .rating, .userRating: return 1...10
-        case .weight:              return 1...5
-        case .playtime:            return 15...300
-        case .players, .bestFor:   return 1...10
-        case .bggRank:             return 1...5000
-        case .yearPublished:       return 1970...2026
-        case .timesPlayed:         return 0...200
-        }
-    }
-
-    var step: Double {
-        switch self {
-        case .rating, .userRating: return 0.5
-        case .weight:              return 0.1
-        case .playtime:            return 15
-        case .bggRank:             return 50
-        default:                   return 1
-        }
-    }
-
-    var unit: String? {
-        switch self {
-        case .playtime: return "min"
-        case .bestFor:  return "players"
-        default:        return nil
-        }
-    }
-
-    var isInteger: Bool {
-        switch self {
-        case .playtime, .players, .bestFor, .bggRank, .yearPublished, .timesPlayed:
-            return true
-        default:
-            return false
-        }
-    }
-
-    var defaultValue: Double {
-        switch self {
-        case .rating, .userRating: return 7
-        case .weight:              return 3
-        case .playtime:            return 60
-        case .players, .bestFor:   return 4
-        case .bggRank:             return 1000
-        case .yearPublished:       return 2015
-        case .timesPlayed:         return 5
-        }
-    }
-
-    func formatValue(_ v: Double) -> String {
-        isInteger ? "\(Int(v))" : String(format: "%.1f", v)
-    }
-}
-
-// MARK: - Checklist (set-based) filter fields
-
-enum SetFilterField: String, CaseIterable, Identifiable, Hashable, Codable {
-    case designers  = "Designers"
-    case artists    = "Artists"
-    case publishers = "Publisher"
-    case types      = "Types"
-    case categories = "Categories"
-    case mechanics  = "Mechanics"
-
-    var id: String { rawValue }
-
-    var icon: String {
-        switch self {
-        case .designers:  return "pencil.and.ruler"
-        case .artists:    return "paintpalette"
-        case .publishers: return "building.2"
-        case .types:      return "square.grid.2x2"
-        case .categories: return "tag"
-        case .mechanics:  return "gearshape"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .designers:  return .cyan
-        case .artists:    return .pink
-        case .publishers: return .brown
-        case .types:      return .indigo
-        case .categories: return .teal
-        case .mechanics:  return .mint
-        }
-    }
-
-    func values(from games: [Game]) -> [(String, Int)] {
-        var counts: [String: Int] = [:]
-        for game in games {
-            for v in gameValues(game) { counts[v, default: 0] += 1 }
-        }
-        return counts.map { ($0.key, $0.value) }.sorted { $0.1 > $1.1 }
-    }
-
-    func gameValues(_ game: Game) -> [String] {
-        switch self {
-        case .designers:  return game.designers ?? []
-        case .artists:    return game.artists ?? []
-        case .publishers: return game.publishers ?? []
-        case .types:      return game.types ?? []
-        case .categories: return game.categories ?? []
-        case .mechanics:  return game.mechanics ?? []
-        }
-    }
-}
-
-// MARK: - Language dependence levels
-
-struct LangLevel: Identifiable {
-    let level: Int
-    let title: String
-    let subtitle: String
-    let color: Color
-    let symbol: String
-    var id: Int { level }
-}
-
-let langLevels: [LangLevel] = [
-    LangLevel(level: 1, title: "No necessary in-game text",  subtitle: "Can be played in any language.",                      color: .green,                               symbol: "circle"),
-    LangLevel(level: 2, title: "Some necessary text",         subtitle: "Easy to recall or needs a small cheat sheet.",        color: .green,                               symbol: "triangle"),
-    LangLevel(level: 3, title: "Moderate in-game text",       subtitle: "Needs a reference sheet or translated aids.",         color: Color(red: 0.75, green: 0.6, blue: 0), symbol: "diamond"),
-    LangLevel(level: 4, title: "Extensive use of text",       subtitle: "Massive conversion needed to be playable.",           color: Color(red: 0.85, green: 0.45, blue: 0), symbol: "pentagon"),
-    LangLevel(level: 5, title: "All in-game text necessary",  subtitle: "Unplayable in another language.",                     color: .red,                                 symbol: "hexagon"),
-]
-
-// MARK: - Filter spec
-
-struct FilterSpec: Equatable, Codable {
-    var mode: FilterMode
-    var value: Double
-}
-
-// MARK: - GameFilters
-
-struct GameFilters: Equatable, Codable {
-    var specs: [FilterField: FilterSpec] = [:]
-    var setFilters: [SetFilterField: Set<String>] = [:]
-    var titleContains: String = ""
-    var languageLevels: Set<Int> = []
-
-    var isEmpty: Bool { specs.isEmpty && setFilters.isEmpty && titleContains.isEmpty && languageLevels.isEmpty }
-    var activeCount: Int { specs.count + setFilters.count + (titleContains.isEmpty ? 0 : 1) + (languageLevels.isEmpty ? 0 : 1) }
-
-    func apply(_ games: [Game]) -> [Game] {
-        guard !isEmpty else { return games }
-        return games.filter { passes($0) }
-    }
-
-    private func passes(_ game: Game) -> Bool {
-        if !titleContains.isEmpty {
-            let query = titleContains.trimmingCharacters(in: .whitespaces)
-            if !query.isEmpty, !game.name.localizedCaseInsensitiveContains(query) { return false }
-        }
-        if !languageLevels.isEmpty {
-            guard let v = game.languageDependence, languageLevels.contains(v) else { return false }
-        }
-        for (field, selected) in setFilters {
-            if !field.gameValues(game).contains(where: { selected.contains($0) }) { return false }
-        }
-        for (field, spec) in specs {
-            if !fieldMatches(field, spec: spec, game: game) { return false }
-        }
-        return true
-    }
-
-    private func fieldMatches(_ field: FilterField, spec: FilterSpec, game: Game) -> Bool {
-        func check(_ v: Double) -> Bool {
-            switch spec.mode {
-            case .minimum: return v >= spec.value
-            case .maximum: return v <= spec.value
-            case .exactly: return abs(v - spec.value) < 0.001
-            }
-        }
-
-        // Unknown values aren't filtered out — a missing field means "not enough info",
-        // not "exclude". Keeps games visible when BGG lacks weight/rating/etc.
-        switch field {
-        case .rating:
-            guard let v = game.rating else { return true }
-            return check(v)
-        case .userRating:
-            guard let v = game.userRating else { return true }
-            return check(v)
-        case .weight:
-            guard let v = game.weight else { return true }
-            return check(v)
-        case .playtime:
-            guard let v = game.playtime else { return true }
-            return check(Double(v))
-        case .players:
-            guard game.minPlayers != nil || game.maxPlayers != nil else { return true }
-            let mn = Double(game.minPlayers ?? game.maxPlayers ?? 0)
-            let mx = Double(game.maxPlayers ?? game.minPlayers ?? 0)
-            switch spec.mode {
-            case .minimum: return mx >= spec.value
-            case .maximum: return mn <= spec.value
-            case .exactly: return mn <= spec.value && spec.value <= mx
-            }
-        case .bestFor:
-            guard let rp = game.recommendedPlayers, !rp.isEmpty else { return true }
-            let n = Int(spec.value)
-            switch spec.mode {
-            case .minimum: return rp.contains { $0 >= n }
-            case .maximum: return rp.contains { $0 <= n }
-            case .exactly: return rp.contains(n)
-            }
-        case .bggRank:
-            // Lower rank = better. "maximum 500" → top-500 games. Unranked games pass through.
-            guard let v = game.bggRank else { return true }
-            return check(Double(v))
-        case .yearPublished:
-            guard let v = game.yearPublished else { return true }
-            return check(Double(v))
-        case .timesPlayed:
-            guard let v = game.numberOfPlays else { return true }
-            return check(Double(v))
-        }
-    }
-}
-
 // MARK: - FilterRows (embeddable sections — used by FilterView and SmartListEditor)
 
 /// Renders the enabled + other filter sections inline inside any List.
@@ -294,30 +12,52 @@ struct FilterRows: View {
     @State private var exactInputs: [FilterField: String] = [:]
     @State private var languageExpanded = false
 
-    private var activeSets: [SetFilterField]  { SetFilterField.allCases.filter { filters.setFilters[$0] != nil } }
-    private var inactiveSets: [SetFilterField] { SetFilterField.allCases.filter { filters.setFilters[$0] == nil } }
-    private var activeNumeric: [FilterField]   { FilterField.allCases.filter { filters.specs[$0] != nil } }
-    private var inactiveNumeric: [FilterField] { FilterField.allCases.filter { filters.specs[$0] == nil } }
+    // BGG-familiar order: classification → players/time → ratings → credits/dates.
+    // Single unified list so set filters, numeric filters, title, and language can be
+    // interleaved instead of always rendering as separate blocks.
+    private static let rowOrder: [FilterRowKind] = [
+        .set(.types), .set(.categories), .set(.mechanics),
+        .numeric(.players), .numeric(.playtime),
+        .numeric(.weight), .numeric(.bestFor),
+        .numeric(.rating), .numeric(.bggRank), .numeric(.userRating),
+        .language,
+        .set(.designers), .set(.artists), .set(.publishers),
+        .numeric(.yearPublished), .numeric(.timesPlayed),
+        .title,
+    ]
+
+    private func isActive(_ row: FilterRowKind) -> Bool {
+        switch row {
+        case .title:          return !filters.titleContains.isEmpty
+        case .language:       return !filters.languageLevels.isEmpty
+        case .set(let field): return filters.setFilters[field] != nil
+        case .numeric(let field): return filters.specs[field] != nil
+        }
+    }
 
     var body: some View {
         Group {
             if !filters.isEmpty {
                 Section("Enabled filters") {
-                    if !filters.titleContains.isEmpty { titleRow }
-                    if !filters.languageLevels.isEmpty { languageDependenceRow }
-                    ForEach(activeSets) { checklistRow($0) }
-                    ForEach(activeNumeric) { filterRow($0) }
+                    ForEach(Self.rowOrder.filter(isActive)) { rowView($0) }
                 }
             }
             Section(filters.isEmpty ? "Select filters" : "Other filters") {
-                if filters.titleContains.isEmpty { titleRow }
-                if filters.languageLevels.isEmpty { languageDependenceRow }
-                ForEach(inactiveSets) { checklistRow($0) }
-                ForEach(inactiveNumeric) { filterRow($0) }
+                ForEach(Self.rowOrder.filter { !isActive($0) }) { rowView($0) }
             }
         }
         .onChange(of: filters.isEmpty) { _, isEmpty in
             if isEmpty { exactInputs.removeAll(); languageExpanded = false }
+        }
+    }
+
+    @ViewBuilder
+    private func rowView(_ row: FilterRowKind) -> some View {
+        switch row {
+        case .title:              titleRow
+        case .language:           languageDependenceRow
+        case .set(let field):     checklistRow(field)
+        case .numeric(let field): filterRow(field)
         }
     }
 
@@ -425,29 +165,41 @@ struct FilterRows: View {
         let spec = filters.specs[field]
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: field.icon).frame(width: 24).foregroundStyle(field.color)
+                fieldIcon(field).frame(width: 24).foregroundStyle(field.color)
                 Text(field.rawValue).font(.body)
                 Spacer()
                 modeMenu(field, spec: spec)
             }
             if let spec {
-                if spec.mode == .exactly { exactlyInput(field) }
-                else { sliderControl(field, spec: spec) }
+                switch spec.mode {
+                case .exactly:
+                    exactlyInput(field)
+                case .between:
+                    betweenControl(field, spec: spec)
+                case .minimum, .maximum:
+                    sliderControl(field, spec: spec)
+                }
             }
         }
         .padding(.vertical, spec != nil ? 4 : 0)
         .animation(.easeInOut(duration: 0.2), value: spec != nil)
     }
 
+    @ViewBuilder
+    private func fieldIcon(_ field: FilterField) -> some View {
+        if field.isCustomImage { Image(field.icon) } else { Image(systemName: field.icon) }
+    }
+
     private func modeMenu(_ field: FilterField, spec: FilterSpec?) -> some View {
         Menu {
             Button("Off") { filters.specs[field] = nil; exactInputs[field] = nil }
-            ForEach(FilterMode.allCases) { mode in
-                Button(mode.rawValue) {
-                    let v = filters.specs[field]?.value ?? field.defaultValue
-                    filters.specs[field] = FilterSpec(mode: mode, value: v)
-                    exactInputs[field] = mode == .exactly ? field.formatValue(v) : nil
-                }
+            Divider()
+            modeButton(.minimum, field: field)
+            modeButton(.maximum, field: field)
+            modeButton(.exactly, field: field)
+            if field.supportsBetween {
+                Divider()
+                modeButton(.between, field: field)
             }
         } label: {
             HStack(spacing: 3) {
@@ -461,6 +213,19 @@ struct FilterRows: View {
         }
     }
 
+    private func modeButton(_ mode: FilterMode, field: FilterField) -> some View {
+        Button(mode.rawValue) {
+            let v = filters.specs[field]?.value ?? field.defaultValue
+            let upper = filters.specs[field]?.upperValue ?? defaultUpperValue(for: field, lower: v)
+            filters.specs[field] = FilterSpec(mode: mode, value: v, upperValue: mode == .between ? upper : nil)
+            exactInputs[field] = mode == .exactly ? field.formatValue(v) : nil
+        }
+    }
+
+    private func defaultUpperValue(for field: FilterField, lower: Double) -> Double {
+        min(field.range.upperBound, max(lower + field.step, field.defaultValue + field.step))
+    }
+
     private func sliderControl(_ field: FilterField, spec: FilterSpec) -> some View {
         VStack(spacing: 2) {
             Slider(
@@ -471,6 +236,44 @@ struct FilterRows: View {
             HStack {
                 Spacer()
                 Text(field.formatValue(spec.value) + (field.unit.map { " \($0)" } ?? ""))
+                    .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
+            }
+        }
+    }
+
+    private func betweenControl(_ field: FilterField, spec: FilterSpec) -> some View {
+        let upper = spec.upperValue ?? defaultUpperValue(for: field, lower: spec.value)
+        let lowerValue = min(spec.value, upper)
+        let upperValue = max(spec.value, upper)
+
+        return VStack(spacing: 6) {
+            Slider(
+                value: Binding(
+                    get: { lowerValue },
+                    set: { newValue in
+                        filters.specs[field]?.value = min(newValue, filters.specs[field]?.upperValue ?? upperValue)
+                    }
+                ),
+                in: field.range,
+                step: field.step
+            )
+            .tint(spec.mode.color)
+
+            Slider(
+                value: Binding(
+                    get: { upperValue },
+                    set: { newValue in
+                        filters.specs[field]?.upperValue = max(newValue, filters.specs[field]?.value ?? lowerValue)
+                    }
+                ),
+                in: field.range,
+                step: field.step
+            )
+            .tint(spec.mode.color)
+
+            HStack {
+                Spacer()
+                Text("\(field.formatValue(lowerValue)) – \(field.formatValue(upperValue))" + (field.unit.map { " \($0)" } ?? ""))
                     .font(.subheadline).foregroundStyle(.secondary).monospacedDigit()
             }
         }

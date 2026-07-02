@@ -1,0 +1,25 @@
+feature:
+  name: onboarding-settings
+  product: ios
+  description: Help the user set up the local-first iOS app and manage lightweight local preferences.
+
+components:
+  ONBOARDING:
+    requirements:
+      1: The app shows onboarding before the first completed setup.
+      2: The user can finish onboarding without importing games.
+      3: The user can start an import from onboarding.
+      4: The app does not show onboarding again after completion unless local state is reset.
+  SETTINGS:
+    requirements:
+      1: The app lets the user open import flows after onboarding.
+      2: The app stores the BGG username as a local preference.
+      3: The app lets the user update the BGG username without backend sync.
+      4: The app exposes local app actions without requiring login.
+
+constraints:
+  LOCAL_FIRST:
+    requirements:
+      1: Onboarding and settings do not require an account.
+      2: Onboarding and settings do not call the MBGC backend.
+      3: Local preferences remain available after app relaunch.

@@ -102,4 +102,34 @@ import Testing
 
         #expect(filters.apply([keeper, miss]).map(\.bggId) == [1])
     }
+
+    @Test func searchAndFilter_FILTER_SEARCH_9_timesPlayedBetweenIsInclusive() {
+        let low = game(1)
+        low.numberOfPlays = 2
+        let high = game(2)
+        high.numberOfPlays = 5
+        let miss = game(3)
+        miss.numberOfPlays = 6
+
+        var filters = GameFilters()
+        filters.specs[.timesPlayed] = FilterSpec(mode: .between, value: 2, upperValue: 5)
+
+        #expect(filters.apply([low, high, miss]).map(\.bggId) == [1, 2])
+    }
+
+    @Test func languageLevelsMatchExactlyNotGreaterThan() {
+        let games = (1...5).map { level -> Game in
+            let g = game(level)
+            g.languageDependence = level
+            return g
+        }
+
+        var single = GameFilters()
+        single.languageLevels = [1]
+        #expect(single.apply(games).map(\.bggId) == [1])
+
+        var firstTwo = GameFilters()
+        firstTwo.languageLevels = [1, 2]
+        #expect(firstTwo.apply(games).map(\.bggId) == [1, 2])
+    }
 }

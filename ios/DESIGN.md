@@ -36,7 +36,7 @@
 ┌────────────────────────────▼────────────────────────────┐
 │  BGGClient (actor)                                      │
 │  BGG XML API — /xmlapi2/collection, /xmlapi2/thing      │
-│  2 RPS · batches of 20 · 4-attempt retry                │
+│  5s pacing · batches of 20 · 4-attempt retry            │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -138,6 +138,14 @@ Sole network interface. All calls go to BGG's public XML API. Concurrency-safe b
 - `maxAttempts = 4` with exponential backoff
 
 **URLSession config:** 30 s request timeout, 120 s resource timeout.
+
+**Benchmarking / logging:** `perform(_:label:)` wraps `session.data` and emits a
+`Logger` (`subsystem: app.lumedina.mbgc`, `category: BGGClient`) `.debug` line per
+request — `HTTP <status> in <ms>ms, <bytes>` — visible in Console/Xcode while
+debugging, dropped in release. `ImportView.importFromBGG()` logs `Finished in X.Xs`
+(`ContinuousClock`) to the on-screen sync log, giving a per-collection reference
+point. Import time is rate-limit-bound: `T ≈ 5s × (1 + ceil(N/20))` for N new games.
+Measure before tuning `requestDelay`.
 
 #### Methods
 
@@ -492,6 +500,33 @@ ContentView.task → seedLibraryIfNeeded()
 | Swift version | Swift 6.2 strict concurrency — all actors/`@MainActor` must be consistent |
 | Simulator target | iPhone 17 Pro (iPhone 16 Pro not available in current environment) |
 | No third-party deps | All functionality is first-party; `Package.swift` must stay dependency-free |
+| **Design tokens** | All spacing, radii, typography, and surface colors must come from `Views/DesignTokens.swift`. No magic numbers for visual constants. |
+
+### Design Tokens (`Views/DesignTokens.swift`)
+
+Single source of truth for every visual constant. **Check here before hardcoding any `CGFloat`, `Color`, or `Font`.**
+
+| Enum | Tokens |
+|---|---|
+| `Spacing` | `xs(4) sm(8) md(12) lg(16) xl(20) xxl(24) section(32) screen(24) floatingNavReserved(60)` |
+| `Radius` | `small(12) medium(16) large(24) xlarge(32) pill(999)` |
+| `Typography` | `screenTitle sectionTitle cardTitle body bodyEmphasis metadata caption step tab` |
+| `Surface` | `background card elevated separator metadataText` |
+| `BrandAccent` | `color(.indigo) tint(.indigo @ 0.10)` |
+
+Reusable view components in the same file:
+
+| Component | Purpose |
+|---|---|
+| `GameMetadataRow` | Rating / players / playtime in one row |
+| `ChromeButton` | Circular neutral button (back, settings, menu) |
+| `SectionTitle` | 22pt semibold section headers |
+| `ScreenTitle` | 38pt bold hero title with optional subtitle |
+| `TagPill` | Compact chip for vibe / mechanic labels |
+| `SelectableCard` | Accent-fill card for quiz/finder selection steps |
+| `GameCoverImage` | Square cover thumbnail with placeholder |
+
+**Append-only rule:** add new tokens; never rename or change existing values — call sites reference them by name.
 
 ---
 

@@ -77,6 +77,16 @@ Full log: `docs/handoff/2026-06-25-ios-local-first.md`. Agent rules: `ios/AGENTS
 When given a task, agents MUST:
 - **Before debugging errors**: search the runbook for known fixes — `rg "<error text>" docs/runbook/`. If no match, document the fix after resolving by loading the `add-runbook` skill.
 
+## Compound Engineering workflow
+
+Use the Compound Engineering plugin for non-trivial engineering work:
+- Setup: after plugin install or update, restart Codex and run `/ce-setup` in this repo.
+- Features: `/ce-brainstorm` → `/ce-plan` → `/ce-work` → `/ce-simplify-code` → `/ce-code-review` → `/ce-compound`.
+- Bugs: search the runbook first, then use `/ce-debug`; follow with `/ce-code-review` and `/ce-compound` when the fix is non-trivial.
+- Autonomous flow: use `/lfg` only after `/ce-brainstorm` has produced grounded requirements.
+- Additional skills: `/ce-ideate`, `/ce-strategy`, `/ce-product-pulse`, `/ce-pov`, `/ce-doc-review`, `/ce-compound-refresh`, `/ce-resolve-pr-feedback`, `/ce-commit`, `/ce-commit-push-pr`, `/ce-worktree`, `/ce-promote`, `/ce-test-browser`, `/ce-test-xcode`, `/ce-polish`, `/ce-proof`, `/ce-dogfood`.
+- Plugin install notes: `docs/runbook/codex/compound-engineering-plugin.md`.
+
 ## Setup & Build
 
 > Full first-time setup guide: **[SETUP.md](./SETUP.md)**

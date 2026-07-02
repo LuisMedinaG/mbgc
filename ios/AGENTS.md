@@ -43,7 +43,8 @@ ios/MBGC/
 ├── MBGCApp.swift              App entry — modelContainer([Game, Collection])
 ├── Models/
 │   ├── Game.swift             @Model — bggId is @Attribute(.unique) primary key
-│   └── Collection.swift       @Model — isDefault=true reserved for Library
+│   ├── Collection.swift       @Model — isDefault=true reserved for Library
+│   └── FinderFlow.swift       Tonight picker flow; per-question logic behind FinderAxis
 ├── Networking/
 │   ├── BGGClient.swift        actor — fetchThings(ids:token:), 5s pacing, 4-attempt retry
 │   ├── BGGXMLParser.swift     XMLParser delegate for /xmlapi2/thing XML
@@ -77,6 +78,7 @@ ios/MBGC/
 - Library is sorted first via `createdAt = Date.distantPast`
 - **Never delete or rename Library** — check `!collection.isDefault` before any destructive op
 - Games are added to collections via `CollectionPickerView` after import — user picks the destination
+- Smart collections (`isSmart == true`): `games` relationship stays empty — always resolve membership via `Collection.smartGames(collections:allGames:)`, never read `.games` directly (it silently reads as 0)
 
 ### BGG username
 - Stored in `UserDefaults.standard` under key `"profile.bggUsername"`
@@ -104,6 +106,7 @@ ios/MBGC/
 | Search | ✅ Working (local-first @Query filter) |
 | BGG username sync (full) | ✅ Working (local-first via BGG public API) |
 | Vibes/Collections editing on game detail | ✅ Working (local-first via SwiftData) |
+| Smart Filter editor (`SmartListEditor`) — base lists + combine/intersect/subtract/exclude, filters scoped to resolved set | ✅ Working (local-first) |
 
 ---
 
@@ -132,6 +135,24 @@ xcodebuild -scheme MBGC \
 
 ---
 
+## Design tokens
+
+All visual constants live in `Views/DesignTokens.swift`. Use them for every UI change. No magic numbers in views.
+
+| Token enum | What it covers |
+|---|---|
+| `Spacing` | `xs(4) sm(8) md(12) lg(16) xl(20) xxl(24) section(32) screen(24)` |
+| `Radius` | `small(12) medium(16) large(24) xlarge(32) pill(999)` |
+| `Typography` | `screenTitle sectionTitle cardTitle body bodyEmphasis metadata caption step tab` |
+| `Surface` | `background card elevated separator metadataText` |
+| `BrandAccent` | `color(.indigo) tint(.indigo @ 0.10)` |
+
+Reusable components also in `DesignTokens.swift`: `GameMetadataRow`, `ChromeButton`, `SectionTitle`, `ScreenTitle`, `TagPill`, `SelectableCard`, `GameCoverImage`.
+
+**Rule:** if you're hardcoding a `CGFloat`, `Color`, or `Font` that matches an existing token, use the token. Add new tokens rather than mutating existing ones — names are referenced by call sites.
+
+---
+
 ## Critical rules
 
 **NEVER modify `.pbxproj` or `.xcodeproj/` directory contents.**
@@ -145,11 +166,19 @@ Exception: sheets must be standalone `View` structs with their own
 `@Environment(\.modelContext)` (SwiftUI doesn't reliably propagate context into computed
 view properties used as sheet content).
 
+**Finder questions stay behind `FinderAxis`.** Add a new Tonight picker question by
+adding a `FinderAxis` case, a private `FinderQuestionKind` struct in
+`Models/FinderFlow.swift`, and a `FinderConfig.funnel` entry. Do not introduce a
+full factory/registration system until Finder needs runtime-configurable questions,
+multi-select/free-text question types, or a larger question catalog.
+
 **Do NOT add or call a backend API client.** Any new iOS data feature must go
 through `BGGClient` or SwiftData directly.
 
-**BGG rate limiting.** `BGGClient` paces requests at ~5s via `Task.sleep`. Do not add
-parallel fetches without updating the rate-limit budget — BGG will 429/5xx the IP.
+**BGG rate limiting.** `BGGClient` paces requests at ~5s via `Task.sleep` (`requestDelay`).
+Do not add parallel fetches without updating the rate-limit budget — BGG will 429/5xx the IP.
+Import time is rate-limit-bound; benchmark it before tuning `requestDelay`. See DESIGN.md §3.1
+for the timing model and the DEBUG per-request `Logger` / `Finished in X.Xs` instrumentation.
 
 ---
 
