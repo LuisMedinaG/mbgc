@@ -12,6 +12,7 @@ struct GameDetailView: View {
     @State private var showAddToCollection = false
     @State private var isDescExpanded = false
     @State private var didDelete = false
+    private var orderedCollections: [Collection] { Collection.ordered(allCollections) }
 
     var body: some View {
         Group {
@@ -37,7 +38,7 @@ struct GameDetailView: View {
                 }
                 .safeAreaInset(edge: .bottom) { bottomBar(game) }
                 .sheet(isPresented: $showAddToCollection) {
-                    AddToCollectionSheet(game: game, allCollections: allCollections)
+                    AddToCollectionSheet(game: game, allCollections: orderedCollections)
                 }
             } else if let error = viewModel.errorMessage {
                 Text(error).foregroundStyle(.red)

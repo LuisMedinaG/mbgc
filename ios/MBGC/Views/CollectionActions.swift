@@ -65,9 +65,13 @@ struct AddGamesSheet: View {
                     if selected.contains(game.bggId) { selected.remove(game.bggId) }
                     else { selected.insert(game.bggId) }
                 } label: {
-                    HStack(spacing: 14) {
-                        CachedAsyncImage(url: URL(string: game.thumbnail ?? ""), size: 44, cornerRadius: 6)
-                        VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: Spacing.lg) {
+                        GameCoverImage(
+                            url: URL(string: game.thumbnail ?? game.image ?? ""),
+                            size: Sizing.compactThumbnail,
+                            cornerRadius: Radius.small
+                        )
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
                             if let year = game.yearPublished, year > 0 {
                                 Text(game.name).bold().font(.subheadline) + Text(" (\(String(format: "%d", year)))").font(.subheadline).foregroundColor(.secondary)
                             } else {
@@ -113,7 +117,7 @@ extension View {
     func pillLabel(_ tint: Color) -> some View {
         self.fontWeight(.semibold)
             .foregroundStyle(tint)
-            .padding(.vertical, 14)
-            .padding(.horizontal, 24)
+            .padding(.vertical, Spacing.md)
+            .padding(.horizontal, Spacing.xxl)
     }
 }

@@ -10,6 +10,7 @@ final class Collection {
     /// true = Library (default, cannot be deleted)
     var isDefault: Bool = false
     var createdAt: Date = Date()
+    var displayOrder: Double = 0
     var colorHex: String = ""   // "#RRGGBB"; empty = derive from name hash
     var iconName: String = ""   // SF Symbol name; empty = derive from name hash
 
@@ -72,9 +73,31 @@ final class Collection {
         self.desc = desc
         self.isDefault = isDefault
         self.createdAt = isDefault ? Date.distantPast : Date() // distantPast sorts Library before all user collections
+        self.displayOrder = isDefault ? 0 : Date().timeIntervalSinceReferenceDate
         if !isDefault {
             colorHex = Collection.colorPalette[Int.random(in: 0..<Collection.colorPalette.count)]
             iconName  = Collection.iconPalette[Int.random(in: 0..<Collection.iconPalette.count)]
+        }
+    }
+}
+
+extension Collection {
+    static func ordered(_ collections: [Collection]) -> [Collection] {
+        collections.sorted { lhs, rhs in
+            if lhs.isDefault != rhs.isDefault {
+                return lhs.isDefault
+            }
+            if lhs.displayOrder == rhs.displayOrder {
+                return lhs.createdAt < rhs.createdAt
+            }
+            return lhs.displayOrder < rhs.displayOrder
+        }
+    }
+
+    static func applyDisplayOrder(_ collections: [Collection]) {
+        for (index, collection) in collections.enumerated() {
+            // local-library.COLLECTIONS.6
+            collection.displayOrder = Double(index)
         }
     }
 }

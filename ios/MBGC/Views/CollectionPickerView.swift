@@ -14,6 +14,7 @@ struct CollectionPickerView: View {
     @State private var destinationError: String?
     @State private var showNewCollection = false
     @State private var newName = ""
+    private var orderedCollections: [Collection] { Collection.ordered(collections) }
 
     var body: some View {
         VStack(spacing: 32) {
@@ -28,7 +29,7 @@ struct CollectionPickerView: View {
             }
 
             Picker("", selection: $selectedID) {
-                ForEach(collections) { col in
+                ForEach(orderedCollections) { col in
                     Label(col.name, systemImage: col.isDefault ? "square.grid.2x2.fill" : "folder.fill")
                         .tag(Optional(col.persistentModelID))
                 }
@@ -79,11 +80,11 @@ struct CollectionPickerView: View {
     private func setDefaultSelection() {
         // Keep an existing valid pick — otherwise the @Query refresh after
         // createAndSelect() would clobber the just-created collection back to Library.
-        if let id = selectedID, collections.contains(where: { $0.persistentModelID == id }) {
+        if let id = selectedID, orderedCollections.contains(where: { $0.persistentModelID == id }) {
             return
         }
-        selectedID = collections.first(where: { $0.isDefault })?.persistentModelID
-            ?? collections.first?.persistentModelID
+        selectedID = orderedCollections.first(where: { $0.isDefault })?.persistentModelID
+            ?? orderedCollections.first?.persistentModelID
     }
 
     private func createAndSelect() {
@@ -103,7 +104,7 @@ struct CollectionPickerView: View {
 
     private func confirm() {
         guard let id = selectedID,
-              let col = collections.first(where: { $0.persistentModelID == id }) else { return }
+              let col = orderedCollections.first(where: { $0.persistentModelID == id }) else { return }
         LocalLibrary.add(games, to: col)
         do {
             try modelContext.save()
