@@ -44,7 +44,6 @@ jobs:
     outputs:
       go:  ${{ steps.filter.outputs.go }}
       web: ${{ steps.filter.outputs.web }}
-      ios: ${{ steps.filter.outputs.ios }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v4
@@ -57,8 +56,6 @@ jobs:
               - 'go.work'
             web:
               - 'web/**'
-            ios:
-              - 'ios/**'
 
   # ── Branch gate (PR only) ─────────────────────────────────────────────────
   # Enforces: feature/* → dev only, dev → main only.
@@ -81,7 +78,7 @@ jobs:
               exit 1
             fi
           elif [ "$target" = "dev" ]; then
-            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+' || echo "$branch" | grep -q "ios-review"; then
+            if echo "$branch" | grep -qE '^(feature|fix|bug|chore|refactor|hotfix)/.+'; then
               echo "✓ '$branch' → dev allowed"
             else
               echo "✗ Branch '$branch' cannot merge into 'dev'"
@@ -212,35 +209,6 @@ jobs:
         working-directory: web
         env:
           VITE_API_BASE_URL: ""
-
-  # ref: ci-cd.BUILD.3 — warnings are build-breaking (SWIFT_TREAT_WARNINGS_AS_ERRORS),
-  # since Swift 6 strict-concurrency issues (actor isolation, Sendable) surface as
-  # warnings or errors depending on settings and are easy to miss locally.
-  ios:
-    name: iOS
-    runs-on: macos-15
-    timeout-minutes: 15
-    needs: changes
-    if: needs.changes.outputs.ios == 'true' || github.event_name != 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install XcodeGen
-        run: brew install xcodegen
-      - name: Create secrets config
-        env:
-          BGG_TOKEN: ${{ secrets.BGG_TOKEN }}
-        run: printf 'BGG_TOKEN = %s\n' "$BGG_TOKEN" > Secrets.xcconfig
-        working-directory: ios
-      - name: Generate project
-        run: xcodegen generate
-        working-directory: ios
-      - name: Build (warnings as errors)
-        run: |
-          xcodebuild build \
-            -scheme MBGC \
-            -destination 'generic/platform=iOS Simulator' \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
-        working-directory: ios
 
   # ── Deploy (push/dispatch only, gated on build success) ───────────────────
 

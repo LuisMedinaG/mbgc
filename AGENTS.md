@@ -2,21 +2,17 @@
 
 ## Project Overview
 
-Personal board game collection app. Go API + React frontend + SwiftUI iOS app.
+Personal board game collection app. Go API + React frontend.
+
+> The SwiftUI iOS app lives in its own repo: **[LuisMedinaG/mbgc-ios](https://github.com/LuisMedinaG/mbgc-ios)** (split out 2026-07-01).
 
 ```
 mbgc/
 ├── services/
 │   └── api/             Single consolidated Go API (auth, games, collections, importer, profile)
 ├── web/                 React + Vite + TypeScript + Tailwind
-├── ios/                 SwiftUI iOS app — LOCAL-FIRST, no backend (Swift 6.2, SwiftData)
-│   ├── AGENTS.md        iOS architecture, data model, dead code map, next steps
-│   └── MBGC/
-│       ├── Models/      Game.swift, Collection.swift (SwiftData @Model)
-│       └── Networking/  BGGClient.swift, BGGXMLParser.swift, APIClient.swift (dead)
 ├── docs/
-│   └── handoff/
-│       └── 2026-06-25-ios-local-first.md   Full iOS migration log (Sessions 1–3)
+│   └── handoff/         Handoff logs
 ├── infra/               Terraform — GCP Cloud Run, Cloudflare, Supabase
 │   └── scripts/
 │       ├── bootstrap.sh       one-time infra provisioning + GitHub secrets sync
@@ -41,20 +37,6 @@ services/api  (JWT validation via JWKS + all route handlers)
 ```
 
 JWT validation inline in `services/api/internal/jwt/` — no gateway proxy.
-
-```
-iOS app  (local-first — does NOT call services/api)
-      │
-      ├──▶  BGG XML API (public, no auth)
-      │       https://boardgamegeek.com/xmlapi2/thing?id=...&stats=1
-      │       BGGClient actor — 2 RPS, 4-attempt retry, batch 20
-      │
-      └──▶  SwiftData (on-device SQLite)
-              Models: Game (@bggId unique), Collection (Library seeded on first launch)
-```
-
-iOS architecture changed 2026-06-25 — login removed, no JWT, no backend calls.
-Full log: `docs/handoff/2026-06-25-ios-local-first.md`. Agent rules: `ios/AGENTS.md`.
 
 ## CI/CD
 
@@ -90,7 +72,6 @@ Use the Compound Engineering plugin for non-trivial engineering work:
 ## Setup & Build
 
 > Full first-time setup guide: **[SETUP.md](./SETUP.md)**
-> iOS-specific build/test: **[ios/AGENTS.md](./ios/AGENTS.md)**
 
 ```sh
 # Root Makefile — primary entry points:
@@ -112,10 +93,6 @@ make dev           # Vite dev server
 make build         # tsc -b && vite build
 make lint
 make test-e2e      # Playwright — mocked, no backend needed; spins up its own isolated Vite server
-
-# iOS (from ios/ — see ios/AGENTS.md for full details):
-# Primary: xcode-gen MCP tasks `build_sim` / `test_sim`
-# Fallback: xcodebuild -scheme MBGC -destination 'platform=iOS Simulator,name=iPhone 16 Pro' build
 ```
 
 ### Admin user
@@ -191,9 +168,6 @@ SUPABASE_JWT_SECRET=    # leave empty — local issues ES256, JWKS-only works
 - Server state via TanStack Query (`@tanstack/react-query` v5) — use `useQuery`/`useMutation`; never hand-roll `useState`+`useEffect` for API calls. Query keys in `web/src/lib/queryKeys.ts`, client config in `web/src/lib/queryClient.ts`
 - Hook conventions: `useGames(filters)`, `useGame(id)`, `useCollections()`, `useProfile()` — one hook per domain, exported from `web/src/hooks/`
 
-**Swift (iOS):**
-- See [ios/AGENTS.md](./ios/AGENTS.md) for full iOS conventions — @Observable, SwiftData, Keychain, URLSession async/await, xcodegen
-
 ## Git Workflow
 
 ```
@@ -231,7 +205,6 @@ refactor/*
 - Expose raw `err.Error()` from DB or internal code to HTTP responses
 - Commit secrets, `.env` files, or service account credentials
 - Use `--no-verify` on commits
-- Manually edit `.pbxproj` or `.xcodeproj/` in iOS app — hook prevents this by design. Use `xcodegen generate` in `ios/` directory instead
 
 <!-- lean-ctx-compression -->
 OUTPUT STYLE: dense
